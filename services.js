@@ -1,27 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const servicesData = window.appData.services || [];
-
-    // --- Check for a newly created service from create-service.html ---
-    const newlyCreatedServiceJSON = sessionStorage.getItem('newlyCreatedService');
-    if (newlyCreatedServiceJSON) {
-        const newService = JSON.parse(newlyCreatedServiceJSON);
-        // Add the new service to the top of the data array
-        servicesData.unshift(newService);
-        // Clean up sessionStorage
-        sessionStorage.removeItem('newlyCreatedService');
-    }
-
-    // --- Check for an updated service from service-profile.html ---
-    const updatedServiceJSON = sessionStorage.getItem('updatedServiceData');
-    if (updatedServiceJSON) {
-        const updatedService = JSON.parse(updatedServiceJSON);
-        const index = servicesData.findIndex(s => s.serviceId === updatedService.serviceId);
-        if (index !== -1) {
-            servicesData[index] = updatedService; // Replace the old data
-        }
-        // Clean up sessionStorage
-        sessionStorage.removeItem('updatedServiceData');
-    }
+    const db = firebase.firestore();
+    let servicesData = window.appData.services || [];
 
     const appointmentsData = window.appData.appointments || [];
     const walkinsData = window.appData.walkins || [];
@@ -29,6 +8,76 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('service-search');
     const categoryFilter = document.getElementById('service-category-filter');
     const deleteSelectedBtn = document.getElementById('delete-selected-services-btn');
+
+    if (!servicesTbody) return;
+
+    // --- Fetch Services from Firestore ---
+    const fetchServicesFromFirestore = async () => {
+        try {
+            const snapshot = await db.collection('services').get();
+            
+            if (snapshot.empty) {
+                console.log('No services found in Firestore.');
+                servicesData = [];
+            } else {
+                servicesData = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    const imageUrl = data.imageUrl || data.image || data.bannerUrl || null;
+                    console.log('Service data from Firestore:', doc.id, {
+                        service: data.service || data.serviceName,
+                        imageUrl: imageUrl,
+                        allData: data
+                    });
+                    return {
+                        serviceId: doc.id,
+                        service: data.service || data.serviceName || 'Unknown Service',
+                        category: data.category || 'Uncategorized',
+                        imageUrl: imageUrl,
+                        featured: data.featured || false,
+                        availability: data.availability || 'Available',
+                        small: data.small || null,
+                        medium: data.medium || null,
+                        large: data.large || null,
+                        xLarge: data.xLarge || null,
+                        pricingScheme: data.pricingScheme || 'Car Sizes',
+                        notes: data.notes || '',
+                        ...data
+                    };
+                });
+                console.log('Services loaded from Firestore:', servicesData);
+            }
+            
+            // After fetching from Firestore, check for newly created or updated services from sessionStorage
+            const newlyCreatedServiceJSON = sessionStorage.getItem('newlyCreatedService');
+            if (newlyCreatedServiceJSON) {
+                const newService = JSON.parse(newlyCreatedServiceJSON);
+                // Add the new service to the top of the data array
+                servicesData.unshift(newService);
+                // Clean up sessionStorage
+                sessionStorage.removeItem('newlyCreatedService');
+            }
+
+            // Check for an updated service from service-profile.html
+            const updatedServiceJSON = sessionStorage.getItem('updatedServiceData');
+            if (updatedServiceJSON) {
+                const updatedService = JSON.parse(updatedServiceJSON);
+                const index = servicesData.findIndex(s => s.serviceId === updatedService.serviceId);
+                if (index !== -1) {
+                    servicesData[index] = updatedService; // Replace the old data
+                }
+                // Clean up sessionStorage
+                sessionStorage.removeItem('updatedServiceData');
+            }
+
+            // Render the table after data is loaded
+            renderTable();
+        } catch (error) {
+            console.error('Error fetching services from Firestore:', error);
+            // Fallback to window.appData.services if Firestore fetch fails
+            servicesData = window.appData.services || [];
+            renderTable();
+        }
+    };
 
     // --- Delete Confirmation Modal Elements ---
     const confirmOverlay = document.getElementById('delete-confirm-overlay');
@@ -67,11 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (service.pricingScheme === 'Car Sizes' || !service.pricingScheme) { // Default to Car Sizes if not set
             if (service.small) { priceBreakdownHTML += `<div><small>5-Seater:</small> <strong>${formatPrice(service.small)}</strong></div>`; hasSpecificPrices = true; }
             if (service.medium) { priceBreakdownHTML += `<div><small>7-Seater:</small> <strong>${formatPrice(service.medium)}</strong></div>`; hasSpecificPrices = true; }
-            if (service.large) { priceBreakdownHTML += `<div><small>9-Seater:</small> <strong>${formatPrice(service.large)}</strong></div>`; hasSpecificPrices = true; }
-            if (service.xLarge) { priceBreakdownHTML += `<div><small>12-Seater:</small> <strong>${formatPrice(service.xLarge)}</strong></div>`; hasSpecificPrices = true; }
         } else if (service.pricingScheme === 'Motorcycle CCs') {
             if (service.small) { priceBreakdownHTML += `<div><small>399cc below:</small> <strong>${formatPrice(service.small)}</strong></div>`; hasSpecificPrices = true; }
-            if (service.xLarge) { priceBreakdownHTML += `<div><small>400cc above:</small> <strong>${formatPrice(service.xLarge)}</strong></div>`; hasSpecificPrices = true; }
+            if (service.medium) { priceBreakdownHTML += `<div><small>400cc above:</small> <strong>${formatPrice(service.medium)}</strong></div>`; hasSpecificPrices = true; }
         } else if (service.pricingScheme === 'Custom') {
             // For custom, just display all available prices with generic labels
             if (service.small) { priceBreakdownHTML += `<div><small>Small:</small> <strong>${formatPrice(service.small)}</strong></div>`; hasSpecificPrices = true; }
@@ -114,13 +161,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>
                 <div class="service-banner-cell">
                     <img
-                        src="${service.imageUrl || './images/placeholder-image.png'}"
-                        alt="${service.service}"
-                        onerror="this.onerror=null;this.src='./images/placeholder-image.png';"
+                        src="${service.imageUrl || './images/services.png'}"
+                        alt="${service.service || 'Service'}"
+                        class="service-table-image"
+                        onerror="this.src='./images/services.png';"
+                        style="max-width: 100%; height: auto; display: block;"
                     >
                 </div>
             </td>
-            <td>${service.serviceId}</td>
             <td>
                 <div class="service-name-cell">
                     <strong>${service.service}</strong>                    
@@ -355,6 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeModalBtn) closeModalBtn.addEventListener('click', closeDeleteConfirmModal);
     if (confirmOverlay) confirmOverlay.addEventListener('click', (e) => { if (e.target === confirmOverlay) closeDeleteConfirmModal(); });
 
-    // Initial render
-    renderTable();
+    // --- Fetch data from Firestore and render table ---
+    fetchServicesFromFirestore();
 });

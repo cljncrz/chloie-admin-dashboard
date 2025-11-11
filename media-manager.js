@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectAllCheckbox = document.getElementById('select-all-media');
     const deleteSelectedBtn = document.getElementById('delete-selected-media-btn');
     const filterButtons = document.querySelectorAll('.media-filter-btn');
+    // Add a button to fetch images directly from Storage for demonstration
+    const fetchFromStorageBtn = document.getElementById('fetch-from-storage-btn');
 
     // --- Media Detail Modal Elements ---
     const detailModalOverlay = document.getElementById('media-detail-modal-overlay');
@@ -26,9 +28,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const isPickerMode = urlParams.get('picker') === 'true';
     const openerId = urlParams.get('openerId'); // To identify which editor opened the manager
 
-    // This will be populated from Firestore
+    // This will be populated from Firestore or Storage
     let mediaData = [];
     let currentFilter = 'all'; // 'all', 'image', or 'video'
+
+    /**
+     * Fetches all images directly from Firebase Storage under the 'media' folder.
+     * This bypasses Firestore and lists all image files in the folder.
+     */
+    const fetchImagesFromStorage = async () => {
+        if (galleryLoader) mediaManagerContainer.classList.add('is-loading');
+        try {
+            // List all files under 'media/'
+            const listRef = storage.ref('media');
+            const res = await listRef.listAll();
+            // Only keep image files
+            const imageItems = res.items.filter(item => item.name.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i));
+            // Get download URLs and build mediaData
+            const imageData = await Promise.all(imageItems.map(async (item) => {
+                const url = await item.getDownloadURL();
+                return {
+                    id: item.fullPath, // Use storage path as id
+                    name: item.name,
+                    url: url,
+                    storagePath: item.fullPath,
+                    type: 'image',
+                    size: '', // Size not available from Storage listAll
+                    createdAt: null,
+                };
+            }));
+            mediaData = imageData;
+            renderGallery(false);
+        } catch (error) {
+            console.error('Error fetching images from Storage:', error);
+            noResultsEl.innerHTML = '<p>Error loading images from Storage. Please try again.</p>';
+            noResultsEl.style.display = 'block';
+        } finally {
+            if (galleryLoader) mediaManagerContainer.classList.remove('is-loading');
+        }
+    };
 
     const createMediaCard = (mediaItem) => {
         const card = document.createElement('div');
@@ -256,42 +294,102 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (galleryLoader) mediaManagerContainer.classList.add('is-loading');
 
+        let successCount = 0;
+
+        // Check if user is authenticated
+        const currentUser = firebase.auth().currentUser;
+        if (!currentUser) {
+            if (typeof showErrorToast === 'function') {
+                showErrorToast('You must be logged in to upload files.');
+            } else {
+                alert('You must be logged in to upload files.');
+            }
+            if (galleryLoader) mediaManagerContainer.classList.remove('is-loading');
+            return;
+        }
+
+        const API_URL = 'http://localhost:5000/api/upload';
+
         for (const file of files) {
-            const fileName = `${Date.now()}-${file.name}`;
-            const filePath = `media/${fileName}`;
-            const fileRef = storage.ref(filePath);
-
             try {
-                // 1. Upload the file to Firebase Storage
-                const uploadTask = await fileRef.put(file);
-                const downloadURL = await uploadTask.ref.getDownloadURL();
+                console.log(`Attempting to upload: ${file.name}`);
 
-                // 2. Create a document in Firestore
-                const newMediaDoc = {
-                    name: file.name,
-                    url: downloadURL,
-                    storagePath: filePath, // Store path for easy deletion
-                    type: file.type.startsWith('image') ? 'image' : 'video',
-                    size: formatFileSize(file.size),
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                };
+                // Convert file to base64
+                const fileData = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        // Extract base64 data without the "data:...;base64," prefix
+                        const base64 = reader.result.split(',')[1];
+                        resolve(base64);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
 
-                const docRef = await db.collection('media').add(newMediaDoc);
+                // Send to backend server
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fileName: file.name,
+                        fileData: fileData,
+                        fileType: file.type,
+                    }),
+                });
 
-                // 3. Add to local data array and re-render
-                mediaData.unshift({ id: docRef.id, ...newMediaDoc });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.details || errorData.error || 'Upload failed');
+                }
 
+                const result = await response.json();
+                console.log(`Upload successful: ${result.url}`);
+
+                // Add to local mediaData array
+                mediaData.unshift({
+                    id: result.id,
+                    name: result.name,
+                    url: result.url,
+                    storagePath: result.storagePath,
+                    type: result.type,
+                    size: result.size,
+                    createdAt: result.createdAt,
+                });
+
+                successCount++;
+                renderGallery(false);
+
+                if (typeof showSuccessToast === 'function') {
+                    showSuccessToast(`${file.name} uploaded successfully!`);
+                }
             } catch (error) {
-                console.error("Error uploading file:", error);
-                alert(`Failed to upload ${file.name}: ${error.message}. Please check the console for more details.`);
+                console.error('Error uploading file:', error);
+
+                // Check if server is running
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    if (typeof showErrorToast === 'function') {
+                        showErrorToast('Backend server is not running. Start it with: npm start');
+                    } else {
+                        alert('Error: Backend server is not running.\n\nTo start the server:\n1. Open terminal\n2. Run: npm install\n3. Run: npm start');
+                    }
+                    break; // Stop trying other files
+                } else {
+                    if (typeof showErrorToast === 'function') {
+                        showErrorToast(`Failed to upload ${file.name}: ${error.message}`);
+                    } else {
+                        alert(`Failed to upload ${file.name}: ${error.message}`);
+                    }
+                }
             }
         }
 
-        // Re-render the gallery without a loader for a snappy update
-        renderGallery(false);
+        // Hide loader
         if (galleryLoader) mediaManagerContainer.classList.remove('is-loading');
-        if (typeof showSuccessToast === 'function') {
-            showSuccessToast(`${files.length} file(s) uploaded successfully!`);
+
+        if (successCount > 0) {
+            renderGallery(false);
         }
     };
 
@@ -324,24 +422,54 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Deletes media items from Firestore and Firebase Storage.
+     * Deletes media items from Firestore and Firebase Storage via backend API.
      * @param {string[]} idsToDelete - An array of Firestore document IDs to delete.
      */
     const deleteMediaItems = async (idsToDelete) => {
-        const batch = db.batch();
-        const itemsToDelete = mediaData.filter(item => idsToDelete.includes(item.id));
+        const API_URL = 'http://localhost:5000/api/media';
 
-        for (const item of itemsToDelete) {
-            // Delete from Firestore
-            const docRef = db.collection('media').doc(item.id);
-            batch.delete(docRef);
-            // Delete from Storage
-            if (item.storagePath) {
-                await storage.ref(item.storagePath).delete().catch(err => console.error(`Failed to delete ${item.storagePath} from storage:`, err));
+        for (const id of idsToDelete) {
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.details || errorData.error || 'Delete failed');
+                }
+
+                console.log(`Deleted media item: ${id}`);
+                
+                if (typeof showSuccessToast === 'function') {
+                    showSuccessToast(`Media deleted successfully!`);
+                }
+            } catch (error) {
+                console.error('Error deleting media item:', error);
+
+                // Check if server is running
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    if (typeof showErrorToast === 'function') {
+                        showErrorToast('Backend server is not running. Start it with: npm start');
+                    } else {
+                        alert('Error: Backend server is not running.\n\nTo start the server:\n1. Open terminal\n2. Run: npm start');
+                    }
+                    break; // Stop trying other files
+                } else {
+                    if (typeof showErrorToast === 'function') {
+                        showErrorToast(`Failed to delete media: ${error.message}`);
+                    } else {
+                        alert(`Failed to delete media: ${error.message}`);
+                    }
+                }
             }
         }
-        await batch.commit();
-        await fetchMedia(); // Refetch the data to ensure consistency
+
+        // Refetch the data to ensure consistency
+        await fetchMedia();
     };
     // --- Event Listeners ---
     if (searchInput) {
@@ -439,4 +567,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial Render
     fetchMedia();
+
+    // Add event listener for the fetch-from-storage button if present
+    if (fetchFromStorageBtn) {
+        fetchFromStorageBtn.addEventListener('click', fetchImagesFromStorage);
+    }
 });

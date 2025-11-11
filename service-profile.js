@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Image Update Logic ---
     const renderImage = () => {
-        const placeholderUrl = './images/placeholder-image.png';
+        const placeholderUrl = './images/services.png';
         imageElement.src = serviceData.imageUrl || placeholderUrl;
         imageElement.onerror = () => { imageElement.src = placeholderUrl; };
     };

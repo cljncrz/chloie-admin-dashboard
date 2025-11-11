@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Populate Image
     const renderImage = () => {
-        const placeholderUrl = './images/placeholder-image.png';
+        const placeholderUrl = './images/services.png';
         imageElement.src = promoData.imageUrl || placeholderUrl;
         imageElement.onerror = () => { imageElement.src = placeholderUrl; };
     };

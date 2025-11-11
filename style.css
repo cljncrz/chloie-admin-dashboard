@@ -859,6 +859,32 @@ main .insights::-webkit-scrollbar-thumb {
     text-align: center;
 }
 
+/* Price Breakdown Styling */
+.price-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.price-breakdown > div,
+.price-notes {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    line-height: 1.4;
+}
+
+.price-breakdown small {
+    min-width: 60px;
+}
+
+.service-banner-cell,
+.service-name-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
 .show-all-link {
     text-align: center;
     display: block;
