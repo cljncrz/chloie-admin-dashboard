@@ -1,0 +1,5535 @@
+/* ================== GOOGLE FONTS ================== */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* ================== CSS VARIABLES ================== */
+:root {
+    --color-primary: #7F1618;
+    --color-danger: #d9534f; /* A clear, standard red for danger actions */
+    --color-toast-success: #349a78; /* A distinct green for toast notifications */
+    --color-success: #ffff; /* Corrected from #ffff to a visible green */
+    --color-warning: #ffff;
+    --color-white: #ffffff; 
+    --color-info-dark: #000000; /* Changed to dark for light mode visibility */
+    --color-info-light: #dce1eb;
+    --color-dark: #363949;
+    --color-light: rgba(132, 139, 200, 0.18);
+    --color-primary-variant: #6e1315;
+    --color-danger-variant: #bf0010;
+    --color-success-variant: #349a78;
+    --color-warning-variant: #b07e33;
+    --color-dark-variant: #1f1f1f; /* Restored to a lighter grey */
+    --color-background: #f6f6f9;
+
+    --color-star-rating: #ffc107; /* Gold color for stars */
+    --card-border-radius: 2rem;
+    --border-radius-1: 0.4rem;
+    --border-radius-2: 0.8rem;
+    --border-radius-3: 1.2rem;
+
+    --card-padding: 1.8rem;
+    --padding-1: 1.2rem;
+
+    --box-shadow: 0 10px 25px rgba(0, 0, 0, 0.07);
+
+    /* Scrollbar Colors */
+    --scrollbar-track-color: transparent;
+    --scrollbar-thumb-color: rgba(132, 139, 200, 0.4);
+    --scrollbar-thumb-hover-color: rgba(132, 139, 200, 0.6);
+
+    /* Chart Specific Colors (Light Mode) */
+    --chart-text-color: #363949; /* Dark text for light mode */
+    --chart-grid-color: rgba(132, 139, 200, 0.18); /* Subtle grid lines */
+    --chart-header-bg: var(--color-white); /* Match card background */
+    --chart-header-border: var(--color-light); /* Use standard light border */
+}
+
+/* ================== DARK THEME VARIABLES ================== */
+.dark-theme-variables {
+    --color-background: #181a1e;
+    --color-white: #202528;
+    --color-info-dark: #ffffff; /* Lighter grey for dark mode text */
+    --color-dark: #ffffff;
+    --color-dark-variant: #eeeeee;
+    --color-light: rgba(187, 181, 181, 0.15); /* Changed to a light transparent color for dark mode */
+    --box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    --color-success-variant: #349a78;
+    --color-success: #ffff;
+    --color-warning: #ffff;
+    --color-warning-variant: #b07e33;
+    
+    /* Chart Specific Colors (Dark Mode) */
+    --chart-text-color: #e0e0e0; /* A bright, readable light gray for text */
+    --chart-grid-color: rgba(255, 255, 255, 0.2); /* A visible but not distracting grid line */
+    --chart-header-bg: #2c2f33; /* A slightly lighter background for the chart header */
+    --chart-header-border: #42464d; /* A subtle border for the chart header */
+
+    /* Scrollbar Colors */
+    --scrollbar-track-color: transparent;
+    --scrollbar-thumb-color: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover-color: rgba(255, 255, 255, 0.35);
+}
+
+/* ================== GENERAL STYLES ================== */
+* {
+    margin: 0;
+    padding: 0;
+    outline: 0;
+    appearance: none;
+    border: 0;
+    text-decoration: none;
+    list-style: none;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 14px;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color); /* For Firefox */
+}
+
+/* ================== CUSTOM SCROLLBAR (Webkit) ================== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent; /* Make track invisible */
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb-color);
+    border-radius: var(--border-radius-1);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover-color);
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.88rem;
+    background: var(--color-background);
+    user-select: none;
+    overflow-x: hidden;
+    color: var(--color-dark);
+}
+
+body.modal-open {
+    overflow: hidden;
+}
+
+.container {
+    display: grid;
+    width: 96%;
+    margin: 0 auto;
+    gap: 1.8rem;
+    grid-template-columns: 15rem auto;
+}
+
+a {
+    color: var(--color-dark);
+}
+
+img {
+    display: block;
+    width: 100%;
+}
+
+h1 {
+    font-weight: 800;
+    font-size: 1.8rem;
+}
+
+h2 {
+    font-size: 1.4rem;
+}
+
+h3 {
+    font-size: 0.87rem;
+}
+
+.text-muted {
+    color: var(--color-info-dark);
+}
+
+.primary {
+    color: var(--color-primary);
+}
+.danger {
+    color: var(--color-danger);
+}
+.success {
+    color: var(--color-success);
+}
+.warning {
+    color: var(--color-warning);
+}
+.text-center {
+    text-align: center;
+}
+
+/* ================== SIDEBAR ================== */
+aside {
+    height: 100vh;
+    position: sticky;
+    top: 0;
+}
+
+aside .sidebar-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1.4rem;
+}
+
+aside .logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.8rem;
+}
+
+aside .logo img {
+    width: 100%;
+    max-width: 13rem;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 90.2));
+    transition: all 300ms ease;
+}
+
+.dark-theme-variables aside .logo img {
+    filter: none; /* No shadow in dark mode */
+}
+
+aside .sidebar-close {
+    display: none;
+}
+
+aside .sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    height: 86vh;
+    position: relative; /* Changed from top: 3rem */
+    top: 3rem;
+}
+
+aside h3 {
+    font-weight: 500;
+}
+
+aside .sidebar-menu a {
+    display: flex;
+    color: var(--color-info-dark);
+    margin-left: 2rem;
+    gap: 1rem;
+    align-items: center;
+    position: relative;
+    height: 3.7rem;
+    transition: all 300ms ease;
+}
+
+aside .sidebar-menu a span {
+    font-size: 1.6rem;
+    transition: all 300ms ease;
+}
+
+aside .sidebar-menu a.active {
+    background: var(--color-light);
+    color: var(--color-primary);
+    margin-left: 0;
+}
+
+aside .sidebar-menu a.active:before {
+    content: '';
+    width: 6px;
+    height: 100%;
+    background: var(--color-primary);
+}
+
+aside .sidebar-menu a.active span {
+    color: var(--color-primary);
+}
+
+.dark-theme-variables aside .sidebar-menu a.active h3 {
+    color: #ffffff; /* Make text white in dark mode */
+}
+
+
+aside .sidebar-menu a:hover {
+    color: var(--color-primary);
+}
+
+/* Make the h3 a positioning context for the badge */
+aside .sidebar-menu a h3 {
+    position: relative;
+}
+
+/* New style for the unread count badge in the sidebar */
+aside .sidebar-menu a .message-count {
+    background: var(--color-danger);
+    color: white;
+    padding: 2px 6px;
+    font-size: 11px;
+    border-radius: var(--border-radius-1);
+    /* Position it absolutely next to the text */
+    position: absolute;
+    top: 50%;
+    right: -2.5rem; /* Adjust as needed */
+    transform: translateY(-50%);
+    display: none; /* Hidden by default */
+}
+
+aside .sidebar-menu a.active .message-count {
+    background: var(--color-primary);
+    color: var(--color-white); /* Ensure text is white on the primary background */
+}
+
+aside .sidebar-menu a:hover span {
+    margin-left: 1rem;
+}
+
+.action-icon-btn {
+    background: transparent;
+    cursor: pointer;
+    color: var(--color-info-dark);
+    transition: all 300ms ease;
+    padding: 0.2rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-icon-btn:hover {
+    background: var(--color-light);
+    color: var(--color-primary);
+}
+
+.action-icon-btn:disabled {
+    cursor: not-allowed;
+    color: var(--color-info-light);
+    background: transparent;
+}
+
+/* ================== MAIN CONTENT ================== */
+main {
+    margin-top: 1.4rem;
+}
+
+main .page {
+    display: none;
+}
+
+main .page.active {
+    display: block;
+    animation: fadeIn 0.5s ease-in-out;
+    /* padding: 20px; */ /* This padding is causing layout issues on grid pages */
+}
+
+main .page h2 {
+    margin-bottom: 1rem;
+}
+
+/* Add spacing between elements on a page, like on the appointments page */
+#appointments-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+main .insights {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap; /* Ensure cards stay in a single line for scrolling */
+    gap: 1.6rem;
+    padding-bottom: 1rem; /* Add space for the scrollbar */
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: thin;       /* Firefox */
+    scrollbar-color: #b3b2b2 var(--scrollbar-track-color); /* Firefox */
+}
+
+/* Specific styles for the reviews page insights */
+#reviews-page-insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    scrollbar-color: #b3b2b2 var(--scrollbar-track-color); /* Firefox */
+}
+
+/* Specific styles for the reviews page insights */
+#reviews-page-insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    margin-bottom: 1.6rem;
+}
+
+/* Stat cards on the reviews page */
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.stat-card .material-symbols-outlined {
+    font-size: 3rem;
+    background: var(--color-primary);
+    color: white;
+    padding: 1rem;
+    border-radius: 50%;
+}
+
+.stat-card:nth-child(2) .material-symbols-outlined {
+    background: var(--color-star-rating);
+}
+
+.stat-card:nth-child(3) .material-symbols-outlined {
+    background: var(--color-success-variant);
+}
+
+.stat-card h3 {
+    font-size: 1rem;
+}
+/* Base styles for all insight cards (dashboard, sales, etc.) */
+.insights > .card {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--box-shadow);
+    flex: 1 0 300px; /* Allow growing, don't shrink, with a base size */
+    min-width: 280px; /* Ensure cards don't get too small */
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 300ms ease;
+}
+
+/* Animation properties specifically for the dashboard */
+.dashboard .insights > .card {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+main .insights > .card.visible {
+    opacity: 1;
+    transform: translateY(0)
+}
+
+main .insights > .card:hover {
+    box-shadow: none
+}
+
+main .insights > .card span {
+    background: var(--color-primary);
+    padding: 0.5rem;
+    border-radius: 50%;
+    color: var(--color-white);
+    font-size: 2rem;
+}
+
+/* Specific icon colors for each card */
+main .insights > .card.sales .card-header span {
+    background: var(--color-primary);
+}
+main .insights > .card.bookings .card-header span {
+    background: var(--color-danger-variant);
+}
+main .insights > .card.completed .card-header span {
+    background: var(--color-success-variant);
+}
+
+/* New styles for the redesigned card structure */
+.insights > .card .card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.insights > .card h1 {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 2.2rem; /* Make the number larger */
+    flex-grow: 1; /* Allow it to push the footer down */
+}
+
+.insights > .card .card-footer {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.insights > .card .trend {
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--border-radius-1);
+    font-size: 0.8rem;
+}
+
+.insights > .card .trend.positive {
+    background: var(--color-success-variant);
+    color: var(--color-success);
+}
+
+.dashboard .insights > .card .trend.negative {
+    background: var(--color-danger-variant);
+    color: var(--color-danger);
+}
+
+main .insights h3 {
+    font-size: 1rem;
+}
+
+/* Appointment Page Insights */
+#appointment-page-insights { /* Override grid to enable horizontal scroll like dashboard */
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 1rem; /* Space for scrollbar */
+    gap: 1.6rem;
+    margin-bottom: -0rem;
+}
+
+/* Specific icon colors for appointment stats */
+#appointment-page-insights .stat-card:nth-child(1) .material-symbols-outlined {
+    background: var(--color-primary); /* Total */
+}
+#appointment-page-insights .widget-card.stat-card:nth-child(2) .material-symbols-outlined {
+    background: var(--color-warning-variant); /* Pending */
+}
+#appointment-page-insights .widget-card.stat-card:nth-child(3) .material-symbols-outlined {
+    background: var(--color-primary-variant); /* In Progress */
+}
+#appointment-page-insights .widget-card.stat-card:nth-child(4) .material-symbols-outlined {
+    background: var(--color-success-variant); /* Completed */
+}
+#appointment-page-insights .widget-card.stat-card:nth-child(5) .material-symbols-outlined {
+    background: var(--color-danger-variant); /* Cancelled */
+}
+
+/* Custom Scrollbar for Insights */
+main .insights::-webkit-scrollbar {
+    height: 8px;
+}
+
+main .insights::-webkit-scrollbar-track {
+    background: var(--scrollbar-track-color);
+    border-radius: var(--border-radius-1);
+}
+
+main .insights::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb-color);
+    border-radius: var(--border-radius-1);
+}
+
+/* Dashboard Grid & Recent Appointments Table */
+.dashboard-grid {
+    margin-top: 2rem;
+    display: grid;
+    grid-template-columns: minmax(0, 2.5fr) minmax(0, 1fr);
+    gap: 1.6rem;
+}
+
+.dashboard-main-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+    font-size: 1rem; /* Larger font size for main content */
+}
+
+.dashboard-right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+}
+
+.recent-appointments,
+.todo-list-card,
+.quick-actions-card,
+.widget-card {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--box-shadow);
+    transition: all 300ms ease;
+    font-size: 1rem; /* Increase base font size for card content */
+}
+
+.recent-appointments:hover,
+.todo-list-card:hover,
+.quick-actions-card:hover,
+.widget-card:hover {
+    box-shadow: none;
+}
+
+.recent-appointments h2, .todo-list-card h2, .quick-actions-card h2, .widget-card h2 {
+    margin-bottom: 0.8rem;
+}
+
+.recent-appointments table {
+    width: 100%;
+    text-align: left; /* Change default alignment for better readability */
+    border-collapse: collapse; /* Cleaner borders */
+}
+
+.recent-appointments table thead th {
+    color: var(--color-info-dark);
+    font-weight: 500;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--color-light);
+    white-space: nowrap;
+}
+
+/* New styles for the redesigned dashboard tables */
+.dashboard .recent-appointments:not(.walk-in-appointments) table tbody tr {
+    transition: background-color 300ms ease;
+    cursor: pointer;
+}
+
+.dashboard .recent-appointments:not(.walk-in-appointments) table tbody tr:hover {
+    background-color: var(--color-light);
+}
+
+.dashboard .recent-appointments:not(.walk-in-appointments) table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+.dashboard .recent-appointments:not(.walk-in-appointments) .customer-cell {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dashboard .recent-appointments:not(.walk-in-appointments) .customer-cell .profile-photo {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 50px;
+    margin-bottom: 0.8rem;
+}
+
+.table-controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
+.table-responsive-wrapper {
+    /* Let's make the table a bit taller on the dedicated page */
+    max-height: 55vh; 
+    overflow-y: auto;
+    margin-bottom: 1rem; /* Space between table and pagination */
+    position: relative;
+}
+
+.table-search-container {
+    flex-grow: 1; /* Allow it to grow, but not excessively */
+    max-width: 400px; /* Set a max-width for the search bar container */
+}
+
+.table-action-buttons {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.table-search-container input,
+.status-filter-container select {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: var(--color-light);
+    border: 1px solid var(--color-light);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.88rem;
+    color: var(--color-dark);
+    transition: all 300ms ease;
+}
+.table-search-container input:focus {
+    border-color: var(--color-primary-variant);
+}
+
+.status-filter-container {
+    min-width: 180px;
+}
+
+/* New Status Filter Buttons */
+.status-filter-container {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--color-light);
+    padding: 0.4rem;
+    border-radius: var(--border-radius-2);
+}
+
+.status-filter-btn {
+    padding: 0.6rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: transparent;
+    color: var(--color-dark-variant);
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all 300ms ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-filter-btn.active {
+    background: var(--color-white);
+    color: var(--color-primary);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.status-filter-btn .status-count {
+    background: var(--color-info-light);
+    color: var(--color-dark-variant);
+    padding: 0.1rem 0.5rem;
+    border-radius: 2rem;
+    font-size: 0.7rem;
+}
+
+.recent-appointments table thead th[data-sortable="true"],
+#reviews-table thead th[data-sortable="true"] {
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+}
+
+.recent-appointments table thead th[data-sortable="true"]::after {
+    content: ' \2195'; /* Up-down arrow */
+    font-size: 0.8em;
+    color: var(--color-info-light);
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: all 300ms ease;
+}
+
+.recent-appointments table thead th.sorted-asc::after,
+#reviews-table thead th.sorted-asc::after {
+    content: ' \25B2'; /* Up arrow */
+    color: var(--color-primary);
+}
+.recent-appointments table thead th.sorted-desc::after,
+#reviews-table thead th.sorted-desc::after {
+    content: ' \25BC'; /* Down arrow */
+    color: var(--color-primary);
+}
+
+.dark-theme-variables .recent-appointments table thead th.sorted-asc::after,
+.dark-theme-variables #reviews-table thead th.sorted-asc::after,
+.dark-theme-variables .recent-appointments table thead th.sorted-desc::after,
+.dark-theme-variables #reviews-table thead th.sorted-desc::after {
+    /* Use a brighter, more visible color for the active sort icon in dark mode */
+    color: #ff6b6b;
+}
+
+/* Custom Scrollbar for Table Wrapper */
+.table-responsive-wrapper::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-responsive-wrapper::-webkit-scrollbar-track {
+    background: var(--scrollbar-track-color);
+    border-radius: var(--border-radius-1);
+}
+.table-responsive-wrapper::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb-color);
+    border-radius: var(--border-radius-1);
+}
+
+
+.recent-appointments table tbody td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--color-light);
+    color: var(--color-dark-variant);
+}
+
+.recent-appointments table tbody tr:not(.no-results-row) {
+    cursor: pointer;
+}
+
+.clickable-row {
+    cursor: pointer;
+}
+
+.technician-select {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--border-radius-1);
+    background: var(--color-light);
+    border: 1px solid transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.8rem;
+    color: var(--color-dark-variant);
+    cursor: pointer;
+    transition: all 300ms ease;
+    justify-content: center;
+}
+
+.technician-select:focus {
+    background: var(--color-white);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-light);
+    
+}
+/* Status Select Dropdown Colors */
+.technician-select.available,
+.status-select-promo.active {
+    background: var(--color-success-variant);
+    color: var(--color-white);
+}
+
+.technician-select.unavailable,
+.status-select-promo.draft {
+    background: var(--color-warning-variant);
+    color: var(--color-white);
+}
+
+.status-select-promo.expired {
+    background: var(--color-danger-variant);
+    color: var(--color-white);
+}
+
+.technician-select.unavailable {
+    background: var(--color-warning-variant);
+    color: var(--color-white);
+}
+
+.dark-theme-variables .technician-select.available,
+.dark-theme-variables .technician-select.unavailable {
+    color: var(--color-dark-variant); /* Ensure text is light in dark mode */
+}
+
+/* Status Colors for Table Cells */
+.recent-appointments table tbody td .completed {
+    background: var(--color-success-variant);
+    color: var(--color-success);
+}
+.recent-appointments table tbody td .pending {
+    background: var(--color-warning-variant);
+    color: var(--color-warning);
+}
+.recent-appointments table tbody td .in-progress {
+    background: var(--color-primary-variant);
+    color: #ffffff;
+}
+.recent-appointments table tbody td .cancelled {
+    background: var(--color-danger-variant);
+    color: var(--color-danger);
+}
+
+.recent-appointments table tbody td .completed,
+.recent-appointments table tbody td .pending,
+.recent-appointments table tbody td .in-progress,
+.recent-appointments table tbody td .cancelled {
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--border-radius-1);
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.recent-appointments table tbody tr:last-child td {
+    border: none;
+}
+
+.recent-appointments .no-results-row {
+    display: none; /* Hidden by default */
+    text-align: center;
+}
+
+.show-all-link {
+    text-align: center;
+    display: block;
+    margin: 1rem auto;
+    color: var(--color-primary);
+   
+}
+
+.dark-theme-variables .show-all-link {
+        color: #ffffff;
+    }
+
+/* Table Pagination */
+.table-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-light);
+}
+
+.pagination-btn {
+    background: var(--color-light);
+    color: var(--color-dark-variant);
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-1);
+    cursor: pointer;
+    transition: all 300ms ease;
+    font-family: 'Poppins', sans-serif;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: var(--color-primary);
+    color: white;
+}
+
+.pagination-btn:disabled {
+    background: var(--color-light);
+    color: var(--color-info-light);
+    cursor: not-allowed;
+}
+
+/* Table Loader Animation */
+.table-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.5);
+    z-index: 5;
+    display: none; /* Hidden by default */
+    align-items: center;
+    justify-content: center;
+}
+
+.dark-theme-variables .table-loader {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.table-loader.loading {
+    display: flex;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--color-light);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* To-Do List */
+.todo-list-card .todo-item {
+    background: var(--color-light);
+    border-radius: var(--border-radius-2);
+    padding: 0.8rem 1rem;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 1rem;
+    margin-bottom: 0.7rem;
+}
+
+.todo-list-card .todo-item .icon {
+    padding: 0.6rem;
+    background: var(--color-primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+}
+
+.todo-list-card .todo-item .details h3 {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.todo-list-card .todo-item.completed .details h3 {
+    text-decoration: line-through;
+    color: var(--color-info-dark);
+}
+
+.todo-list-card .todo-item.completed .icon {
+    background: var(--color-success);
+}
+
+.todo-list-card .todo-item.removing {
+    animation: fadeOut 0.4s ease forwards;
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        height: 0;
+        padding: 0;
+        margin: 0;
+    }
+}
+
+.todo-list-card .todo-item.new-item {
+    animation: fadeInItem 0.5s ease-out forwards;
+}
+
+@keyframes fadeInItem {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.todo-list-page-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.todo-list-card .delete-todo-btn {
+    margin-left: auto;
+    cursor: pointer;
+    background: transparent;
+    color: var(--color-info-dark);
+    transition: all 300ms ease;
+}
+.todo-list-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+/* Redesigned To-Do Item */
+.todo-list-card .todo-item,
+.todo-list-page-container .todo-item {
+    background: transparent;
+    /* border-left is now handled by the priority indicator */
+    border-bottom: 1px solid var(--color-light);
+    border-radius: var(--border-radius-2);
+    padding: 1rem 1.2rem;
+    display: flex;
+    position: relative;
+    align-items: center;
+    gap: 1rem;
+    transition: background-color 300ms ease, opacity 400ms ease, transform 400ms ease;
+    margin-bottom: 0; /* Remove margin from old style */
+}
+
+.todo-list-card .todo-item:hover,
+.todo-list-page-container .todo-item:hover {
+    background-color: var(--color-light);
+}
+
+.todo-list-card .todo-item .icon-container,
+.todo-list-page-container .todo-item .icon-container {
+    color: var(--color-primary);
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    transition: color 300ms ease;
+}
+
+.todo-list-card .todo-item .icon-complete,
+.todo-list-page-container .todo-item .icon-complete {
+    display: none;
+}
+
+.todo-list-card .todo-item .icon-incomplete,
+.todo-list-page-container .todo-item .icon-incomplete {
+    display: block;
+}
+
+.todo-list-card .todo-item .details,
+.todo-list-page-container .todo-item .details {
+    flex-grow: 1;
+}
+
+.todo-list-card .todo-item .details h3,
+.todo-list-page-container .todo-item .details h3 {
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: color 300ms ease;
+}
+
+.todo-item .todo-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.4rem;
+}
+
+.todo-item .todo-due-date .material-symbols-outlined {
+    font-size: 1rem; /* Adjust icon size */
+}
+
+/* --- New Priority Indicator and Menu --- */
+.priority-menu-container {
+    position: relative;
+}
+
+.priority-indicator {
+    width: 12px;
+    height: 24px;
+    border-radius: var(--border-radius-1);
+    cursor: pointer;
+    transition: transform 200ms ease;
+}
+
+.priority-indicator:hover {
+    transform: scale(1.1);
+}
+
+.todo-item[data-priority="low"] .priority-indicator {
+    background-color: var(--color-success-variant);
+}
+.todo-item[data-priority="medium"] .priority-indicator {
+    background-color: var(--color-warning-variant);
+}
+.todo-item[data-priority="high"] .priority-indicator {
+    background-color: var(--color-danger-variant);
+}
+
+.priority-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--color-white);
+    border-radius: var(--border-radius-1);
+    box-shadow: var(--box-shadow);
+    z-index: 10;
+    padding: 0.5rem;
+    width: 100px;
+}
+
+.priority-menu.show {
+    display: block;
+}
+
+.priority-option {
+    padding: 0.5rem 0.8rem;
+    border-radius: var(--border-radius-1);
+    cursor: pointer;
+    font-weight: 500;
+}
+.priority-option:hover {
+    background: var(--color-light);
+}
+
+/* Completed State */
+.todo-list-card .todo-item.completed,
+.todo-list-page-container .todo-item.completed {
+    background: transparent;
+    opacity: 0.6;
+}
+
+.todo-list-card .todo-item.completed .details h3,
+.todo-list-page-container .todo-item.completed .details h3 {
+    text-decoration: line-through;
+    color: var(--color-info-dark);
+}
+
+.todo-list-card .todo-item.completed .icon-container,
+.todo-list-page-container .todo-item.completed .icon-container {
+    color: var(--color-success-variant);
+}
+
+.todo-list-card .todo-item.completed .icon-complete,
+.todo-list-page-container .todo-item.completed .icon-complete {
+    display: block;
+}
+
+.todo-list-card .todo-item.completed .icon-incomplete,
+.todo-list-page-container .todo-item.completed .icon-incomplete {
+    display: none;
+}
+
+.todo-list-card .todo-item.completed:hover,
+.todo-list-page-container .todo-item.completed:hover {
+    opacity: 1;
+    background-color: var(--color-info-light);
+}
+
+/* Archived State */
+.todo-item.archived {
+    background: transparent;
+    opacity: 0.5;
+    border-bottom-style: dashed;
+}
+
+.todo-item.archived .details h3 {
+    text-decoration: line-through;
+    color: var(--color-info-dark);
+}
+
+.todo-item.archived:hover {
+    opacity: 0.8;
+}
+
+/* Hide priority indicator on completed tasks */
+.todo-item.completed .priority-indicator {
+    background-color: var(--color-info-light);
+}
+
+/* Hide delete button by default, show on hover */
+.todo-item .delete-todo-btn {
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 300ms ease;
+}
+
+.todo-item:hover .delete-todo-btn {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Animation for removing an item */
+.todo-item.removing {
+    animation: shrinkOut 0.4s ease-out forwards;
+}
+@keyframes shrinkOut {
+    to { opacity: 0; transform: scaleY(0); height: 0; padding: 0; margin: 0; }
+}
+
+/* Empty State Redesign */
+.todo-list-items .no-results-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 3rem 1rem;
+    border: 2px dashed var(--color-light);
+    border-radius: var(--border-radius-2);
+}
+
+.todo-list-items .no-results-row .material-symbols-outlined {
+    font-size: 4rem;
+    color: var(--color-info-light);
+}
+
+.todo-list-card .add-item-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    background: var(--color-light);
+    color: var(--color-primary);
+    padding: 1rem;
+    margin: 1.5rem -1.8rem -1.8rem; /* Extend to card edges */
+    border-bottom-left-radius: var(--card-border-radius);
+    border-bottom-right-radius: var(--card-border-radius);
+    cursor: pointer;
+    transition: all 300ms ease;
+}
+
+.dark-theme-variables .status-filter-btn.active {
+    background: var(--color-background);
+    color: var(--color-primary);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Specific styles for the To-Do page header */
+.widget-card #todo-list-header {
+    justify-content: space-between;
+    align-items: center;
+}
+
+.todo-list-card .delete-todo-btn:hover {
+    color: var(--color-danger);
+}
+
+.todo-list-card .add-item-link:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+.dark-theme-variables .todo-list-card .add-item-link {
+    border-color: var(--color-dark-variant);
+    color: var(--color-dark-variant);
+}
+
+.todo-list-card .add-item-link span {
+    font-size: 1.4rem;
+}
+
+/* Quick Actions */
+.quick-actions-card {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--box-shadow);
+    transition: all 300ms ease;
+}
+
+.quick-actions-card:hover {
+    box-shadow: none;
+}
+
+.quick-actions-card h2 {
+    margin-bottom: 0.8rem;
+}
+
+.quick-actions-card .action-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.quick-actions-card .action-btn {
+    background: var(--color-light);
+    border-radius: var(--border-radius-2);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: all 300ms ease;
+}
+
+.quick-actions-card .action-btn:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+.quick-actions-card .action-btn span {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Top Technicians Widget */
+.top-technicians-card .technician-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.top-technicians-card .technician-item .profile-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.top-technicians-card .technician-item .technician-info h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.top-technicians-card .technician-item .performance-badge {
+  margin-left: auto;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--border-radius-1);
+  display: flex;
+  align-items: center;
+}
+
+.performance-badge.success {
+  background: var(--color-success-variant);
+  color: #ffffff;
+}
+
+/* Team Schedule Widget */
+.team-schedule-card .schedule-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-light);
+  padding: 1rem;
+  border-radius: var(--border-radius-2);
+  margin-bottom: 1rem;
+}
+
+.team-schedule-card .schedule-item .technician-info h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.team-schedule-card .schedule-item .schedule-time {
+  font-weight: 600;
+}
+
+/* Service Popularity Widget */
+.service-popularity-card .service-item {
+  margin-bottom: 1.5rem;
+}
+
+.service-popularity-card .service-item .service-info {
+  margin-bottom: 0.4rem;
+}
+
+.service-popularity-card .service-item .service-info h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.service-popularity-card .progress-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--color-light);
+  border-radius: var(--border-radius-1);
+  position: relative;
+  overflow: hidden;
+}
+
+.service-popularity-card .progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--border-radius-1);
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+
+/* Technicians Page */
+.technician-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.technician-card {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    text-align: center;
+    transition: all 300ms ease;
+}
+
+.technician-card:hover {
+    box-shadow: none;
+    transform: translateY(-5px);
+}
+
+.technician-card img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+    object-fit: cover;
+    border: 4px solid var(--color-light);
+}
+
+.technician-card h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.technician-card p {
+    color: var(--color-info-dark);
+    font-size: 0.8rem;
+}
+
+.technician-table-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.technician-table-info .profile-photo {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+/* ================== HEADER ================== */
+.main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-background);
+    transition: box-shadow 300ms ease, padding 300ms ease;
+    padding: 0 1.6rem;
+    border-radius: 20px;
+    gap: 1rem;
+}
+
+.main-header h1 {
+    padding: 0.8rem 0;
+}
+
+.header-title-container {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-grow: 1;
+}
+
+.header-action-btn {
+    background: transparent;
+    cursor: pointer;
+    color: var(--color-dark-variant);
+    text-decoration: none;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: all 300ms ease;
+}
+.header-action-btn:hover {
+    background: var(--color-light);
+}
+
+.header-action-btn#chat-icon-btn {
+    position: relative; /* This is the key to positioning the badge correctly */
+}
+
+.header-action-btn#chat-icon-btn .message-count {
+    background: var(--color-primary-variant);
+    color: white;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 10px;
+    position: absolute;
+    top: 0; /* Position at the top of the icon */
+    right: 0; /* Position at the right of the icon */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.main-header #menu-btn {
+    display: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--color-dark);
+}
+
+.main-header .header-right {
+    display: flex;
+    position: relative;
+    align-items: center;
+    gap: 2rem;
+}
+
+.theme-toggler {
+    background: var(--color-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 1.6rem;
+    width: 4.2rem;
+    cursor: pointer;
+    border-radius: var(--border-radius-1);
+}
+
+.theme-toggler span {
+    font-size: 1.2rem;
+    width: 50%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.theme-toggler span.active {
+    background: var(--color-primary);
+    color: white;
+    border-radius: var(--border-radius-1);
+}
+
+/* Notification Bell */
+.notification-bell {
+  position: relative;
+  color: var(--color-dark-variant);
+  cursor: pointer;
+}
+
+.notification-bell .message-count {
+  background: var(--color-primary-variant);
+  color: white;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-background);
+}
+
+.main-header .profile {
+    display: flex;
+    gap: 2rem;
+    text-align: right;
+}
+
+.main-header .profile-photo {
+    width: 2.8rem;
+    height: 2.8rem;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+/* Notification Dropdown */
+.notification-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -20px;
+  background: var(--color-white);
+  border-radius: var(--border-radius-2);
+  box-shadow: var(--box-shadow);
+  width: 320px;
+  z-index: 10;
+  display: none;
+  transition: all 300ms ease;
+  overflow: hidden; /* To keep the border-radius on children */
+  max-height: 400px; /* Prevent dropdown from being too long */
+  display: none;
+  flex-direction: column;
+}
+
+.notification-list-dropdown {
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.notification-footer {
+  display: block;
+  padding: 0.8rem 1rem;
+  text-align: center;
+  font-weight: 500;
+  color: var(--color-primary);
+  border-top: 1px solid var(--color-light);
+  transition: background-color 300ms ease;
+}
+
+.notification-dropdown.show {
+  display: flex; /* Changed from block to flex */
+}
+
+/* Profile Dropdown */
+.main-header .profile {
+    position: relative;
+    cursor: pointer;
+}
+
+.profile-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    width: 160px;
+    z-index: 10;
+    overflow: hidden;
+    display: none;
+    transition: all 300ms ease;
+}
+
+.profile-dropdown.show {
+    display: block;
+    animation: fadeInDropdown 0.3s ease forwards;
+}
+
+@keyframes fadeInDropdown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.profile-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 1.2rem;
+    color: var(--color-dark-variant);
+    font-size: 0.9rem;
+}
+
+.profile-dropdown a:hover {
+    background: var(--color-light);
+    color: var(--color-primary);
+}
+
+/* ================== LOGIN PAGE ================== */
+.login-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-background);
+}
+
+.login-container {
+    width: 100%;
+    max-width: 400px;
+    padding: 2rem;
+}
+
+.login-logo {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.login-logo img {
+    width: 200px;
+    height: 80px;
+    margin: auto;
+}
+
+.login-logo h2 {
+    color: var(--color-primary);
+    margin-top: 0.5rem;
+}
+
+.auth-form {
+    background: var(--color-white);
+    padding: 2rem;
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+}
+
+.auth-form.hidden {
+    display: none;
+}
+
+.auth-form h3 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.4rem;
+    color: var(--color-dark);
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--color-dark-variant);
+}
+
+.form-group input, .modal-form .form-group input[type="date"] {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: var(--color-light);
+    border: 1px solid var(--color-info-light);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9rem;
+    color: var(--color-dark);
+}
+
+.form-group textarea {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: var(--color-light);
+    border: 1px solid var(--color-info-light);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9rem;
+    color: var(--color-dark);
+    resize: vertical;
+    min-height: 80px; /* Reduced height */
+}
+
+.form-group select {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: var(--color-light);
+    border: 1px solid var(--color-info-light);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9rem;
+    color: var(--color-dark);
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23363949' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+}
+
+/* Dark mode specific styles for form dropdowns */
+.dark-theme-variables .form-group select {
+    background-color: var(--color-white); /* Use the dark theme's 'white' which is a dark grey */
+    color: var(--color-dark-variant); /* Use a light text color */
+    border-color: var(--color-light);
+    /* Update the SVG arrow to be white for dark backgrounds */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23eeeeee' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+}
+
+/* Dark mode override for dashboard status filter dropdowns */
+.dark-theme-variables .status-filter-container select {
+    background: var(--color-white); /* Use the dark theme's 'white' which is a dark grey */
+    color: var(--color-dark-variant); /* Use a light text color */
+    border-color: var(--color-light);
+    /* The arrow color is already handled by the general .dark-theme-variables .form-group select rule */
+}
+
+
+/* Specific override for booking modal dropdowns in dark mode for better contrast */
+.dark-theme-variables #book-appointment-content .form-group select {
+    background-color: var(--color-background); /* Match the modal's background */
+    border-color: var(--color-dark-variant); /* Use a lighter border */
+    color: var(--color-dark-variant); /* Ensure text is light */
+}
+
+/* New Vehicle Info Display in Booking Modal */
+.vehicle-info-display {
+    background: var(--color-light);
+    padding: 1rem;
+    border-radius: var(--border-radius-1);
+    border: 1px solid var(--color-info-light);
+}
+
+.vehicle-info-display p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--color-dark-variant);
+}
+
+.vehicle-info-display p strong {
+    color: var(--color-dark);
+}
+
+/* Custom Select with Search in Booking Modal */
+.custom-select-with-search {
+    position: relative;
+}
+
+.custom-select-with-search input[type="text"] {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: var(--color-light);
+    border: 1px solid var(--color-info-light);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9rem;
+    color: var(--color-dark);
+}
+
+.custom-select-with-search input[type="text"]:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-light);
+}
+
+.custom-select-options {
+    display: none; /* Hidden by default */
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--color-white);
+    border: 1px solid var(--color-info-light);
+    border-radius: var(--border-radius-1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 105; /* Above other modal content */
+    box-shadow: var(--box-shadow);
+}
+
+.custom-select-options.show {
+    display: block;
+}
+
+.custom-select-option {
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    transition: background-color 200ms ease;
+}
+
+.custom-select-option:hover {
+    background-color: var(--color-light);
+}
+
+.custom-select-option strong {
+    display: block;
+    font-weight: 500;
+    color: var(--color-dark);
+}
+
+.custom-select-option small {
+    color: var(--color-info-dark);
+}
+
+/* Dark mode adjustments for the custom select */
+.dark-theme-variables .custom-select-option:hover {
+    background-color: var(--color-primary-variant);
+}
+
+.form-group input.invalid,
+.form-group select.invalid {
+    border-color: var(--color-danger);
+    box-shadow: 0 0 0 2px rgba(255, 119, 130, 0.2);
+}
+
+.btn-primary {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.8rem 1.2rem;
+    background: var(--color-primary);
+    color: var(--color-white);
+    border-radius: var(--border-radius-1);
+    cursor: pointer;
+    font-size: 1rem;
+    white-space: nowrap; /* Prevent text from wrapping */
+    font-weight: 500;
+    transition: all 300ms ease;
+}
+
+.btn-primary {
+    color: #ffffff; /* Ensure button text is always white */
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--color-light);
+    color: var(--color-dark-variant);
+    padding: 0.8rem 1.2rem;
+    border-radius: var(--border-radius-1);
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 300ms ease;
+}
+.btn-secondary:hover {
+    opacity: 0.8;
+}
+
+.btn-danger {
+    background: var(--color-danger);
+    color: #ffffff; /* Ensure button text is always white */
+    padding: 0.8rem 1.2rem;
+    border-radius: var(--border-radius-1);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 300ms ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+    opacity: 0.8;
+}
+
+.btn-danger:disabled {
+    background: var(--color-light);
+    color: var(--color-info-dark);
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
+.btn-primary:hover {
+    opacity: 0.85;
+}
+
+.form-switch {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.form-switch a {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+/* ================== MODAL ================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.show {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal {
+    background: var(--color-background);
+    padding: 2rem;
+    border-radius: var(--border-radius-2);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 1rem 3rem rgba(0,0,0,0.2);
+    animation: slideIn 0.4s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-light);
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.modal-close {
+    background: transparent;
+    cursor: pointer;
+    color: var(--color-dark-variant);
+    font-size: 1.6rem;
+    transition: all 300ms ease;
+}
+
+.modal-close:hover {
+    color: var(--color-danger);
+}
+
+.modal-body p {
+    color: var(--color-dark-variant);
+}
+
+.modal-content {
+    display: none;
+}
+
+.modal-content.active {
+    display: block;
+}
+
+.modal-form .form-group select {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: var(--color-light);
+    border: 1px solid var(--color-info-light);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9rem;
+    color: var(--color-dark);
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* Approval List in Modal */
+.approval-list .approval-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--color-light);
+    padding: 1rem;
+    border-radius: var(--border-radius-2);
+    margin-bottom: 1rem;
+}
+
+.approval-list .item-details p {
+    color: var(--color-dark);
+    font-size: 0.9rem;
+}
+
+.approval-list .item-details small {
+    font-size: 0.8rem;
+}
+
+.btn-primary-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-1);
+    font-weight: 500; 
+    cursor: pointer;
+    transition: all 300ms ease;
+}
+
+.btn-primary-outline:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+.dark-theme-variables .btn-primary-outline {
+    color: var(--color-info-dark); /* Use a light color for text */
+    border-color: var(--color-info-dark); /* and border */
+}
+
+.dark-theme-variables .btn-danger {
+    background: var(--color-danger-variant);
+    color: #fff; /* Ensure text is pure white */
+}
+
+/* Customer Profile Modal */
+.customer-profile-modal {
+    text-align: center;
+}
+
+.customer-profile-modal h2 {
+    margin-bottom: 1.5rem;
+}
+
+.profile-detail-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    color: var(--color-dark-variant);
+}
+
+.profile-detail-item .material-symbols-outlined {
+    color: var(--color-info-dark);
+}
+
+.profile-detail-item b {
+    color: var(--color-dark);
+    font-weight: 500;
+}
+
+.profile-detail-item .status-badge.verified {
+    background: var(--color-success-variant);
+    color: var(--color-success);
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--border-radius-1);
+    font-size: 0.8rem;
+}
+
+.profile-detail-item .status-badge.not-verified {
+    background: var(--color-warning-variant);
+    color: var(--color-warning);
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--border-radius-1);
+    font-size: 0.8rem;
+}
+
+
+/* Appointment Details Modal */
+.appointment-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.appointment-details-grid .detail-item p {
+    font-weight: 500;
+    font-size: 1rem;
+    color: var(--color-dark);
+}
+
+.appointment-details-grid .detail-item #modal-status {
+    padding: 0.3rem 0.8rem;
+    border-radius: var(--border-radius-1);
+    display: inline-block;
+    font-size: 0.8rem;
+}
+
+.modal-actions {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-light);
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+/* Success Toast Message */
+.success-toast {
+    position: fixed;
+    bottom: -100px; /* Start off-screen */
+    left: 50%;
+    transform: translateX(-50%); 
+    background: var(--color-toast-success);
+    color: #fff; /* Use hardcoded white for text */
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius-1);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    transition: all 0.5s ease-in-out;
+    opacity: 0;
+    pointer-events: none;
+}
+.success-toast.show {
+    bottom: 2rem; /* Slide in */
+    opacity: 1;
+}
+
+/* Undo Toast Message */
+.undo-toast {
+    position: fixed;
+    bottom: -100px; /* Start off-screen */
+    left: 50%;
+    transform: translateX(-50%); 
+    background: var(--color-dark-variant);
+    color: var(--color-background);
+    padding: 1rem 1.5rem;
+    border-radius: var(--border-radius-1);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    transition: all 0.5s ease-in-out;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.dark-theme-variables .undo-toast {
+    background: var(--color-light);
+    color: var(--color-dark);
+}
+
+.undo-toast.show {
+    bottom: 2rem; /* Slide in */
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.undo-toast button {
+    padding: 0.4rem 0.8rem; /* Smaller padding for toast button */
+    font-size: 0.85rem;
+    background: var(--color-primary);
+    color: white;
+}
+
+.dark-theme-variables .undo-toast button {
+    background: var(--color-primary);
+    color: white;
+}
+
+/* ================== GENERIC STATUS BADGE ================== */
+.status-badge {
+    padding: 0.3rem 0.8rem;
+    border-radius: var(--border-radius-1);
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+}
+.status-badge.verified {
+    background: #349a78;
+    color: #ffffff
+}
+.status-badge.available {
+    background: #349a78;
+    color: #ffffff
+}
+.status-badge.unavailable {
+    background: var(--color-warning-variant);
+    color: var(--color-warning);
+}
+.status-badge.not-verified {
+    background: #a36201;
+    color: #ffffff;
+}
+
+/* Payment Status Badge */
+.payment-status-badge {
+    padding: 0.3rem 0.8rem;
+    border-radius: var(--border-radius-1);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.payment-status-badge.paid {
+    background: #349a78;
+    color: #ffffff
+}
+.payment-status-badge.unpaid {
+    background: #a36201;
+    color: #ffffff;
+}
+
+.status-badge.completed,
+.status-badge.active {
+    background: var(--color-success-variant);
+    color: var(--color-success);
+}
+.status-badge.pending,
+.status-badge.draft {
+    background: var(--color-warning-variant);
+    color: var(--color-warning);
+}
+.status-badge.cancelled,
+.status-badge.expired {
+    background: var(--color-danger-variant);
+    color: var(--color-danger);
+}
+.status-badge.tech-active {
+    background: var(--color-success-variant);
+    color: var(--color-success);
+}
+
+.status-badge.tech-on-leave {
+    background: var(--color-warning-variant);
+    color: var(--color-warning);
+}
+
+/* ================== PROMOTIONS PAGE ================== */
+.promotions-header {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--box-shadow);
+    margin-bottom: 1.6rem;
+}
+
+.promotions-carousel {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    padding-bottom: 1rem; /* For scrollbar */
+}
+
+.promotion-card {
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 320px; /* For horizontal scroll */
+    min-width: 300px;
+    transition: all 300ms ease;
+}
+
+.promotion-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+}
+
+.promo-card-image {
+    height: 180px;
+    position: relative;
+}
+
+.promo-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.promo-status-badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--border-radius-1);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: white;
+}
+
+.promo-status-badge.active {
+    background: var(--color-success-variant);
+}
+
+.promo-status-badge.expired {
+    background: var(--color-dark-variant);
+    color: var(--color-info-light);
+}
+
+.promo-card-content {
+    padding: 1.5rem;
+    flex-grow: 1;
+}
+
+.promo-card-content h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.promo-card-content p {
+    font-size: 0.9rem;
+    color: var(--color-dark-variant);
+    margin-bottom: 1rem;
+}
+
+.promo-pricing {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+}
+
+.promo-price {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.promo-pricing del {
+    color: var(--color-info-dark);
+    font-weight: 500;
+}
+
+.promo-card-footer {
+    background: var(--color-light);
+    padding: 1rem 1.5rem;
+}
+
+.promo-countdown {
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+}
+
+.feedback-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.feedback-card {
+    display: flex;
+    gap: 1.0rem;
+    background: var(--color-light);
+    padding: 1rem;
+    border-radius: var(--border-radius-2);
+    align-items: center;
+}
+
+.feedback-media {
+    flex: 0 0 90px; /* Don't grow, don't shrink, base width of 90px */
+    height: 90px;
+    border-radius: var(--border-radius-1);
+    overflow: hidden;
+}
+
+.feedback-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.form-column-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.form-section {
+    background: var(--color-white);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-2);
+    border: 1px solid var(--color-light);
+}
+
+.dark-theme-variables .form-section {
+    border-color: var(--color-dark-variant);
+}
+
+.form-section h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.price-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+}
+
+.featured-toggle-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-light);
+    padding: 0.8rem 1rem;
+    border-radius: var(--border-radius-1);
+}
+
+.form-actions {
+    grid-column: 1 / -1; /* Span across all columns */
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-light);
+}
+
+.create-service-grid {
+    grid-column: 1 / -1; /* Ensure the form spans the full width of its container */
+}
+
+/* New Image Uploader Styles */
+.image-uploader-container {
+    position: relative;
+    height: 100%;
+    min-height: 180px; /* Further reduced height */
+}
+
+.image-uploader-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    display: none; /* Hide the default input */
+    cursor: pointer;
+    z-index: 10;
+}
+
+.image-preview {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed var(--color-info-light);
+    border-radius: var(--border-radius-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: var(--color-light);
+    overflow: hidden;
+    transition: all 300ms ease;
+}
+
+.image-uploader-container:hover .image-preview {
+    border-color: var(--color-primary);
+    background: var(--color-white);
+}
+
+.image-uploader-placeholder {
+    text-align: center;
+    color: var(--color-info-dark);
+    padding: 1rem;
+}
+.image-uploader-placeholder .material-symbols-outlined {
+    font-size: 3.5rem;
+}
+
+.feedback-content {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.feedback-content .review-header {
+    margin-bottom: 0.2rem;
+}
+
+.countdown-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-dark);
+}
+
+.countdown-label {
+    font-size: 0.7rem;
+    color: var(--color-info-dark);
+    display: block;
+}
+
+.countdown-expired {
+    width: 100%;
+    text-align: center;
+    font-weight: 600;
+    color: var(--color-danger-variant);
+}
+
+/* Create Promotion Page */
+.service-checklist {
+    max-height: 250px;
+    overflow-y: auto;
+    background: var(--color-light);
+    padding: 1rem;
+    border-radius: var(--border-radius-1);
+}
+
+.checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem; /* Increased gap between checkbox and label */
+    padding: 0.5rem 0; /* Added vertical padding */
+}
+.promo-banner-cell {
+    width: 120px;
+    height: 70px;
+    border-radius: var(--border-radius-1);
+    overflow: hidden;
+}
+
+.promo-banner-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.promo-details-cell strong {
+    font-weight: 600;
+    color: var(--color-dark);
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.promo-details-cell ul {
+    padding-left: 1.2rem;
+    font-size: 0.8rem;
+    color: var(--color-dark-variant);
+}
+
+.service-banner-cell {
+    width: 120px;
+    height: 70px;
+    border-radius: var(--border-radius-1);
+    overflow: hidden;
+}
+
+.service-banner-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.promo-pricing-cell {
+    display: flex;
+    flex-direction: column;
+}
+
+.promo-pricing-cell .promo-price {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Specific styles for the payment monitoring page insights */
+#payments-page-insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.6rem;
+}
+
+#payments-page-insights .stat-card .material-symbols-outlined {
+    background: var(--color-primary);
+    color: white;
+}
+
+#payments-page-insights .stat-card .payment-logo-icon {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    background: white;
+    border-radius: 50%;
+    padding: 8px;
+}
+
+.image-uploader-placeholder p {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--color-dark);
+}
+
+.feedback-content .review-rating {
+    margin-bottom: 0.8rem;
+}
+
+.feedback-content .review-comment {
+    margin-bottom: 0;
+    font-size: 0.85rem;
+}
+
+/* ================== CUSTOMER PROFILE PAGE ================== */
+.profile-page-container {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.profile-card {
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    overflow: hidden;
+    box-shadow: var(--box-shadow);
+}
+
+.profile-header {
+    background: var(--color-white);
+    padding: 2rem 1.5rem;
+    text-align: center;
+}
+
+.profile-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+    overflow: hidden;
+    border: 5px solid var(--color-light);
+}
+
+.profile-header h2 {
+    margin-bottom: 0.2rem;
+}
+
+.profile-header .text-muted {
+    font-size: 1rem;
+}
+
+.verification-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 1rem;
+    border-radius: var(--border-radius-1);
+    margin-top: 1rem;
+    font-weight: 500;
+}
+
+.verification-status.verified {
+    background: #41cea2;
+    color: #ffffff;
+}
+
+.verification-status.unverified {
+    background: #a36201;
+    color: #eeeeee;
+}
+
+.profile-details {
+    padding: 1.5rem;
+}
+
+.profile-details h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.profile-details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.profile-details-header h3 {
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+.profile-details-header .btn-primary-outline,
+.profile-details-header .btn-primary {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+}
+
+.profile-details .detail-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.price-edit-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.profile-details .detail-item .material-symbols-outlined {
+    color: var(--color-primary);
+    font-size: 1.8rem;
+    margin-top: 0.2rem;
+}
+
+.profile-details .detail-item .technician-select {
+    width: auto; /* Allow the select to fit its content */
+    min-width: 200px; /* Ensure it's not too small */
+}
+
+.profile-avatar.service-avatar {
+    background: var(--color-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-avatar.service-avatar .material-symbols-outlined {
+    font-size: 4rem;
+    color: var(--color-primary);
+}
+
+.price-breakdown-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.profile-details .detail-item p {
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+.profile-history {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+}
+
+.profile-history h3 {
+    margin-bottom: 1rem;
+}
+
+.profile-history #history-table-wrapper {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.profile-history table {
+    width: 100%;
+    text-align: left;
+}
+
+.profile-history th {
+    position: sticky;
+    top: 0;
+    background: var(--color-white);
+    color: var(--color-info-dark);
+    font-weight: 500;
+    padding-bottom: 0.8rem;
+    border-bottom: 2px solid var(--color-light);
+}
+
+.profile-history td {
+    padding: 0.8rem 0.4rem;
+    border-bottom: 1px solid var(--color-light);
+    color: var(--color-dark-variant);
+}
+
+/* --- Service Progress Tracker --- */
+.status-tracker-container {
+    margin-bottom: 2rem;
+}
+
+.status-tracker-container h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.status-tracker {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    padding: 0 1rem;
+}
+
+.status-tracker::before {
+    content: '';
+    position: absolute;
+    top: 20px; /* Vertically center with the icon */
+    left: 10%;
+    right: 10%;
+    height: 4px;
+    background: var(--color-light);
+    z-index: 0;
+}
+
+.status-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    width: 100px;
+}
+
+.status-step.clickable {
+    cursor: pointer;
+}
+
+.status-step .icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--color-background);
+    border: 4px solid var(--color-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-info-dark);
+    transition: all 0.4s ease;
+}
+
+.status-step.completed .icon,
+.status-step.active .icon {
+    border-color: var(--color-success-variant);
+    color: var(--color-success-variant);
+}
+
+.status-step.active .icon {
+    animation: pulse 2s infinite;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ================== SERVICE REVIEWS PAGE ================== */
+.reviews-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.review-card {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    display: flex;
+    flex-direction: column;
+    transition: all 300ms ease;
+}
+
+.review-card:hover {
+    box-shadow: none;
+    transform: translateY(-5px);
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.review-header .review-actions {
+    margin-left: auto; /* Push button to the right */
+    padding-left: 1rem;
+}
+
+.review-header .quick-reply-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+}
+
+.admin-reply-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.review-customer-info h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+}
+
+.review-customer-info small {
+    color: var(--color-info-dark);
+    font-weight: 500;
+}
+
+.review-rating {
+    display: flex;
+    gap: 0.2rem;
+    color: var(--color-star-rating);
+}
+
+.review-rating .material-symbols-outlined {
+    font-size: 1.2rem;
+    font-variation-settings: 'FILL' 0;
+}
+
+.review-rating .material-symbols-outlined.filled {
+    font-variation-settings: 'FILL' 1;
+}
+
+.review-comment {
+    color: var(--color-dark-variant);
+    font-style: italic;
+    margin-bottom: 1.5rem;
+    flex-grow: 1;
+}
+
+/* Truncate long review text in the reviews table */
+#reviews-table .review-comment {
+    max-width: 350px; /* Adjust this value as needed */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left; /* Ensure it's left-aligned */
+    cursor: default; /* Show default cursor on hover */
+}
+
+
+/* ================== REVIEW DETAILS PAGE ================== */
+.review-details-container {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr;
+    gap: 2rem;
+    align-items: flex-start;
+}
+.review-details-main-column {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.review-info-card .review-comment {
+    font-size: 1.1rem; /* Make the comment text larger on this page */
+    font-style: normal;
+    line-height: 1.6;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    color: var(--color-dark);
+}
+
+.review-info-card .review-date {
+    display: block;
+    text-align: right;
+    margin-top: 1.5rem;
+}
+
+.review-media-card .review-media-content {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--border-radius-2);
+    overflow: hidden;
+    background: var(--color-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.review-media-content img,
+.review-media-content video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.no-media-placeholder {
+    text-align: center;
+    color: var(--color-info-dark);
+}
+
+.admin-reply-card .btn-primary {
+    width: 100%;
+    justify-content: center;
+}
+
+.admin-reply-content {
+    background: var(--color-light);
+    border-radius: var(--border-radius-2);
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+.admin-reply-content p {
+    line-height: 1.6;
+    color: var(--color-dark-variant);
+}
+
+.reply-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.reply-header h3 {
+    margin: 0;
+}
+
+.reply-header .btn-secondary {
+    padding: 0.4rem 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+}
+
+.form-actions.reply-actions {
+    border-top: none;
+    padding-top: 0;
+}
+
+.receipt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.receipt-card h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-light);
+}
+.receipt-header h3 {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.receipt-content .receipt-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.receipt-content .receipt-item:last-child {
+    border-bottom: none;
+}
+
+.receipt-label {
+    color: var(--color-dark-variant);
+}
+
+.receipt-value {
+    font-weight: 600;
+    color: var(--color-dark);
+}
+
+.receipt-item.total .receipt-value {
+    font-size: 1.4rem;
+    color: var(--color-primary);
+}
+
+.price-breakdown {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.price-breakdown div {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3rem;
+}
+
+.price-breakdown small {
+    font-size: 0.75rem;
+}
+
+.price-notes {
+    font-size: 0.85rem;
+}
+
+.service-name-cell {
+    display: flex;
+    flex-direction: column;
+    white-space: pre-line;
+}
+
+.service-name-cell strong {
+    font-weight: 500;
+    color: var(--color-dark);
+}
+.service-name-cell small {
+    display: block; /* This will force the note onto a new line */
+    margin-top: 0.2rem; /* Add a little space between the name and the note */
+    font-size: 0.8rem;
+}
+
+/* ================== TOGGLE SWITCH ================== */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.image-uploader-placeholder {
+    text-align: center;
+    color: var(--color-info-dark);
+}
+.image-uploader-placeholder .material-symbols-outlined {
+    font-size: 3rem;
+}
+
+/* Base styles for the simple slider used in forms */
+.toggle-switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+/* ================== TOGGLE SWITCH (Complete Styling) ================== */
+.toggle-switch input:checked + .slider {
+    background-color: var(--color-primary);
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 2px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* ================== NEW TABLE TOGGLE SWITCH ================== */
+.table-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    vertical-align: middle;
+}
+
+.table-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.table-toggle-switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-info-light);
+    transition: .4s;
+    border-radius: 28px;
+}
+
+.table-toggle-switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.table-toggle-switch input:checked + .slider {
+    background-color: var(--color-primary);
+}
+
+.table-toggle-switch input:checked + .slider:before {
+    -webkit-transform: translateX(22px);
+    -ms-transform: translateX(22px);
+    transform: translateX(22px);
+}
+/* ================== PROFILE/EDITOR PAGE GRID ================== */
+/* Used on user profile, service editor, promotion editor etc. */
+.profile-page-grid,
+.create-service-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.6rem;
+    align-items: flex-start;
+    padding: 0; /* Remove default padding to align with page content */
+}
+
+/* ================== REDESIGNED THEME TOGGLE SWITCH ================== */
+.theme-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+    cursor: pointer;
+}
+
+.theme-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.theme-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-light); /* Off state background */
+    border-radius: 34px;
+    transition: .4s;
+    box-shadow: inset 0 0 2px rgba(0,0,0,0.2); /* Inner shadow for depth */
+    /* Add flex properties to position the icons */
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 5px;
+}
+
+.theme-slider .material-symbols-outlined {
+    font-size: 1.2rem;
+    color: var(--color-dark-variant);
+    z-index: 1; /* Ensure icons are above the slider background */
+    transition: color 0.4s ease;
+}
+
+.theme-slider::before {
+    position: absolute;
+    content: "";
+    height: 26px; /* Slightly smaller than height for padding */
+    width: 26px; /* Square for circle */
+    left: 4px; /* Initial position from left */
+    bottom: 4px; /* Initial position from bottom */
+    background-color: var(--color-white); /* Thumb color */
+    transition: .4s;
+    border-radius: 50%; /* Make it a circle */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Shadow for the thumb */
+}
+
+.theme-toggle-switch input:checked + .theme-slider {
+    background-color: var(--color-primary);
+}
+
+.theme-toggle-switch input:checked + .theme-slider .material-symbols-outlined {
+    color: var(--color-white); /* Make icons white when switch is on */
+}
+
+.theme-toggle-switch input:checked + .theme-slider::before {
+    transform: translateX(26px); /* Move thumb to the right */
+}
+
+/* Smaller version for use in tables or dense forms */
+.theme-toggle-switch.small-toggle {
+    width: 50px;
+    height: 28px;
+}
+
+.theme-toggle-switch.small-toggle .theme-slider::before {
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+}
+
+.theme-toggle-switch.small-toggle input:checked + .theme-slider::before {
+    transform: translateX(18px); /* Adjusted for smaller size */
+}
+/* ================== PAYMENT MONITORING PAGE REDESIGN ================== */
+.summary-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+}
+
+.summary-stats-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.5rem;
+}
+
+.summary-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--color-light);
+    padding: 1rem;
+    border-radius: var(--border-radius-2);
+}
+
+.summary-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.summary-stat-icon.total {
+    background: var(--color-primary);
+    color: white;
+}
+
+.summary-stat-icon.gcash,
+.summary-stat-icon.maya {
+    background: white;
+    padding: 4px;
+}
+
+.summary-stat-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.summary-stat-info h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--color-dark);
+}
+
+
+/* ================== TAB NAVIGATION ================== */
+.tab-nav {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--color-light);
+    margin-bottom: 1.5rem;
+}
+
+.tab-btn {
+    padding: 0.8rem 1.5rem;
+    cursor: pointer;
+    background: transparent;
+    color: var(--color-dark-variant);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    font-size: 1rem;
+    position: relative;
+    top: 2px; /* Align with the bottom border */
+    border-bottom: 2px solid transparent;
+    transition: all 300ms ease;
+}
+
+.tab-btn:hover {
+    color: var(--color-primary);
+}
+
+.tab-btn.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.image-uploader-placeholder {
+    text-align: center;
+    color: var(--color-info-dark);
+}
+.image-uploader-placeholder .material-symbols-outlined {
+    font-size: 3rem;
+}
+
+.tab-content-container {
+    position: relative;
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ================== SIDEBAR OVERLAY ================== */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 2;
+    transition: all 400ms ease;
+}
+
+/* Custom Checkbox Styling */
+input[type="checkbox"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background-color: var(--color-light);
+    border: 1px solid var(--color-info-light);
+    border-radius: var(--border-radius-1);
+    cursor: pointer;
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    transition: all 150ms ease-in-out;
+}
+
+input[type="checkbox"]:checked {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+input[type="checkbox"]:checked::after {
+    content: '✔'; /* Checkmark character */
+    font-size: 14px;
+    color: white;
+    position: absolute;
+    top: 0px;
+    left: 3px;
+}
+
+/* ================== GENERIC PAGE FILTER BAR ================== */
+.page-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    margin-bottom: 1.6rem;
+    box-shadow: var(--box-shadow);
+}
+
+.page-filter-bar .table-search-container {
+    min-width: 300px;
+    flex-grow: 1;
+}
+
+/* ================== SALES PAGE REDESIGN ================== */
+/* The sales page now uses a single column layout */
+.page#sales-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+}
+
+.analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.analytics-header h2 {
+    margin-bottom: 0;
+}
+
+.date-range-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: var(--color-light);
+    padding: 0.5rem;
+    border-radius: var(--border-radius-2);
+}
+
+.date-quick-select {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.quick-select-btn {
+    padding: 0.6rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: transparent;
+    color: var(--color-dark-variant);
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all 300ms ease;
+}
+
+.quick-select-btn.active {
+    background: var(--color-white);
+    color: var(--color-primary);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.date-custom-range {
+    display: flex;
+    align-items: center;
+    background: var(--color-white);
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--border-radius-1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.date-custom-range input[type="date"] {
+    background: transparent;
+    color: var(--color-dark-variant);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    width: 110px; /* Give it a fixed width */
+}
+
+/* Specific styles for the sales page insights to override the default flex behavior */
+#sales-page-insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.6rem;
+    padding-bottom: 0; /* Remove bottom padding as it's not needed for grid */
+    overflow-x: visible; /* Disable horizontal scroll */
+}
+/* Apply dashboard card styling to sales page insights */
+/* ================== PRINT STYLES ================== */
+@media print {
+    /* Hide everything by default */
+    body > *:not(.modal-overlay) {
+        display: none !important;
+    }
+
+    /* Make the modal overlay and its content visible and take up the whole page */
+    .modal-overlay {
+        position: static !important;
+        background: none !important;
+        display: block !important;
+        width: 100%;
+        height: auto;
+    }
+
+    .modal {
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        border: none !important;
+        animation: none !important;
+        padding: 0 !important;
+    }
+
+    /* Hide non-essential modal elements */
+    .modal-close,
+    .modal-actions {
+        display: none !important;
+    }
+
+    .modal-header {
+        border-bottom: 2px solid #000;
+    }
+
+    .appointment-details-grid p {
+        color: #000 !important;
+    }
+
+    /* Print styles for the Review Details Receipt */
+    body.review-details-print-active > .container > *:not(main),
+    body.review-details-print-active main > *:not(.page-content),
+    body.review-details-print-active .page-content > *:not(#review-details-page),
+    body.review-details-print-active #review-details-page > *:not(.review-details-container),
+    body.review-details-print-active .review-details-container > *:not(.review-details-main-column),
+    body.review-details-print-active .review-details-main-column > *:not(.receipt-card),
+    body.review-details-print-active .main-header,
+    body.review-details-print-active aside,
+    body.review-details-print-active .receipt-header button {
+        display: none !important;
+    }
+
+    body.review-details-print-active .container,
+    body.review-details-print-active main,
+    body.review-details-print-active .page-content,
+    body.review-details-print-active #review-details-page,
+    body.review-details-print-active .review-details-container,
+    body.review-details-print-active .review-details-main-column {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        grid-template-columns: 1fr !important;
+    }
+
+    body.review-details-print-active .receipt-card {
+        box-shadow: none !important;
+        border: 1px solid #ccc;
+        border-radius: 0;
+        padding: 1rem;
+    }
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(127, 22, 24, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(127, 22, 24, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(127, 22, 24, 0);
+    }
+}
+
+/* =================================================================== */
+/* ========================= NEW CHAT PAGE ========================= */
+/* =================================================================== */
+
+.chat-page-container {
+    position: relative; /* CRITICAL FIX: This makes the container a positioning context for the dropdown */
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    height: calc(100vh - 8rem); /* Adjust based on your header/padding */
+    background: var(--color-white);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+}
+
+.chat-page-list-column {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--color-light);
+    overflow: hidden; /* Prevent any potential overflow from child elements */
+}
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 1.2rem;
+    border-bottom: 1px solid var(--color-light);
+    flex-shrink: 0;
+}
+
+.chat-header .profile-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.chat-header .chat-header-info {
+    flex-grow: 1;
+}
+
+.chat-header-info .status-badge.small {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+    margin-top: 0.2rem;
+}
+
+.chat-header .chat-header-actions {
+    position: relative;
+    margin-left: auto; /* Push the menu to the far right */
+}
+
+.chat-header-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    width: 180px;
+    z-index: 10;
+    overflow: hidden;
+    display: none;
+    animation: fadeInDropdown 0.3s ease forwards;
+}
+
+.chat-header-dropdown.show {
+    display: block;
+}
+
+.chat-header-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem 1.2rem;
+    color: var(--color-dark-variant);
+    font-size: 0.9rem;
+}
+
+.chat-header-dropdown a:hover {
+    background: var(--color-light);
+    color: var(--color-primary);
+}
+
+.chat-header-dropdown a.danger:hover {
+    background: var(--color-danger-variant);
+    color: var(--color-white);
+}
+
+.chat-header-dropdown a .material-symbols-outlined {
+    font-size: 1.2rem;
+}
+
+.chat-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.chat-list-search {
+    padding: 0.8rem 1.2rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.chat-list-search input {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border-radius: var(--border-radius-1);
+    background: var(--color-light);
+    color: var(--color-dark);
+}
+
+.chat-list-header .chat-list-search input {
+    width: 100%; /* Ensure the input fills its container */
+}
+
+.chat-list-header .chat-list-search {
+    flex-grow: 1;
+    width: 100%;
+}
+
+.chat-list-header {
+    /* No longer needs to be sticky as the parent doesn't scroll */
+    background: var(--color-white);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: -0.2rem 1.2rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.chat-list-actions {
+    position: relative;
+}
+
+.chat-list-header-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    width: 220px;
+    z-index: 10;
+    overflow: hidden;
+    display: none;
+    animation: fadeInDropdown 0.3s ease forwards;
+}
+
+.chat-list-header-dropdown.show {
+    display: block;
+}
+
+.chat-list-header-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem 1.2rem;
+    color: var(--color-dark-variant);
+    font-size: 0.9rem;
+}
+
+.chat-list-header-dropdown a:hover {
+    background: var(--color-light);
+}
+.chat-conversation-list {
+    flex-grow: 1;
+    overflow-y: auto; /* This element should scroll, not the parent column */
+}
+
+.chat-conversation-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-light);
+    transition: background-color 200ms ease;
+}
+
+.chat-conversation-item .conversation-checkbox {
+    display: none; /* Hide checkbox by default */
+    align-items: center;
+}
+
+.selection-mode-active .chat-conversation-item .conversation-checkbox {
+    display: flex; /* Show checkbox in selection mode */
+}
+
+.selection-mode-active .chat-conversation-item .conversation-item-actions {
+    display: none; /* Hide 3-dot menu in selection mode */
+}
+
+.chat-conversation-item .conversation-checkbox input[type="checkbox"] {
+    transform: scale(1.1);
+}
+
+.chat-conversation-item {
+    position: relative; /* CRITICAL FIX: This positions the 3-dot menu icon correctly inside the item. */
+}
+
+.conversation-item-actions {
+    position: absolute;
+    top: 50%; /* Vertically center the button */
+    right: 1rem;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 200ms ease;
+}
+
+.chat-conversation-item:hover .conversation-item-actions {
+    opacity: 1; /* Show on hover */
+    transform: translateY(-50%);
+}
+
+.conversation-item-actions .action-icon-btn {
+    padding: 0.2rem;
+}
+
+.conversation-item-dropdown {
+    position: absolute; /* Revert to absolute positioning */
+    top: 100%; /* Position it below the 3-dot button's container */
+    right: 0; /* Align to the right of the 3-dot button's container */
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    width: 160px;
+    z-index: 15; /* A high enough z-index to be on top of other list items */
+    overflow: hidden;
+    display: none;
+}
+
+.conversation-item-dropdown.show {
+    display: block;
+}
+
+.conversation-item-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem 1.2rem;
+    color: var(--color-dark-variant);
+    font-size: 0.9rem;
+    transition: all 200ms ease;
+}
+
+.conversation-item-dropdown a .material-symbols-outlined {
+    font-size: 1.2rem;
+}
+
+.chat-conversation-item:hover {
+    background-color: var(--color-light);
+}
+
+.chat-conversation-item:hover {
+    /* This is the key fix: bring the hovered item to the front */
+    z-index: 10;
+}
+
+.chat-conversation-item.unread .conversation-details strong {
+    font-weight: 700;
+    color: var(--color-dark);
+}
+
+.chat-conversation-item.unread .conversation-details p {
+    color: var(--color-dark);
+}
+
+.chat-conversation-item.active {
+    background-color: var(--color-primary-variant);
+}
+
+.chat-conversation-item.active .conversation-details strong,
+.chat-conversation-item.active .conversation-details p,
+.chat-conversation-item.active .conversation-details small {
+    color: var(--color-white);
+}
+
+.chat-conversation-item .profile-photo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.conversation-details {
+    flex-grow: 1;
+    overflow: hidden;
+    padding-right: 1.5rem; /* Add space on the right for the menu */
+}
+
+.conversation-header {
+    display: flex;
+    justify-content: space-between;
+}
+
+.conversation-details p {
+    font-size: 0.85rem;
+    color: var(--color-dark-variant);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-list-footer {
+    flex-shrink: 0;
+    padding: 1rem 1.2rem;
+    border-top: 1px solid var(--color-light);
+    background: var(--color-white);
+    display: none; /* Hidden by default, shown in selection mode */
+    flex-shrink: 0; /* Prevent footer from shrinking */
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.chat-page-list-column.selection-mode-active .chat-list-footer {
+    display: flex; /* CORRECTED: Show footer in selection mode */
+}
+
+.chat-list-footer .btn-danger {
+    /* width: 100% and justify-content: center removed for better alignment */
+    padding: 0.7rem 1.2rem;
+    font-size: 0.9rem;
+}
+
+.chat-page-message-column {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 8rem); /* Match the height of the parent grid container */
+}
+
+.chat-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: var(--color-info-dark);
+}
+
+.chat-placeholder .material-symbols-outlined {
+    font-size: 6rem;
+    margin-bottom: 1rem;
+}
+
+#chat-message-view-content {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* This makes the content area fill the parent column */
+    min-height: 0; /* This is a crucial fix for nested flexbox to prevent overflow */
+}
+
+/* This tells the message list to expand and fill all available vertical space,
+   pushing the form to the bottom. It also enables internal scrolling. */
+.chat-message-list {
+    flex-grow: 1;
+    overflow-y: auto; /* Allow the list itself to scroll, not the whole container */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+}
+
+.chat-message-form {
+    flex-shrink: 0; /* Prevent the form from shrinking */
+    display: flex;
+    gap: 0.8rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--color-light);
+}
+
+/* Style the input field within the form */
+.chat-page-container .chat-message-form input {
+    flex-grow: 1; /* Allow the input to take up all available space */
+    background: var(--color-light);
+    border-radius: var(--border-radius-2);
+    padding: 0.8rem 1rem;
+    color: var(--color-dark);
+}
+
+.chat-page-container .chat-message-form .action-icon-btn {
+    align-self: center; /* Vertically center the send button */
+}
+
+/* Style the input field within the form */
+.chat-page-container .chat-message-form input {
+    flex-grow: 1; /* Allow the input to take up all available space */
+    background: var(--color-light);
+    border-radius: var(--border-radius-2);
+    padding: 0.8rem 1rem;
+    color: var(--color-dark);
+}
+
+.chat-page-container .chat-message-form .action-icon-btn {
+    align-self: center; /* Vertically center the send button */
+}
+
+.chat-message {
+    max-width: 80%;
+    padding: 0.8rem 1.2rem;
+    border-radius: var(--border-radius-2);
+}
+
+.chat-message p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.message-meta {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+}
+.chat-message .message-timestamp {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    display: block;
+    text-align: right;
+    margin-top: 0.4rem;
+}
+
+.chat-message p {
+    word-break: break-word; /* Ensure long text wraps nicely */
+}
+
+/* Styles for media within chat bubbles */
+.chat-media-image,
+.chat-media-video {
+    max-width: 100%;
+    border-radius: var(--border-radius-2);
+    margin-bottom: 0.5rem;
+}
+
+.chat-media-image {
+    cursor: pointer;
+}
+
+.chat-message.admin .message-timestamp {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.chat-message .message-status {
+    font-size: 0.75rem;
+}
+.chat-message.customer {
+    background: var(--color-light);
+    align-self: flex-start;
+    border-bottom-left-radius: var(--border-radius-1);
+}
+
+/* Dark mode override for customer chat bubbles for better contrast */
+.dark-theme-variables .chat-message.customer {
+    background: #2c2f33; /* A solid, lighter grey for dark mode */
+    color: var(--color-dark-variant); /* Ensure text is light */
+}
+
+.dark-theme-variables .chat-message.system {
+    background: #2c2f33; /* A solid, lighter grey for dark mode */
+    color: var(--color-info-dark); /* Use a slightly dimmer white for less emphasis */
+    opacity: 0.8;
+}
+
+.chat-message.admin {
+    background: var(--color-primary);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: var(--border-radius-1);
+}
+
+.chat-message.system {
+    align-self: center;
+    background: var(--color-info-light);
+    color: var(--color-dark-variant);
+    font-style: italic;
+    font-size: 0.8rem;
+    text-align: center;
+    max-width: 100%;
+}
+
+/* ================== TYPING INDICATOR ================== */
+.typing-indicator-container {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.5rem 1.5rem;
+    flex-shrink: 0;
+}
+
+.typing-indicator-container .profile-photo {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.typing-indicator-dots {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: var(--color-light);
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--border-radius-2);
+}
+
+.typing-indicator-dots span {
+    width: 8px;
+    height: 8px;
+    background-color: var(--color-info-dark);
+    border-radius: 50%;
+    animation: typing-bounce 1.2s infinite ease-in-out;
+}
+
+.typing-indicator-dots span:nth-child(2) { animation-delay: -1.0s; }
+.typing-indicator-dots span:nth-child(3) { animation-delay: -0.8s; }
+
+@keyframes typing-bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1.0); }
+}
+
+/* ================== FILE ATTACHMENT MESSAGE ================== */
+.chat-file-attachment {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: rgba(0,0,0,0.05);
+    padding: 0.8rem;
+    border-radius: var(--border-radius-1);
+}
+
+.chat-message.admin .chat-file-attachment {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-file-attachment .material-symbols-outlined {
+    font-size: 2.5rem;
+}
+
+.chat-file-attachment .file-info strong {
+    display: block;
+}
+
+/* ================== MEDIA QUERIES (TABLETS) ================== */
+@media screen and (max-width: 1200px) {
+    aside .logo {
+        padding: 0;
+    }
+
+    aside .logo h2 {
+        display: none;
+    }
+
+    aside .sidebar-menu h3 {
+        display: none;
+    }
+
+    aside .sidebar-menu a {
+        width: 5.6rem;
+    }
+
+    aside .sidebar-menu a:last-child {
+        position: relative;
+        margin-top: 1.2rem;
+    }
+
+    main .insights {
+        display: grid; /* Switch to grid for better wrapping on tablets */
+        gap: 1rem;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .appointment-insights {
+        grid-template-columns: 1fr;
+    }
+    
+    .profile-page-container {
+        grid-template-columns: 1fr;
+    }
+
+
+    /* Make quick action buttons stack on tablets */
+    .quick-actions-card .action-buttons {
+        grid-template-columns: 1fr;
+    }
+
+
+    #customers-table th:nth-child(3), /* Email */
+    #customers-table td:nth-child(3),
+    #customers-table th:nth-child(6), /* Date Registered */
+    #customers-table td:nth-child(6) {
+        display: none; /* Hide less critical columns on smaller tablets */
+    }
+
+    /* Hide less critical columns on appointment tables for tablets */
+    #main-appointments-table th:nth-child(3), /* Phone */
+    #main-appointments-table td:nth-child(3),
+    #main-appointments-table th:nth-child(5), /* Car Name */
+    #main-appointments-table td:nth-child(5),
+    #main-appointments-table th:nth-child(6), /* Car Type */
+    #main-appointments-table td:nth-child(6),
+    #walk-in-appointments-table th:nth-child(2), /* Phone */
+    #walk-in-appointments-table td:nth-child(2),
+    #walk-in-appointments-table th:nth-child(3), /* Car Name */
+    #walk-in-appointments-table td:nth-child(3),
+    #walk-in-appointments-table th:nth-child(4), /* Car Type */
+    #walk-in-appointments-table td:nth-child(4) {
+        display: none;
+    }
+
+    .table-actions-footer {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--color-light);
+    }
+
+    .table-actions-footer {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--color-light);
+    }
+
+    .table-controls .table-action-buttons {
+        margin-top: 0.5rem;
+        justify-content: flex-end;
+    }
+}
+
+
+/* ================== MEDIA QUERIES (PHONES) ================== */
+@media screen and (max-width: 768px) {
+    .container {
+        width: 100%;
+        grid-template-columns: 1fr;
+    }
+
+    aside {
+        position: fixed;
+        left: -100%;
+        background: var(--color-white);
+        width: 18rem;
+        z-index: 3;
+        box-shadow: 1rem 3rem 4rem var(--color-light);
+        height: 100vh;
+        padding-right: var(--card-padding);
+        transition: left 400ms ease;
+    }
+
+    aside.show {
+        left: 0;
+    }
+
+    @keyframes showMenu {
+        to {
+            left: 0;
+        }
+    }
+
+    aside .logo {
+        margin-left: 1rem;
+    }
+
+    aside .logo h2 {
+        display: inline;
+    }
+
+    aside .sidebar-menu h3 {
+        display: inline;
+    }
+
+    aside .sidebar-menu a {
+        width: 100%;
+        height: 3.4rem;
+    }
+
+    aside .sidebar-menu a:last-child {
+        position: absolute;
+        bottom: 5rem;
+    }
+
+    aside .sidebar-close {
+        display: inline-block;
+        cursor: pointer;
+    }
+
+    main {
+        margin-top: 8rem;
+        padding: 0; /* Remove padding to allow content to span full width */
+    }
+
+    .main-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        padding: 0 1.6rem;
+        height: 5rem;
+        background: var(--color-background);
+        z-index: 2;
+        box-shadow: 0 1rem 1rem var(--color-light);
+        margin: 0;
+    }
+
+    main .insights { 
+        display: flex; /* Revert to flex for horizontal scrolling on mobile */
+        flex-wrap: nowrap;
+    }
+
+    /* On mobile, make appointment insights scroll horizontally like the dashboard */
+    #appointment-page-insights {
+        display: flex;
+        overflow-x: auto;
+        padding-bottom: 1rem;
+    }
+
+    .main-header #menu-btn {
+        display: inline-block;
+    }
+
+    .main-header .profile {
+        gap: 1rem;
+    }
+
+    .main-header .profile .info {
+        display: none;
+    }
+
+    .recent-appointments table {
+        width: 100%;
+        margin: 0;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Ensure all two-column editor/details pages collapse on mobile */
+    .profile-page-grid,
+    .create-service-grid,
+    .review-details-container,
+    .profile-page-container {
+        grid-template-columns: 1fr;
+    }
+
+
+    .summary-column {
+        grid-row: 1; /* Move summary to the top on tablets */
+    }
+
+
+    /* Ensure quick action buttons are full-width on mobile */
+    .quick-actions-card .action-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    #customers-table th:nth-child(4), /* Phone */
+    #customers-table td:nth-child(4),
+    #customers-table th:nth-child(5), /* Orders */
+    #customers-table td:nth-child(5) {
+        display: none; /* Hide even more columns on phones */
+    }
+
+    /* Hide even more columns on appointment tables for phones */
+    #main-appointments-table th:nth-child(1), /* ID */
+    #main-appointments-table td:nth-child(1),
+    #main-appointments-table th:nth-child(8), /* Technician */
+    #main-appointments-table td:nth-child(8),
+    #walk-in-appointments-table th:nth-child(6) /* Technician */
+    #walk-in-appointments-table td:nth-child(6) {
+        display: none;
+    }
+
+    #walk-in-appointments-table th:nth-child(6), /* Technician */
+    #walk-in-appointments-table td:nth-child(6) {
+        display: none;
+    }
+    .table-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+
+}
+.media-card.selected {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 8px 20px rgba(127, 22, 24, 0.2);
+}
+
+/* ================== MEDIA MANAGER PAGE ================== */
+.media-manager-container {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--box-shadow);
+    position: relative; /* For drag-drop overlay positioning */
+}
+
+.media-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.media-header-left, .media-header-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.media-header-right {
+    margin-left: auto;
+}
+
+.media-manager-actions {
+    display: flex;
+    align-items: center;
+}
+.media-manager-header .table-search-container {
+    max-width: 450px;
+}
+
+.upload-btn-label {
+    cursor: pointer;
+}
+
+.media-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.media-filter-container {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--color-light);
+    padding: 0.4rem;
+    border-radius: var(--border-radius-2);
+}
+
+.media-filter-btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--border-radius-1);
+    background: transparent;
+    color: var(--color-dark-variant);
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all 300ms ease;
+}
+
+.media-filter-btn.active {
+    background: var(--color-white);
+    color: var(--color-primary);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.drag-drop-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(127, 22, 24, 0.05);
+    border: 3px dashed var(--color-primary);
+    border-radius: var(--card-border-radius);
+    z-index: 10;
+    display: none; /* Hidden by default */
+    align-items: center;
+    justify-content: center;
+    pointer-events: none; /* Allow events to pass through when hidden */
+}
+
+.drag-drop-content {
+    text-align: center;
+    color: var(--color-primary);
+}
+
+.drag-drop-content .material-symbols-outlined {
+    font-size: 4rem;
+}
+
+.drag-drop-content h3 {
+    font-size: 1.4rem;
+    margin-top: 0.5rem;
+}
+
+.media-card.selected {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 8px 20px rgba(127, 22, 24, 0.2);
+}
+.media-card.selected .media-preview::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(127, 22, 24, 0.1);
+    z-index: 2;
+}
+
+.media-card {
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+    transition: all 300ms ease;
+    border: 2px solid transparent;
+}
+
+.media-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+.media-card.picker-mode {
+    cursor: pointer;
+}
+
+.media-card.picker-mode:hover {
+    border-color: var(--color-primary);
+}
+
+.media-preview {
+    aspect-ratio: 1 / 1;
+    background: var(--color-light);
+    position: relative;
+}
+
+.media-preview img,
+.media-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    pointer-events: none; /* Allows clicks to pass through */
+    transition: opacity 300ms ease;
+}
+
+.media-card:hover .video-overlay {
+    opacity: 0;
+}
+
+.video-overlay .material-symbols-outlined {
+    font-size: 3rem;
+}
+
+.media-info {
+    padding: 0.8rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.media-name {
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.media-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.media-card .media-checkbox {
+    position: absolute;
+    top: 0.8rem;
+    left: 0.8rem;
+    z-index: 3;
+    transform: scale(1.2);
+    opacity: 0;
+    transition: opacity 300ms ease;
+}
+
+.media-card:hover .media-checkbox,
+.media-card.selected .media-checkbox {
+    opacity: 1;
+}
+
+/* Hide media selection elements as per user request */
+.media-card .media-checkbox,
+.media-manager-container .media-manager-actions {
+    display: none !important;
+}
+
+/* ================== MEDIA DETAIL MODAL ================== */
+#media-detail-modal {
+    max-width: 90vw;
+    width: 1100px;
+}
+
+.dark-theme-variables #media-detail-modal {
+    background: #202528;
+}
+
+#media-detail-modal .modal-body {
+    padding: 0;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    max-height: 80vh;
+}
+
+.media-detail-preview {
+    background: var(--color-background);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: hidden;
+}
+
+.media-detail-preview img,
+.media-detail-preview video {
+    max-width: 100%;
+    max-height: 75vh;
+    object-fit: contain;
+    border-radius: var(--border-radius-1);
+}
+
+.media-detail-info {
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-light);
+}
+
+.media-detail-info h3 {
+    font-size: 1.2rem;
+    word-break: break-all; /* Break long filenames */
+    margin-bottom: 2rem;
+}
+
+.detail-info-group {
+    margin-bottom: 1.5rem;
+}
+
+.detail-info-group label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-info-dark);
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.detail-info-group p {
+    font-weight: 500;
+    color: var(--color-dark);
+}
+
+.media-detail-info .modal-actions {
+    margin-top: auto; /* Push actions to the bottom */
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-light);
+}
+
+/* ================== NOTIFICATIONS PAGE ================== */
+.notifications-container {
+    padding: 1.5rem;
+}
+
+.notifications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.notification-actions {
+    display: flex;
+    gap: 0.8rem;
+}
+
+.notification-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.notification-item {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.2rem 1.5rem;
+    border-radius: var(--border-radius-2);
+    transition: background-color 300ms ease, opacity 300ms ease;
+    cursor: pointer;
+}
+
+.notification-item.unread {
+    background: var(--color-light);
+    font-weight: 500;
+}
+
+.notification-item:hover {
+    background: var(--color-info-light);
+}
+
+.dark-theme-variables .notification-item:hover {
+    background: #2a2e32;
+}
+
+.notification-icon {
+    color: var(--color-primary);
+}
+
+.notification-icon .material-symbols-outlined {
+    font-size: 2rem;
+}
+
+.notification-details p {
+    margin-bottom: 0.2rem;
+}
+
+.notification-item-actions {
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 300ms ease;
+}
+
+.notification-item:hover .notification-item-actions {
+    opacity: 1;
+}
+
+/* ================== PROFILE/EDITOR PAGE GRID ================== */
+/* Used on user profile, service editor, promotion editor etc. */
+.profile-page-grid,
+.create-service-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.6rem;
+    align-items: flex-start;
+    padding: 0; /* Remove default padding to align with page content */
+}
+
+.profile-main-column, .profile-aside-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+}
+
+/* --- Profile Page Specific Styles --- */
+.profile-picture-preview {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    margin: 1rem auto;
+    position: relative;
+    overflow: hidden;
+    border: 4px solid var(--color-light);
+    box-shadow: var(--box-shadow);
+}
+
+.profile-picture-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-picture-preview .upload-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 300ms ease;
+    cursor: pointer;
+    border-radius: 50%; /* Match the container's shape */
+}
+
+
+.form-group-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    background: var(--color-white);
+    padding: 1rem;
+    border-radius: var(--border-radius-2);
+}
+
+.form-group-toggle .toggle-switch {
+    margin-left: auto;
+}
+.profile-picture-preview:hover .upload-overlay {
+    opacity: 1;
+}
+
+.recent-activity-card .activity-log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 400px; /* Give it a max height for scrolling */
+    overflow-y: auto;
+    padding-right: 0.5rem; /* Space for scrollbar */
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.activity-icon {
+    background: var(--color-light);
+    color: var(--color-primary);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.activity-details p {
+    font-size: 0.9rem;
+    margin-bottom: 0.2rem;
+}
+
+.activity-item-placeholder {
+    padding: 2rem 1rem;
+    text-align: center;
+    border: 2px dashed var(--color-light);
+    border-radius: var(--border-radius-2);
+}
+
+
+/* =================================================================== */
+/* ================== EDITOR PAGE REDESIGN STYLES ================== */
+/* =================================================================== */
+
+/* Main container for editor pages */
+.editor-page-container {
+    padding: 1.6rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* New card style for editor pages */
+.editor-card {
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    border: 1px solid var(--color-light);
+    transition: all 300ms ease;
+    overflow: hidden; /* Ensures child border-radius is respected */
+}
+
+.dark-theme-variables .editor-card {
+    border-color: var(--color-dark-variant);
+}
+
+.editor-card-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.dark-theme-variables .editor-card-header {
+    border-bottom-color: var(--color-dark-variant);
+}
+
+.editor-card-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.editor-card-header small {
+    font-size: 0.8rem;
+    color: var(--color-info-dark);
+}
+
+.editor-card-content {
+    padding: 1.5rem;
+}
+
+/* Specific grid for pricing inputs */
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+}
+
+.pricing-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.pricing-section {
+    padding: 1.5rem;
+    background: var(--color-light);
+    border-radius: var(--border-radius-2);
+}
+
+.pricing-section h4 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-dark);
+}
+
+.pricing-section > small {
+    display: block;
+    margin-bottom: 1rem;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+}
+
+/* New Image Uploader for Editors */
+.editor-image-uploader {
+    width: 100%;
+    max-width: 300px;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--border-radius-2);
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+    border: 3px solid var(--color-light);
+    background: var(--color-light);
+}
+
+.editor-image-uploader img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.editor-image-uploader .upload-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 300ms ease;
+    cursor: pointer;
+}
+
+.editor-image-uploader:hover .upload-overlay {
+    opacity: 1;
+}
+
+/* Hide the default file input */
+#service-image-input, #promo-image-input {
+    display: none;
+}
+
+/* Sticky Footer for Editor Forms */
+.editor-form-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-background);
+    padding: 1rem 1.6rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    border-top: 1px solid var(--color-info-light);
+    z-index: 10;
+    margin-top: 1.6rem;
+}
+
+.dark-theme-variables .editor-form-footer {
+    border-top-color: var(--color-dark-variant);
+}
+
+/* ================== GEOFENCING PAGE ================== */
+.operating-hours-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.operating-hours-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 1fr 80px;
+    align-items: center;
+    gap: 1rem;
+}
+
+.operating-hours-row .day-label {
+    font-weight: 600;
+}
+
+.operating-hours-row input[type="time"] {
+    padding: 0.6rem;
+    background: var(--color-light);
+    border: 1px solid var(--color-info-light);
+    border-radius: var(--border-radius-1);
+    color: var(--color-dark);
+}
+
+/* ================== CARD UPDATE ANIMATION ================== */
+@keyframes card-update-flash {
+  0% {
+    background-color: var(--color-white);
+  }
+  50% {
+    background-color: var(--color-light);
+  }
+  100% {
+    background-color: var(--color-white);
+  }
+}
+.card-flash {
+  animation: card-update-flash 0.7s ease-in-out;
+}
+
+/* ================== FOOTER ================== */
+.main-footer-content {
+    margin-top: 2rem;
+    padding: 1.5rem 0;
+    text-align: center;
+    border-top: 1px solid var(--color-light);
+}
+
+.main-footer-content p {
+    color: var(--color-info-dark);
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+.main-footer-content .footer-credits {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.main-footer-content .footer-meta {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+}
+/* ================== CHART CONTAINER REDESIGN ================== */
+/* Targets Revenue Trend, Revenue by Tech, and Revenue by Category */
+#analytics-container,
+#technician-revenue-widget,
+#category-revenue-widget {
+    padding: 0; /* Remove default padding to use header/content structure */
+    display: flex;
+    flex-direction: column;
+}
+
+#analytics-container h2,
+#technician-revenue-widget h2,
+#category-revenue-widget h2 {
+    margin: 0;
+    padding: 1.2rem 1.8rem;
+    border-bottom: 1px solid var(--chart-header-border, var(--color-light));
+    background-color: var(--chart-header-bg, transparent);
+    font-size: 1.1rem;
+}
+
+/* The div holding the canvas element */
+#analytics-container > div,
+#technician-revenue-widget > div,
+#category-revenue-widget > div {
+    padding: 1.5rem;
+    flex-grow: 1; /* Allow the chart area to fill the container */
+}
+
+/* Add this to your style.css file */
+
+/* ================== SCHEDULER CONTAINER ================== */
+.scheduler-container {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 1.6rem;
+    margin-top: 2rem;
+    grid-template-areas:
+        "calendar timeslots"
+        "calendar queue";
+}
+
+/* ================== CALENDAR WIDGET ================== */
+.calendar-widget {
+    grid-area: calendar;
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--box-shadow);
+    transition: all 300ms ease;
+}
+
+.calendar-widget:hover {
+    box-shadow: none;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.calendar-header h2 {
+    font-size: 1.4rem;
+    margin: 0;
+}
+
+.calendar-weekdays,
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+    text-align: center;
+}
+
+.calendar-weekdays {
+    font-weight: 600;
+    color: var(--color-info-dark);
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.calendar-day {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 3.5rem; /* Increased height for a larger feel */
+    font-size: 1rem; /* Slightly larger font for better readability */
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 200ms ease;
+    position: relative;
+}
+
+.calendar-day:not(.empty):hover {
+    background: var(--color-light);
+}
+
+.calendar-day.empty {
+    cursor: default;
+}
+
+.calendar-day.today {
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.calendar-day.selected {
+    background: var(--color-primary);
+    color: var(--color-white);
+}
+
+.calendar-day.has-appointments .appointment-dot {
+    position: absolute;
+    bottom: 8px; /* Adjusted position for the larger cell */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-warning);
+}
+
+.calendar-day.selected .appointment-dot {
+    background: var(--color-white);
+}
+
+/* ================== TIME SLOTS WIDGET ================== */
+.time-slots-widget,
+.queue-widget {
+    background: var(--color-white);
+    padding: var(--card-padding);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--box-shadow);
+    /* Add the dashboard card layout to sales cards */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: all 300ms ease;
+}
+
+#sales-page-insights .card:hover {
+    transition: all 300ms ease;
+}
+
+.time-slots-widget:hover,
+.queue-widget:hover {
+    box-shadow: none;
+}
+
+.time-slots-widget {
+    grid-area: timeslots;
+}
+
+.widget-card#dashboard-queue-widget .widget-header span {
+    margin-left: auto;
+    color: var(--color-info-dark);
+}
+
+.queue-widget {
+    grid-area: queue;
+}
+
+.widget-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.widget-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    flex-grow: 1; /* Allow title to take available space */
+}
+
+.widget-header .btn-primary {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    /* The margin-left: auto is no longer needed with the new structure */
+    height: fit-content;
+    order: 2; /* Ensure button is the last item on the right */
+}
+
+.time-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.8rem;
+}
+
+.time-slot {
+    background: var(--color-light);
+    padding: 0.8rem;
+    border-radius: var(--border-radius-2);
+    text-align: center;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 200ms ease;
+    border: 2px solid transparent;
+}
+
+.time-slot:not(.booked):hover {
+    background: var(--color-primary-variant);
+    color: var(--color-primary);
+}
+
+.time-slot.booked {
+    background: var(--color-danger-variant);
+    color: var(--color-danger);
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+.time-slot.booked:hover {
+    background: var(--color-danger-variant); /* Keep color on hover */
+}
+
+.time-slot.active {
+    background: var(--color-primary);
+    color: var(--color-white);
+    border-color: var(--color-primary-variant);
+    transform: scale(1.05);
+    box-shadow: var(--box-shadow);
+}
+
+.selected-booking-time {
+    background: var(--color-light);
+    padding: 1rem;
+    border-radius: var(--border-radius-1);
+    text-align: center;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--color-primary);
+    border: 1px solid var(--color-info-light);
+}
+
+.selected-booking-time .text-muted {
+    font-size: 0.9rem;
+    font-weight: 400;
+}
+
+/* ================== QUEUE WIDGET ================== */
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 200px; /* Adjust as needed */
+    overflow-y: auto;
+}
+
+.queue-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-light);
+    padding: 0.8rem 1rem;
+    border-radius: var(--border-radius-2);
+}
+
+.queue-item-info strong {
+    display: block;
+    font-size: 0.9rem;
+}
+
+.queue-item-time {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+/* ================== RESCHEDULE REQUESTS WIDGET ================== */
+#reschedule-requests-widget {
+    grid-column: 1 / -1; /* Make it span the full width */
+    margin-top: 1rem;
+}
+
+#reschedule-requests-widget .widget-header span {
+    margin-left: auto;
+    color: var(--color-info-dark);
+}
+
+.reschedule-requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.reschedule-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    background: var(--color-light);
+    padding: 1rem 1.5rem;
+    border-radius: var(--border-radius-2);
+}
+
+.reschedule-item-info strong {
+    display: block;
+    font-size: 1rem;
+}
+
+.reschedule-item-info small {
+    font-size: 0.85rem;
+    color: var(--color-dark-variant);
+}
+
+.reschedule-item-info .reason {
+    font-style: italic;
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+}
+
+.reschedule-item-actions {
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.btn-danger-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--color-danger);
+    color: var(--color-danger);
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-1);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 300ms ease;
+}
+
+/* ================== RESPONSIVENESS ================== */
+@media screen and (max-width: 1200px) {
+    .scheduler-container {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "calendar"
+            "timeslots"
+            "queue";
+    }
+}

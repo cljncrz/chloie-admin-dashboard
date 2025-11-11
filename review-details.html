@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Review Details - Kingsley Carwash</title>
+
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <!-- Authentication Guard -->
+  <script src="auth-guard.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- ========== Sidebar ========== -->
+      <aside>
+        <div class="sidebar-top">
+          <a href="index.html" class="logo">
+            <img
+              src="./images/minimalkingsley.png"
+              alt="Kingsley Carwash Logo"
+            />
+          </a>
+          <div class="sidebar-close" id="close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </div>
+        </div>
+
+        <div class="sidebar-menu">
+          <a href="index.html">
+            <span class="material-symbols-outlined">dashboard</span>
+            <h3>Dashboard</h3>
+          </a>
+          <a href="appointment.html">
+            <span class="material-symbols-outlined">book_online</span>
+            <h3>Appointments</h3>
+          </a>
+          <a href="technicians.html">
+            <span class="material-symbols-outlined">engineering</span>
+            <h3>Technicians</h3>
+          </a>
+          <a href="customers.html">
+            <span class="material-symbols-outlined">groups</span>
+            <h3>Customers</h3>
+          </a>
+          <a href="services.html">
+            <span class="material-symbols-outlined">local_car_wash</span>
+            <h3>Services & Pricing</h3>
+          </a>
+          <a href="promotions.html">
+            <span class="material-symbols-outlined">campaign</span>
+            <h3>Promotions</h3>
+          </a>
+          <a href="media-manager.html">
+            <span class="material-symbols-outlined">perm_media</span>
+            <h3>Media Manager</h3>
+          </a>
+          <a href="sales.html">
+            <span class="material-symbols-outlined">trending_up</span>
+            <h3>Sales</h3>
+          </a>
+          <a href="reviews.html" class="active">
+            <span class="material-symbols-outlined">reviews</span>
+            <h3>Reviews</h3>
+          </a>
+          <a href="payment-monitoring.html" class="">
+            <span class="material-symbols-outlined">payment</span>
+            <h3>Payment Monitoring</h3>
+          </a>
+          <a href="geofencing.html">
+            <span class="material-symbols-outlined">location_on</span>
+            <h3>Geofencing</h3>
+          </a>
+        </div>
+      </aside>
+      <!-- ========== End of Sidebar ========== -->
+
+      <!-- ========== Main Content ========== -->
+      <main>
+        <!-- ========== Header ========== -->
+        <header class="main-header">
+          <button id="menu-btn">
+            <span class="material-symbols-outlined">menu</span>
+          </button>
+          <div class="header-title-container">
+            <a href="reviews.html" class="action-icon-btn" id="back-btn">
+              <span class="material-symbols-outlined">arrow_back</span>
+            </a>
+            <h1>Review Details</h1>
+          </div>
+          <div class="header-right">
+            <div class="theme-toggler">
+              <span class="material-symbols-outlined active">light_mode</span>
+              <span class="material-symbols-outlined">dark_mode</span>
+            </div>
+            <div class="notification-bell">
+              <span class="material-symbols-outlined">notifications</span>
+              <span class="message-count">5</span>
+              <div class="notification-dropdown">
+                <div class="notification-list-dropdown">
+                  <!-- Notification items will be injected here by JS -->
+                  <p style="padding: 1rem; text-align: center">
+                    No new notifications.
+                  </p>
+                </div>
+                <a href="notifications.html" class="notification-footer">
+                  View All Notifications
+                </a>
+              </div>
+            </div>
+            <a
+              href="chats.html"
+              class="header-action-btn"
+              id="chat-icon-btn"
+              title="Customer Chats"
+            >
+              <span class="material-symbols-outlined">forum</span>
+              <span
+                class="message-count"
+                id="chat-message-count"
+                style="display: none"
+                >0</span
+              >
+            </a>
+            <a
+              href="todo-lists.html"
+              class="header-action-btn"
+              title="To-Do List"
+            >
+              <span class="material-symbols-outlined"
+                >format_list_bulleted</span
+              >
+            </a>
+            <div class="profile">
+              <div class="info">
+                <p>Hey, <b>Adam</b>!</p>
+                <small class="text-muted">Admin</small>
+              </div>
+              <div class="profile-photo">
+                <img src="images/adam.jpg" alt="Admin Profile Picture" />
+              </div>
+              <div class="profile-dropdown">
+                <a href="profile-page.html">
+                  <span class="material-symbols-outlined">person</span>
+                  <h3>Profile</h3>
+                </a>
+                <a href="settings.html">
+                  <span class="material-symbols-outlined">settings</span>
+                  <h3>Settings</h3>
+                </a>
+                <a href="login.html" id="logout-btn">
+                  <span class="material-symbols-outlined">logout</span>
+                  <h3>Logout</h3>
+                </a>
+              </div>
+            </div>
+          </div>
+        </header>
+        <!-- ========== End of Header ========== -->
+
+        <!-- ========== Page Content ========== -->
+        <div class="page-content">
+          <section id="review-details-page" class="page active">
+            <div class="review-details-container">
+              <div class="review-details-main-column">
+                <!-- Left Column: Review Info -->
+                <div class="review-info-card widget-card">
+                  <div class="review-header">
+                    <div class="review-customer-info">
+                      <h3 id="review-customer-name">Customer Name</h3>
+                      <small id="review-service-name">Service Name</small>
+                    </div>
+                    <div class="review-rating" id="review-star-rating">
+                      <!-- Stars will be injected here -->
+                    </div>
+                  </div>
+                  <p class="review-comment" id="review-full-comment">
+                    "Full review comment will be displayed here."
+                  </p>
+                  <small class="review-date text-muted" id="review-date"
+                    >Reviewed on: Month Day, Year</small
+                  >
+                </div>
+
+                <!-- Admin Reply Section -->
+                <div class="admin-reply-card widget-card">
+                  <!-- This section shows an existing reply -->
+                  <div
+                    id="existing-reply-container"
+                    class="reply-container"
+                    style="display: none"
+                  >
+                    <div class="reply-header">
+                      <h3>Admin's Reply</h3>
+                      <button class="btn-secondary" id="edit-reply-btn">
+                        <span class="material-symbols-outlined">edit</span> Edit
+                      </button>
+                    </div>
+                    <div class="admin-reply-content">
+                      <p id="admin-reply-text"></p>
+                    </div>
+                  </div>
+
+                  <!-- This form is for submitting a new reply -->
+                  <form
+                    id="admin-reply-form"
+                    class="modal-form"
+                    style="display: none"
+                  >
+                    <h3 id="reply-form-title">Reply to this Review</h3>
+                    <div class="form-group">
+                      <textarea
+                        id="reply-textarea"
+                        rows="5"
+                        placeholder="Write your response here..."
+                      ></textarea>
+                    </div>
+                    <div class="form-actions reply-actions">
+                      <button
+                        type="button"
+                        class="btn-secondary"
+                        id="cancel-reply-btn"
+                      >
+                        Cancel
+                      </button>
+                      <button type="submit" class="btn-primary">
+                        Submit Reply
+                      </button>
+                    </div>
+                  </form>
+
+                  <!-- This button shows when there is no reply yet -->
+                  <button
+                    class="btn-primary"
+                    id="show-reply-form-btn"
+                    style="display: none"
+                  >
+                    <span class="material-symbols-outlined">reply</span> Reply
+                    to Customer
+                  </button>
+                </div>
+
+                <!-- Receipt Details Section -->
+                <div class="receipt-card widget-card">
+                  <div class="receipt-header">
+                    <h3>Receipt Details</h3>
+                    <button class="btn-primary-outline" id="print-receipt-btn">
+                      <span class="material-symbols-outlined">print</span>
+                      Print
+                    </button>
+                  </div>
+                  <div class="receipt-content">
+                    <div class="receipt-item">
+                      <span class="receipt-label">Transaction ID</span>
+                      <span class="receipt-value" id="receipt-trans-id"></span>
+                    </div>
+                    <div class="receipt-item">
+                      <span class="receipt-label">Service Availed</span>
+                      <span class="receipt-value" id="receipt-service"></span>
+                    </div>
+                    <div class="receipt-item">
+                      <span class="receipt-label">Mode of Payment</span>
+                      <span class="receipt-value" id="receipt-mop"></span>
+                    </div>
+                    <div class="receipt-item total">
+                      <span class="receipt-label">Total Amount Paid</span>
+                      <span class="receipt-value" id="receipt-total"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: Media -->
+              <div class="review-media-card widget-card">
+                <h2>Customer Media</h2>
+                <div class="review-media-content" id="review-media-content">
+                  <!-- Media (Image/Video) will be injected here -->
+                  <div class="no-media-placeholder">
+                    <span class="material-symbols-outlined">hide_image</span>
+                    <p>No media submitted for this review.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <!-- ========== End of Page Content ========== -->
+        <!-- ========== Footer ========== -->
+        <footer class="main-footer-content">
+          <p>
+            &copy; 2024 Kingsley Carwash and Detailing Services. All Rights
+            Reserved.
+          </p>
+          <p class="footer-credits">
+            Created by: Marc Kenneth Cula, Adam Mari Amplayo, Chloie Jane Cruz,
+            Angel Adellene Alcordo, & Chetli Kien San Juan
+          </p>
+          <div class="footer-meta">
+            <p class="footer-version">Version 1.0.1</p>
+            <p class="footer-last-updated"></p>
+          </div>
+        </footer>
+      </main>
+    </div>
+    <div class="chat-flyout-footer"></div>
+
+    <script src="all-data.js"></script>
+    <script src="global-updates.js"></script>
+    <script src="script.js"></script>
+    <script src="review-details.js"></script>
+  </body>
+</html>

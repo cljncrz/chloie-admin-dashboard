@@ -1,0 +1,16 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "launch", // This will launch a new instance of Chrome
+            "name": "Launch login.html with Live Server",
+            // This tells the debugger to open the file that is currently active in your editor.
+            // The Live Server extension will intercept this and serve it correctly.
+            "file": "${workspaceFolder}/login.html"
+        }
+    ]
+}

@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Appointments - Kingsley Carwash</title>
+
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <!-- Authentication Guard -->
+  <script src="auth-guard.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- ========== Sidebar ========== -->
+      <aside>
+        <div class="sidebar-top">
+          <a href="#" class="logo">
+            <img
+              src="./images/minimalkingsley.png"
+              alt="Kingsley Carwash Logo"
+            />
+          </a>
+          <div class="sidebar-close" id="close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </div>
+        </div>
+
+        <div class="sidebar-menu">
+          <a href="index.html">
+            <span class="material-symbols-outlined">dashboard</span>
+            <h3>Dashboard</h3>
+          </a>
+          <a href="appointment.html" class="active">
+            <span class="material-symbols-outlined">book_online</span>
+            <h3>Appointments</h3>
+          <a href="technicians.html">
+            <span class="material-symbols-outlined">engineering</span>
+            <h3>Technicians</h3>
+          </a>
+          <a href="customers.html">
+            <span class="material-symbols-outlined">groups</span>
+            <h3>Customers</h3>
+          </a>
+          <a href="services.html">
+            <span class="material-symbols-outlined">local_car_wash</span>
+            <h3>Services & Pricing</h3>
+          </a>
+          <a href="promotions.html">
+            <span class="material-symbols-outlined">campaign</span>
+            <h3>Promotions</h3>
+          </a>
+         
+          <a href="media-manager.html">
+            <span class="material-symbols-outlined">perm_media</span>
+            <h3>Media Manager</h3>
+          </a>
+          <a href="sales.html">
+            <span class="material-symbols-outlined">trending_up</span>
+            <h3>Sales</h3>
+          </a>
+          <a href="reviews.html">
+            <span class="material-symbols-outlined">reviews</span>
+            <h3>Reviews</h3>
+          </a>
+          <a href="payment-monitoring.html">
+            <span class="material-symbols-outlined">payment</span>
+            <h3>Payment Monitoring</h3>
+          </a>
+           <a href="geofencing.html">
+                <span class="material-symbols-outlined">location_on</span>
+                <h3>Geofencing</h3>
+            </a>
+        </div>
+      </aside>
+      <!-- ========== End of Sidebar ========== -->
+
+      <!-- ========== Main Content ========== -->
+      <main>
+        <!-- ========== Header ========== -->
+        <header class="main-header">
+          <button id="menu-btn">
+            <span class="material-symbols-outlined">menu</span>
+          </button>
+          <h1>Appointments</h1>
+          <div class="header-right">
+            <div class="theme-toggler">
+              <span class="material-symbols-outlined active">light_mode</span>
+              <span class="material-symbols-outlined">dark_mode</span>
+            </div>
+            <div class="notification-bell">
+              <span class="material-symbols-outlined">notifications</span>
+              <span class="message-count">5</span>
+              <div class="notification-dropdown">
+                <div class="notification-list-dropdown">
+                  <!-- Notification items will be injected here by JS -->
+                  <p style="padding: 1rem; text-align: center">
+                    No new notifications.
+                  </p>
+                </div>
+                <a href="notifications.html" class="notification-footer">
+                  View All Notifications
+                </a>
+              </div>
+            </div>
+            <a
+              href="chats.html"
+              class="header-action-btn"
+              id="chat-icon-btn"
+              title="Customer Chats"
+            >
+              <span class="material-symbols-outlined">forum</span>
+              <span class="message-count" id="chat-message-count" style="display: none">0</span>
+            </a>
+            <a
+              href="todo-lists.html"
+              class="header-action-btn"
+              title="To-Do List"
+            >
+              <span class="material-symbols-outlined"
+                >format_list_bulleted</span
+              >
+            </a>
+            <div class="profile">
+              <div class="info">
+                <p>Hey, <b>Adam</b>!</p>
+                <small class="text-muted">Admin</small>
+              </div>
+              <div class="profile-photo">
+                <img src="images/adam.jpg" alt="Admin Profile Picture" />
+              </div>
+               <div class="profile-dropdown">
+                <a href="profile-page.html">
+                  <span class="material-symbols-outlined">person</span>
+                  <h3>Profile</h3>
+                </a>
+                <a href="index.html#settings">
+                  <span class="material-symbols-outlined">settings</span>
+                  <h3>Settings</h3>
+                </a>
+                <a href="login.html">
+                  <span class="material-symbols-outlined">logout</span>
+                  <h3>Logout</h3>
+                </a>
+              </div>
+            </div>
+          </div>
+        </header>
+        <!-- ========== End of Header ========== -->
+
+        <!-- ========== Page Content ========== -->
+        <div class="page-content">
+          <section id="appointments-page" class="page active">
+            <!-- Quick Stats Section -->
+            <div
+              class="insights appointment-insights"
+              id="appointment-page-insights"
+            >
+              <div class="widget-card stat-card">
+                <span class="material-symbols-outlined">book_online</span>
+                <div class="stat-info">
+                  <h3>Total Appointments</h3>
+                  <h1 id="total-appointments-stat">0</h1>
+                </div>
+              </div>
+              <div class="widget-card stat-card">
+                <span class="material-symbols-outlined">pending_actions</span>
+                <div class="stat-info">
+                  <h3>Pending</h3>
+                  <h1 id="pending-appointments-stat">0</h1>
+                </div>
+              </div>
+              <div class="widget-card stat-card">
+                <span class="material-symbols-outlined">autorenew</span>
+                <div class="stat-info">
+                  <h3>In Progress</h3>
+                  <h1 id="inprogress-appointments-stat">0</h1>
+                </div>
+              </div>
+              <div class="widget-card stat-card">
+                <span class="material-symbols-outlined">check_circle</span>
+                <div class="stat-info">
+                  <h3>Completed</h3>
+                  <h1 id="completed-appointments-stat">0</h1>
+                </div>
+              </div>
+              <div class="widget-card stat-card">
+                <span class="material-symbols-outlined">cancel</span>
+                <div class="stat-info">
+                  <h3>Cancelled</h3>
+                  <h1 id="cancelled-appointments-stat">0</h1>
+                </div>
+              </div>
+            </div>
+
+            <!-- Add the following HTML right after the closing </div> of the insights section -->
+            <div class="scheduler-container">
+              <div class="calendar-widget">
+                <div class="calendar-header">
+                  <button id="prev-month-btn" class="action-icon-btn">
+                    <span class="material-symbols-outlined">chevron_left</span>
+                  </button>
+                  <h2 id="calendar-month-year"></h2>
+                  <button id="next-month-btn" class="action-icon-btn">
+                    <span class="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </div>
+                <div class="calendar-weekdays">
+                  <div>Sun</div>
+                  <div>Mon</div>
+                  <div>Tue</div>
+                  <div>Wed</div>
+                  <div>Thu</div>
+                  <div>Fri</div>
+                  <div>Sat</div>
+                </div>
+                <div id="calendar-days" class="calendar-days">
+                  <!-- Days will be generated by JS -->
+                </div>
+              </div>
+
+              <div class="time-slots-widget">
+                <div class="widget-header">
+                  <h3>Available Time Slots</h3>
+                  <button class="btn-primary" id="book-new-appointment-btn">
+                    <span class="material-symbols-outlined">add</span> Book New
+                  </button>
+                  <small id="time-slots-date"></small>
+                </div>
+                <div id="time-slots-container" class="time-slots-grid">
+                  <!-- Time slots will be generated by JS -->
+                </div>
+              </div>
+
+              <div class="queue-widget">
+                <div class="widget-header">
+                  <h3>Today's Queue</h3>
+                  <small>Pending Appointments</small>
+                </div>
+                <div id="queue-list" class="queue-list">
+                  <!-- Queue items will be generated by JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- New Reschedule Requests Widget -->
+            <div class="widget-card" id="reschedule-requests-widget">
+              <div class="widget-header">
+                <h3>Reschedule Requests</h3>
+                <span class="material-symbols-outlined">schedule</span>
+              </div>
+              <div
+                class="reschedule-requests-list"
+                id="reschedule-requests-list"
+              >
+                <!-- Requests will be populated by JS -->
+              </div>
+            </div>
+
+            <!-- The rest of your appointments page content (e.g., the tables) follows here -->
+
+            <div
+              class="recent-appointments-container"
+              id="main-appointments-table-container"
+            >
+              <div class="recent-appointments" id="main-appointments-table">
+                <div class="table-header">
+                  <h2>All Appointments (Mobile App Users)</h2>
+                </div>
+                <div class="table-controls">
+                  <div class="table-search-container">
+                    <input
+                      type="search"
+                      id="appointment-search"
+                      placeholder="Search appointments..."
+                    />
+                  </div>
+                  <div class="status-filter-container">
+                    <select class="status-filter"></select>
+                  </div>
+                </div>
+                <div class="table-responsive-wrapper">
+                  <div class="table-loader">
+                    <div class="spinner"></div>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr class="sortable-header">
+                        <th data-sortable="true" data-sort-by="serviceId">ID</th>
+                        <th data-sortable="true" data-sort-by="plate">Plate No</th>
+                        <th data-sortable="true" data-sort-by="carName">CarName</th>
+                        <th data-sortable="true" data-sort-by="carType">Type</th>
+                        <th data-sortable="true" data-sort-by="serviceNames">Service</th>
+                        <th data-sortable="true" data-sort-by="datetime">Date&Time</th>
+                        <th data-sortable="true" data-sort-by="price">Price</th>
+                        <th data-sortable="true" data-sort-by="technician">Technician</th>
+                        <th data-sortable="true" data-sort-by="status" class="text-center">Status</th>
+                        <th data-sortable="true" class="text-center">
+                          Payment
+                        </th>
+                        <th class="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="no-results-row">
+                        <td colspan="11" class="text-center text-muted">
+                          No appointments found.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="table-pagination">
+                  <button class="pagination-btn" data-action="prev">
+                    &laquo; Previous
+                  </button>
+                  <span class="page-info"></span>
+                  <button class="pagination-btn" data-action="next">
+                    Next &raquo;
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="recent-appointments-container"
+              id="walk-in-appointments-table-container"
+            >
+              <div
+                class="recent-appointments walk-in-appointments"
+                id="walk-in-appointments-table"
+              >
+                <div class="table-header">
+                  <h2>Walk-in Customers (Seniors/PWD)</h2>
+                  <a href="add-walk-in.html" class="btn-primary" id="add-walk-in-btn">
+                    <span class="material-symbols-outlined">add</span>
+                    New Walk-in
+                  </a>
+                </div>
+                <div class="table-controls">
+                  <div class="table-search-container">
+                    <input
+                      type="search"
+                      id="walkin-appointment-search"
+                      placeholder="Search walk-ins..."
+                    />
+                  </div>
+                  <div class="status-filter-container">
+                    <select class="status-filter"></select>
+                  </div>
+                </div>
+                <div class="table-responsive-wrapper">
+                  <div class="table-loader">
+                    <div class="spinner"></div>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr class="sortable-header">
+                        <th data-sortable="true" data-sort-by="plate">Plate No.</th>
+                        <th data-sortable="true">CarName</th>
+                        <th data-sortable="true">CarType</th>
+                        <th data-sortable="true">Service</th>
+                        <th data-sortable="true">Date&Time</th>
+                        <th data-sortable="true">Price</th>
+                        <th data-sortable="true">Technician</th>
+                        <th data-sortable="true" class="text-center">Status</th>
+                        <th data-sortable="true" class="text-center">
+                          Payment
+                        </th>
+                        <th class="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="no-results-row">
+                        <td colspan="9" class="text-center text-muted">
+                          No walk-ins found.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="table-pagination">
+                  <button class="pagination-btn" data-action="prev">
+                    &laquo; Previous
+                  </button>
+                  <span class="page-info"></span>
+                  <button class="pagination-btn" data-action="next">
+                    Next &raquo;
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <!-- ========== End of Page Content ========== -->
+        <!-- ========== Footer ========== -->
+        <footer class="main-footer-content">
+          <p>
+            &copy; 2024 Kingsley Carwash and Detailing Services. All Rights
+            Reserved.
+          </p>
+          <p class="footer-credits">
+            Created by: Marc Kenneth Cula, Adam Mari Amplayo, Chloie Jane Cruz,
+            Angel Adellene Alcordo, & Chetli Kien San Juan
+          </p>
+          <div class="footer-meta">
+            <p class="footer-version">Version 1.0.1</p>
+            <p class="footer-last-updated"></p>
+          </div>
+        </footer>
+      </main>
+      <!-- ========== End of Main Content ========== -->
+    </div>
+
+    <!-- ========== Modal ========== -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal" id="app-modal">
+        <div class="modal-header">
+          <h2 id="modal-title">Quick Action</h2>
+          <button class="modal-close" id="modal-close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-body" id="modal-body">
+          <!-- Default Content -->
+          <div class="modal-content" id="default-modal-content">
+            <p>This is where the form or content for the action will go.</p>
+          </div>
+
+          <!-- Appointment Details Content -->
+          <div class="modal-content" id="appointment-details-content">
+            <div class="appointment-details-grid">
+              <div class="detail-item">
+                <small class="text-muted">Customer Name</small>
+                <p id="modal-customer-name"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">CP Number</small>
+                <p id="modal-customer-phone"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Service</small>
+                <p id="modal-service"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Assigned Technician</small>
+                <p id="modal-technician"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Status</small>
+                <select id="modal-status-select" class="status-badge"></select>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Car Plate</small>
+                <p id="modal-car-plate"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Date & Time</small>
+                <p id="modal-datetime"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Start Time</small>
+                <p id="modal-start-time"></p>
+              </div>
+            </div>
+            <div class="modal-actions"></div>
+          </div>
+
+          <!-- New Appointment Booking Modal Content -->
+          <div class="modal-content" id="book-appointment-content">
+            <form id="book-appointment-form" class="modal-form">
+              <div class="form-group">
+                <label for="booking-customer-search"
+                  >Customer (from Mobile App)</label
+                >
+                <div class="custom-select-with-search">
+                  <input
+                    type="text"
+                    id="booking-customer-search"
+                    placeholder="Search or select a customer..."
+                    autocomplete="off"
+                  />
+                  <div
+                    class="custom-select-options"
+                    id="booking-customer-options"
+                  >
+                    <!-- Filtered customer options will be populated by JS -->
+                  </div>
+                  <select
+                    id="booking-customer-select"
+                    required
+                    style="display: none"
+                  ></select>
+                </div>
+              </div>
+              <!-- New Vehicle Info Display -->
+              <div
+                class="form-group"
+                id="booking-vehicle-info-container"
+                style="display: none"
+              >
+                <label>Vehicle Information</label>
+                <div
+                  class="vehicle-info-display"
+                  id="booking-vehicle-info"
+                ></div>
+              </div>
+              <div class="form-group">
+                <label for="booking-service-search">Service</label>
+                <div class="custom-select-with-search">
+                  <input
+                    type="text"
+                    id="booking-service-search"
+                    placeholder="Search or select a service..."
+                    autocomplete="off"
+                  />
+                  <div
+                    class="custom-select-options"
+                    id="booking-service-options"
+                  >
+                    <!-- Filtered service options will be populated by JS -->
+                  </div>
+                  <select
+                    id="booking-service-select"
+                    required
+                    style="display: none"
+                  ></select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Selected Date & Time</label>
+                <div class="selected-booking-time" id="selected-booking-time">
+                  <p class="text-muted">
+                    Please select an available time slot from the calendar.
+                  </p>
+                </div>
+              </div>
+              <div class="modal-actions">
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  id="booking-cancel-btn"
+                >
+                  Cancel
+                </button>
+                <button type="submit" class="btn-primary">
+                  Confirm Booking
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Add Walk-in Form -->
+          <div class="modal-content" id="add-walk-in-form-content">
+            <form id="new-walk-in-form" class="modal-form">
+              <div class="form-group">
+                <label for="walkin-customer-name">Customer Name</label>
+                <input
+                  type="text"
+                  id="walkin-customer-name"
+                  placeholder="e.g., Juan Dela Cruz"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="walkin-car-plate">Car Plate Number</label>
+                <input
+                  type="text"
+                  id="walkin-car-plate"
+                  placeholder="e.g., ABC 1234"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="walkin-customer-phone">Customer Phone</label>
+                <input
+                  type="tel"
+                  id="walkin-customer-phone"
+                  placeholder="e.g., 09171234567"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="walkin-car-name">Car Name</label>
+                <input
+                  type="text"
+                  id="walkin-car-name"
+                  placeholder="e.g., Toyota Vios"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="walkin-car-type">Car Type</label>
+                <input
+                  type="text"
+                  id="walkin-car-type"
+                  placeholder="e.g., Sedan"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="walkin-service">Service</label>
+                <select id="walkin-service" required></select>
+              </div>
+              <div class="form-group">
+                <label for="walkin-price">Price (₱)</label>
+                <input
+                  type="number"
+                  id="walkin-price"
+                  placeholder="e.g., 250"
+                  required
+                  style="overflow-y: auto; max-height: 400px;"
+                />
+              </div>
+              <div class="form-group">
+                <label for="walkin-date">Date & Time</label>
+                <div class="form-row">
+                  <input type="date" id="walkin-date" required />
+                  <input type="time" id="walkin-time" required />
+                  </div>
+                <small class="text-muted">Defaults to the current date and time.</small>
+              </div>
+              <div class="modal-actions" style="justify-content: flex-start">
+                <button type="submit" class="btn-primary">Add to Queue</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Add To-Do Form -->
+        <div class="modal-content" id="add-todo-content">
+          <form id="add-todo-form" class="modal-form">
+            <div class="form-group">
+              <label for="todo-text">Task Description</label>
+              <input
+                type="text"
+                id="todo-text"
+                placeholder="e.g., Order new microfiber towels"
+                required
+              />
+            </div>
+            <button type="submit" class="btn-primary">Add Task</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Success Message Toast ========== -->
+    <div class="success-toast" id="success-toast">
+      <span class="material-symbols-outlined">check_circle</span>
+      <p>Success!</p>
+    </div>
+
+    <script src="all-data.js"></script>
+    <script src="appointments.js"></script>
+    <script src="global-updates.js"></script>
+    <script src="./appointment-scheduler.js"></script>
+    <script src="script.js"></script>
+    <script src="notifications.js"></script>
+  </body>
+</html>

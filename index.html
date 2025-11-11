@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - Kingsley Carwash</title>
+
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    />
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
+    <script src="firebase-config.js"></script>
+    <!-- Authentication Guard -->
+    <script src="auth-guard.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- ========== Sidebar ========== -->
+      <aside>
+        <div class="sidebar-top">
+          <a href="index.html" class="logo">
+            <img
+              src="./images/minimalkingsley.png"
+              alt="Kingsley Carwash Logo"
+            />
+          </a>
+          <div class="sidebar-close" id="close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </div>
+        </div>
+
+        <div class="sidebar-menu">
+          <a href="index.html" class="active">
+            <span class="material-symbols-outlined">dashboard</span>
+            <h3>Dashboard</h3>
+          </a>
+          <a href="appointment.html">
+            <span class="material-symbols-outlined">book_online</span>
+            <h3>Appointments</h3>
+          </a>
+          <a href="technicians.html">
+            <span class="material-symbols-outlined">engineering</span>
+            <h3>Technicians</h3>
+          </a>
+          <a href="customers.html">
+            <span class="material-symbols-outlined">groups</span>
+            <h3>Customers</h3>
+          </a>
+          <a href="services.html">
+            <span class="material-symbols-outlined">local_car_wash</span>
+            <h3>Services & Pricing</h3>
+          </a>
+          <a href="promotions.html">
+            <span class="material-symbols-outlined">campaign</span>
+            <h3>Promotions</h3>
+          </a>
+          <a href="media-manager.html">
+            <span class="material-symbols-outlined">perm_media</span>
+            <h3>Media Manager</h3>
+          </a>
+          <a href="sales.html">
+            <span class="material-symbols-outlined">trending_up</span>
+            <h3>Sales</h3>
+          </a>
+          <a href="reviews.html">
+            <span class="material-symbols-outlined">reviews</span>
+            <h3>Reviews</h3>
+          </a>
+          <a href="payment-monitoring.html">
+            <span class="material-symbols-outlined">payment</span>
+            <h3>Payment Monitoring</h3>
+          </a>
+          <a href="geofencing.html">
+            <span class="material-symbols-outlined">location_on</span>
+            <h3>Geofencing</h3>
+          </a>
+        </div>
+      </aside>
+      <!-- ========== End of Sidebar ========== -->
+
+      <!-- ========== Main Content ========== -->
+      <main>
+        <!-- ========== Header ========== -->
+        <header class="main-header">
+          <button id="menu-btn">
+            <span class="material-symbols-outlined">menu</span>
+          </button>
+          <h1>Dashboard</h1>
+          <div class="header-right">
+            <div class="theme-toggler">
+              <span class="material-symbols-outlined active">light_mode</span>
+              <span class="material-symbols-outlined">dark_mode</span>
+            </div>
+            <div class="notification-bell">
+              <span class="material-symbols-outlined">notifications</span>
+              <span class="message-count">5</span>
+              <div class="notification-dropdown">
+                <div class="notification-list-dropdown">
+                  <!-- Notification items will be injected here by JS -->
+                  <p style="padding: 1rem; text-align: center">
+                    No new notifications.
+                  </p>
+                </div>
+                <a href="notifications.html" class="notification-footer">
+                  View All Notifications
+                </a>
+              </div>
+            </div>
+            <a
+              href="chats.html"
+              class="header-action-btn"
+              id="chat-icon-btn"
+              title="Customer Chats"
+            >
+              <span class="material-symbols-outlined">forum</span>
+              <span
+                class="message-count"
+                id="chat-message-count"
+                style="display: none"
+                >0</span
+              >
+            </a>
+            <a
+              href="todo-lists.html"
+              class="header-action-btn"
+              title="To-Do List"
+            >
+              <span class="material-symbols-outlined"
+                >format_list_bulleted</span
+              >
+            </a>
+            <div class="profile">
+              <div class="info">
+                <p>Hey, <b id="profile-header-name">Adam</b>!</p>
+                <small class="text-muted">Admin</small>
+              </div>
+              <div class="profile-photo">
+                <img src="images/adam.jpg" alt="Admin Profile Picture" />
+              </div>
+              <div class="profile-dropdown">
+                <a href="profile-page.html">
+                  <span class="material-symbols-outlined">person</span>
+                  <h3>Profile</h3>
+                </a>
+                <a href="settings.html">
+                  <span class="material-symbols-outlined">settings</span>
+                  <h3>Settings</h3>
+                </a>
+                <a href="login.html" id="logout-btn">
+                  <span class="material-symbols-outlined">logout</span>
+                  <h3>Logout</h3>
+                </a>
+              </div>
+            </div>
+          </div>
+        </header>
+        <!-- ========== End of Header ========== -->
+
+        <!-- ========== Page Content ========== -->
+        <div class="page-content">
+          <!-- Dashboard Section -->
+          <section id="dashboard" class="page active dashboard">
+            <div class="dashboard-grid">
+              <!-- Main Content Column -->
+              <div class="dashboard-main-column">
+                <div class="insights">
+                  <!-- Total Sales Card -->
+                  <div class="card sales">
+                    <div class="card-header">
+                      <span class="material-symbols-outlined">bar_chart</span>
+                      <h3>Total Sales</h3>
+                    </div>
+                    <h1 data-value="15024">₱0</h1>
+                    <div class="card-footer">
+                      <span class="trend positive">+10%</span>
+                      <small class="text-muted">vs. last 24h</small>
+                    </div>
+                  </div>
+                  <!-- Today's Bookings Card -->
+                  <div class="card bookings">
+                    <div class="card-header">
+                      <span class="material-symbols-outlined"
+                        >calendar_month</span
+                      >
+                      <h3>Today's Bookings</h3>
+                    </div>
+                    <h1 data-value="14">0</h1>
+                    <div class="card-footer">
+                      <span class="trend negative">-5%</span>
+                      <small class="text-muted">vs. yesterday</small>
+                    </div>
+                  </div>
+                  <!-- Services Completed Card -->
+                  <div class="card completed">
+                    <div class="card-header">
+                      <span class="material-symbols-outlined"
+                        >check_circle</span
+                      >
+                      <h3>Services Completed</h3>
+                    </div>
+                    <h1 data-value="8">0</h1>
+                    <div class="card-footer">
+                      <span class="trend positive">+2</span>
+                      <small class="text-muted">vs. yesterday</small>
+                    </div>
+                  </div>
+                </div>
+                <!-- End of Insights -->
+                <div class="recent-appointments">
+                  <h2>Recent Appointments</h2>
+                  <div class="table-controls">
+                    <div class="table-search-container">
+                      <input
+                        type="search"
+                        id="appointment-search"
+                        placeholder="Search appointments..."
+                      />
+                    </div>
+                    <div class="status-filter-container">
+                      <select id="status-filter" class="status-filter"></select>
+                    </div>
+                  </div>
+                  <div class="table-responsive-wrapper">
+                    <div class="table-loader">
+                      <div class="spinner"></div>
+                    </div>
+                    <table>
+                      <thead>
+                        <tr class="sortable-header">
+                          <th data-sortable="true">Customer Name </th>
+                          <th data-sortable="true">Plate No.</th>
+                          <th data-sortable="true">Service</th>
+                          <th data-sortable="true" class="text-center">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr class="no-results-row">
+                          <td colspan="4" class="text-center text-muted">
+                          <td colspan="5" class="text-center text-muted">
+                            No appointments found.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="table-pagination">
+                    <button class="pagination-btn" data-action="prev">
+                      &laquo; Previous
+                    </button>
+                    <span class="page-info"></span>
+                    <button class="pagination-btn" data-action="next">
+                      Next &raquo;
+                    </button>
+                  </div>
+                  <a href="appointment.html" class="show-all-link"
+                    >Show All Appointments</a
+                  >
+                </div>
+
+                <div class="recent-appointments walk-in-appointments">
+                  <h2>Walk-in Customers (Seniors/PWD)</h2>
+                  <div class="table-controls">
+                    <div class="table-search-container">
+                      <input
+                        type="search"
+                        id="walkin-appointment-search"
+                        placeholder="Search walk-ins..."
+                      />
+                    </div>
+                    <div class="status-filter-container">
+                      <select
+                        id="walkin-status-filter"
+                        class="status-filter"
+                      ></select>
+                    </div>
+                  </div>
+                  <div class="table-responsive-wrapper">
+                    <div class="table-loader">
+                      <div class="spinner"></div>
+                    </div>
+                    <table>
+                      <thead>
+                        <tr class="sortable-header">
+                              <th data-sortable="true">Customer Name</th>
+                          <th data-sortable="true">Plate No.</th>
+                          <th data-sortable="true">Service</th>
+                          <th data-sortable="true" class="text-center">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr class="no-results-row">
+                          <td colspan="4" class="text-center text-muted">
+                            No walk-ins found.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="table-pagination">
+                    <button class="pagination-btn" data-action="prev">
+                      &laquo; Previous
+                    </button>
+                    <span class="page-info"></span>
+                    <button class="pagination-btn" data-action="next">
+                      Next &raquo;
+                    </button>
+                  </div>
+                  <a href="appointment.html" class="show-all-link"
+                    >Show All Walk-ins</a
+                  >
+                </div>
+              </div>
+
+              <!-- Right Column -->
+              <div class="dashboard-right-column">
+                <div class="todo-list-card">
+                  <h2>To-Do List</h2>
+                  <div class="todo-list-items" id="dashboard-todo-list">
+                    <div class="todo-item">
+                      <div class="icon">
+                        <span class="material-symbols-outlined">inventory</span>
+                      </div>
+                      <div class="details">
+                        <h3>Restock cleaning supplies</h3>
+                        <small class="text-muted">Due: Tomorrow</small>
+                      </div>
+                      <button class="delete-todo-btn">
+                        <span class="material-symbols-outlined">delete</span>
+                      </button>
+                    </div>
+                    <div class="todo-item">
+                      <div class="icon">
+                        <span class="material-symbols-outlined">call</span>
+                      </div>
+                      <div class="details">
+                        <h3>Call supplier for new towels</h3>
+                        <small class="text-muted">Due: Today</small>
+                      </div>
+                      <button class="delete-todo-btn">
+                        <span class="material-symbols-outlined">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                  <a
+                    href="#"
+                    class="add-item-link"
+                    data-modal-title="Add New To-Do Item"
+                    data-content-id="add-todo-content"
+                    ><span class="material-symbols-outlined">add</span> Add
+                    To-Do</a
+                  >
+                </div>
+
+                <div class="widget-card top-technicians-card">
+                  <h2>Top Technicians</h2>
+                  <div class="technician-item">
+                    <div class="profile-photo">
+                      <img src="./images/redicon.png" alt="Bisu Go" />
+                    </div>
+                    <div class="technician-info">
+                      <h3>Bisu Go</h3>
+                      <small class="text-muted">5 Services Today</small>
+                    </div>
+                    <div class="performance-badge success">
+                      <span class="material-symbols-outlined">trending_up</span>
+                    </div>
+                  </div>
+                  <div class="technician-item">
+                    <div class="profile-photo">
+                      <img src="./images/redicon.png" alt="Rey Ignacio" />
+                    </div>
+                    <div class="technician-info">
+                      <h3>Rey Ignacio</h3>
+                      <small class="text-muted">4 Services Today</small>
+                    </div>
+                    <div class="performance-badge success">
+                      <span class="material-symbols-outlined">trending_up</span>
+                    </div>
+                  </div>
+                  <a href="technicians.html" class="show-all-link"
+                    >View All Technicians</a
+                  >
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Technicians Section -->
+          <section id="technicians" class="page">
+            <h2>Our Technicians</h2>
+            <div class="technician-list">
+              <!-- Technician data will be injected here by JavaScript -->
+            </div>
+          </section>
+
+          <!-- Other Sections (placeholder) -->
+          <section id="appointments" class="page">
+            <h2>Appointments & Bookings</h2>
+          </section>
+          <section id="customers" class="page"><h2>Customers</h2></section>
+          <section id="services" class="page">
+            <h2>Services & Pricing</h2>
+          </section>
+          <section id="promotions" class="page"><h2>Promotions</h2></section>
+          <section id="sales" class="page"><h2>Sales</h2></section>
+          <section id="reports" class="page"><h2>Reports</h2></section>
+          <section id="damage-reviews" class="page">
+            <h2>Damage Reviews</h2>
+          </section>
+          <section id="service-reviews" class="page">
+            <h2>Service Reviews</h2>
+            <div class="reviews-container"></div>
+          </section>
+          <!-- ========== Footer ========== -->
+          <footer class="main-footer-content">
+            <p>
+              &copy; 2024 Kingsley Carwash and Detailing Services. All Rights
+              Reserved.
+            </p>
+            <p class="footer-credits">
+              Created by: Marc Kenneth Cula, Adam Mari Amplayo, Chloie Jane
+              Cruz, Angel Adellene Alcordo, & Chetli Kien San Juan
+            </p>
+            <div class="footer-meta">
+              <p class="footer-version">Version 1.0.1</p>
+              <p class="footer-last-updated"></p>
+            </div>
+          </footer>
+          <section id="settings" class="page"><h2>Settings</h2></section>
+        </div>
+      </main>
+      <!-- ========== End of Main Content ========== -->
+    </div>
+    <!-- End of .container -->
+
+    <!-- ========== New Walk-in Modal (Simpler) ========== -->
+    <div class="modal-overlay" id="walkin-modal-overlay">
+      <div class="modal" id="walkin-modal">
+        <div class="modal-header">
+          <h2>New Walk-in Customer</h2>
+          <button class="modal-close" id="walkin-modal-close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form id="new-walk-in-form" class="modal-form">
+            <div class="form-group">
+              <label for="walkin-car-plate">Car Plate Number</label>
+              <input
+                type="text"
+                id="walkin-car-plate"
+                placeholder="e.g., ABC 1234"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="walkin-customer-phone">Customer Phone</label>
+              <input
+                type="tel"
+                id="walkin-customer-phone"
+                placeholder="e.g., 09171234567"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="walkin-service">Service</label>
+              <select id="walkin-service" required></select>
+            </div>
+            <div class="modal-actions" style="justify-content: flex-start">
+              <button type="submit" class="btn-primary">Add to Queue</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Modal ========== -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal" id="app-modal">
+        <div class="modal-header">
+          <h2 id="modal-title">Quick Action</h2>
+          <button class="modal-close" id="modal-close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-body" id="modal-body">
+          <!-- Default Content -->
+          <div class="modal-content" id="default-modal-content">
+            <p>This is where the form or content for the action will go.</p>
+          </div>
+         
+          <!-- New Quick Reply Form -->
+          <div class="modal-content" id="quick-reply-content">
+            <form id="quick-reply-form" class="modal-form">
+              <div class="form-group">
+                <label for="quick-reply-textarea">Your Reply</label>
+                <textarea
+                  id="quick-reply-textarea"
+                  rows="5"
+                  placeholder="Write your response here..."
+                  required
+                ></textarea>
+              </div>
+              <div class="modal-actions">
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  id="quick-reply-cancel-btn"
+                >
+                  Cancel
+                </button>
+                <button type="submit" class="btn-primary">Submit Reply</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Appointment Details Content -->
+          <div class="modal-content" id="appointment-details-content">
+            <div class="appointment-details-grid">
+              <div class="detail-item">
+                <small class="text-muted">Customer Name</small>
+                <p id="modal-customer-name"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Service</small>
+                <p id="modal-service"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Assigned Technician</small>
+                <p id="modal-technician"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Status</small>
+                <p id="modal-status" class="status-badge"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Car Plate</small>
+                <p id="modal-car-plate"></p>
+              </div>
+              <div class="detail-item">
+                <small class="text-muted">Date & Time</small>
+                <p id="modal-datetime"></p>
+              </div>
+            </div>
+            <div class="modal-actions"></div>
+          </div>
+        </div>
+
+        <!-- Add To-Do Form -->
+        <div class="modal-content" id="add-todo-content">
+          <form id="add-todo-form" class="modal-form">
+            <div class="form-group">
+              <label for="todo-text">Task Description</label>
+              <input
+                type="text"
+                id="todo-text"
+                placeholder="e.g., Order new microfiber towels"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="todo-due-date">Due Date (Optional)</label>
+              <div class="form-row">
+                <input type="date" id="todo-due-date" />
+                <input type="time" id="todo-due-time" />
+              </div>
+            </div>
+            <button type="submit" class="btn-primary">Add Task</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Success Message Toast ========== -->
+    <div class="success-toast" id="success-toast">
+      <span class="material-symbols-outlined">check_circle</span>
+      <p>Success!</p>
+    </div>
+
+    <script src="all-data.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="global-updates.js"></script>
+    <script src="script.js"></script>
+    <script src="notifications.js"></script>
+    <script src="appointments.js"></script>
+    <script src="sales.js"></script>
+    <script src="services.js"></script>
+    <script src="technicians.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

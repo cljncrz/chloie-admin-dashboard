@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Technicians - Kingsley Carwash</title>
+
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+  <!-- Small page-specific styles for technician cards -->
+  <style>
+    /* Technician cards grid (page-specific overrides) */
+    .tech-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.6rem;
+      margin-top: 1rem;
+    }
+    .tech-card {
+      background: var(--color-white);
+      padding: 1.6rem;
+      border-radius: 0.9rem;
+      box-shadow: var(--box-shadow);
+      color: var(--color-info-dark);
+      position: relative;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+    .dark-theme-variables .tech-card { background: #222528; }
+    .tech-card .profile-photo { width: 90px; height: 90px; margin: 0 auto; border-radius: 50%; overflow: hidden; box-shadow: 0 6px 12px rgba(0,0,0,0.45); }
+    .tech-card .profile-photo img { width: 100%; height: 100%; object-fit: cover; display:block }
+    .tech-card .status-badge { position: absolute; top: 14px; right: 14px; background: #2ecc71; color: white; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; }
+    .tech-card .tech-name { text-align:center; margin-top: 0.8rem; font-weight:700; }
+    .tech-card .tech-desc { text-align:center; color: var(--color-info-dark); font-size:0.86rem; margin-bottom: 1rem; }
+    .tech-card hr { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 1rem 0; }
+    .tech-card .summary { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem }
+    .tech-card .summary .label { color: var(--color-info-dark); font-size:0.85rem }
+    .tech-card .card-actions { display:flex; gap:0.6rem; justify-content:center }
+    .tech-card .btn { padding: 0.55rem 0.9rem; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer; background:transparent; color:var(--color-info-dark) }
+    .tech-card .btn-primary { background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06) }
+    .review-rating { display:flex; gap:0.2rem; align-items:center; justify-content:center }
+    .review-rating .filled { color: var(--color-star-rating); }
+    /* Modal: Add Technician form styles */
+    .modal-content #add-technician-form-content {
+      padding: 0.6rem 0;
+    }
+    .modal-form { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+    .avatar-upload { display:flex; flex-direction:column; align-items:center; gap:0.6rem; }
+    .avatar-preview { width: 120px; height: 120px; border-radius: 50%; overflow:hidden; background:#2a2d30; display:flex; align-items:center; justify-content:center; }
+    .avatar-preview img { width:100%; height:100%; object-fit:cover; display:block }
+    .avatar-upload-label { display:inline-flex; gap:0.5rem; align-items:center; cursor:pointer; color:var(--color-primary); }
+    .modal-form .form-group input[type="text"],
+    .modal-form .form-group textarea {
+      width:100%; padding:0.8rem; border-radius:8px; background: rgba(255,255,255,0.02); color:var(--color-info-dark); border:1px solid rgba(255,255,255,0.04);
+    }
+    .modal-form .form-actions { display:flex; gap:0.8rem; justify-content:flex-start; margin-top:0.8rem }
+    .btn-secondary { background:#2a2d30; color:var(--color-info-dark); padding:0.6rem 1rem; border-radius:6px; border:1px solid rgba(255,255,255,0.03); }
+    .btn-primary.create-tech { background: var(--color-primary); color:#fff; padding:0.6rem 1rem; border-radius:6px; border: none }
+  </style>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <!-- Authentication Guard -->
+  <script src="auth-guard.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- ========== Sidebar ========== -->
+      <aside>
+        <div class="sidebar-top">
+          <a href="#" class="logo">
+            <img
+              src="./images/minimalkingsley.png"
+              alt="Kingsley Carwash Logo"
+            />
+          </a>
+          <div class="sidebar-close" id="close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </div>
+        </div>
+
+        <div class="sidebar-menu">
+          <a href="index.html">
+            <span class="material-symbols-outlined">dashboard</span>
+            <h3>Dashboard</h3>
+          </a>
+          <a href="appointment.html">
+            <span class="material-symbols-outlined">book_online</span>
+            <h3>Appointments</h3>
+          </a>
+
+          <a href="technicians.html" class="active">
+            <span class="material-symbols-outlined">engineering</span>
+            <h3>Technicians</h3>
+          </a>
+          <a href="customers.html">
+            <span class="material-symbols-outlined">groups</span>
+            <h3>Customers</h3>
+          </a>
+          <a href="services.html">
+            <span class="material-symbols-outlined">local_car_wash</span>
+            <h3>Services & Pricing</h3>
+          </a>
+          <a href="promotions.html">
+            <span class="material-symbols-outlined">campaign</span>
+            <h3>Promotions</h3>
+          </a>
+
+          <a href="media-manager.html">
+            <span class="material-symbols-outlined">perm_media</span>
+            <h3>Media Manager</h3>
+          </a>
+          <a href="sales.html">
+            <span class="material-symbols-outlined">trending_up</span>
+            <h3>Sales</h3>
+          </a>
+          <a href="reviews.html">
+            <span class="material-symbols-outlined">reviews</span>
+            <h3>Reviews</h3>
+          </a>
+          <a href="payment-monitoring.html">
+            <span class="material-symbols-outlined">payment</span>
+            <h3>Payment Monitoring</h3>
+          </a>
+          <a href="geofencing.html">
+            <span class="material-symbols-outlined">location_on</span>
+            <h3>Geofencing</h3>
+          </a>
+        </div>
+      </aside>
+      <!-- ========== End of Sidebar ========== -->
+
+      <!-- ========== Main Content ========== -->
+      <main>
+        <!-- ========== Header ========== -->
+        <header class="main-header">
+          <button id="menu-btn">
+            <span class="material-symbols-outlined">menu</span>
+          </button>
+          <h1>Technicians</h1>
+          <div class="header-right">
+            <div class="theme-toggler">
+              <span class="material-symbols-outlined active">light_mode</span>
+              <span class="material-symbols-outlined">dark_mode</span>
+            </div>
+            <div class="notification-bell">
+              <span class="material-symbols-outlined">notifications</span>
+              <span class="message-count">5</span>
+              <div class="notification-dropdown">
+                <div class="notification-list-dropdown">
+                  <!-- Notification items will be injected here by JS -->
+                  <p style="padding: 1rem; text-align: center">
+                    No new notifications.
+                  </p>
+                </div>
+                <a href="notifications.html" class="notification-footer">
+                  View All Notifications
+                </a>
+              </div>
+            </div>
+            <a
+              href="chats.html"
+              class="header-action-btn"
+              id="chat-icon-btn"
+              title="Customer Chats"
+            >
+              <span class="material-symbols-outlined">forum</span>
+              <span
+                class="message-count"
+                id="chat-message-count"
+                style="display: none"
+                >0</span
+              >
+            </a>
+            <a
+              href="todo-lists.html"
+              class="header-action-btn"
+              title="To-Do List"
+            >
+              <span class="material-symbols-outlined"
+                >format_list_bulleted</span
+              >
+            </a>
+            <div class="profile">
+              <div class="info">
+                <p>Hey, <b id="profile-header-name">Adam</b>!</p>
+                <small class="text-muted">Admin</small>
+              </div>
+              <div class="profile-photo">
+                <img src="images/adam.jpg" alt="Admin Profile Picture" />
+              </div>
+              <div class="profile-dropdown">
+                <a href="profile-page.html">
+                  <span class="material-symbols-outlined">person</span>
+                  <h3>Profile</h3>
+                </a>
+                <a href="settings.html">
+                  <span class="material-symbols-outlined">settings</span>
+                  <h3>Settings</h3>
+                </a>
+                <a href="login.html" id="logout-btn">
+                  <span class="material-symbols-outlined">logout</span>
+                  <h3>Logout</h3>
+                </a>
+              </div>
+            </div>
+          </div>
+        </header>
+        <!-- ========== End of Header ========== -->
+
+        <!-- ========== Page Content ========== -->
+        <div class="page-content">
+          <section id="technicians-page" class="page active">
+            <div class="recent-appointments" id="technicians-table-container">
+              <div class="table-header">
+                <h2>All Technicians</h2>
+                <button
+                  class="btn-primary open-modal-btn"
+                  id="add-new-technician-btn"
+                  data-modal-title="Add New Technician"
+                  data-content-id="add-technician-form-content"
+                >
+                  <span class="material-symbols-outlined">add</span>
+                  New Technician
+                </button>
+              </div>
+              <div class="table-controls">
+                <div class="table-search-container">
+                  <input
+                    type="search"
+                    id="technician-search"
+                    placeholder="Search by name or status..."
+                  />
+                </div>
+              </div>
+              <div class="table-responsive-wrapper">
+                <div class="table-loader">
+                  <div class="spinner"></div>
+                </div>
+                <!-- Card Grid: populated by technicians.js (cards display like profile tiles) -->
+                <div id="technician-cards-grid" class="tech-card-grid" aria-live="polite"></div>
+                <!-- Table view removed: card grid used instead -->
+              </div>
+              
+            </div>
+          </section>
+        </div>
+        <!-- ========== End of Page Content ========== -->
+        <!-- ========== Footer ========== -->
+        <footer class="main-footer-content">
+          <p>
+            &copy; 2024 Kingsley Carwash and Detailing Services. All Rights
+            Reserved.
+          </p>
+          <p class="footer-credits">
+            Created by: Marc Kenneth Cula, Adam Mari Amplayo, Chloie Jane Cruz,
+            Angel Adellene Alcordo, & Chetli Kien San Juan
+          </p>
+          <div class="footer-meta">
+            <p class="footer-version">Version 1.0.1</p>
+            <p class="footer-last-updated"></p>
+          </div>
+        </footer>
+      </main>
+    </div>
+
+    <!-- ========== Confirmation Modal ========== -->
+    <div class="modal-overlay" id="delete-confirm-overlay">
+      <div class="modal" id="delete-confirm-modal">
+        <div class="modal-header">
+          <h2 id="delete-confirm-title">Confirm Deletion</h2>
+          <button class="modal-close" id="delete-confirm-close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p id="delete-confirm-message">
+            Are you sure you want to delete this technician? This action cannot
+            be undone.
+          </p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="delete-cancel-btn">Cancel</button>
+          <button class="btn-danger" id="delete-confirm-btn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Modal ========== -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal" id="app-modal">
+        <div class="modal-header">
+          <h2 id="modal-title">Quick Action</h2>
+          <button class="modal-close" id="modal-close-btn">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-body" id="modal-body">
+          <!-- Default Content -->
+          <div class="modal-content" id="default-modal-content">
+            <p>This is where the form or content for the action will go.</p>
+          </div>
+
+          <!-- Add Technician Form -->
+          <div class="modal-content" id="add-technician-form-content">
+            <form id="add-technician-form" class="modal-form">
+              <h3>New Technician Profile</h3>
+              <div class="avatar-upload">
+                <div class="avatar-preview" id="avatar-preview">
+                  <img src="./images/redicon.png" alt="Avatar Preview" id="avatar-preview-img" />
+                </div>
+                <label class="avatar-upload-label" for="technician-avatar-input">
+                  <span class="material-symbols-outlined">file_upload</span>
+                  <span>Upload</span>
+                </label>
+                <input type="file" id="technician-avatar-input" accept="image/*" style="display:none" />
+              </div>
+
+              <div class="form-group">
+                <label for="technician-name">Technician Name</label>
+                <input type="text" id="technician-name" placeholder="Enter full name" required />
+              </div>
+
+              <div class="form-group">
+                <label for="technician-description">Description / Role</label>
+                <textarea id="technician-description" rows="4" placeholder="e.g., Senior Detailing Specialist, Team Lead, etc."></textarea>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="btn-secondary" id="add-tech-cancel-btn">Cancel</button>
+                <button type="submit" class="btn-primary create-tech">Create Technician</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Success Message Toast ========== -->
+    <div class="success-toast" id="success-toast">
+      <span class="material-symbols-outlined">check_circle</span>
+      <p>Success!</p>
+    </div>
+
+    <script src="all-data.js"></script>
+    <script src="technicians.js"></script>
+    <script src="global-updates.js"></script>
+    <script src="script.js"></script>
+    <script src="notifications.js"></script>
+  </body>
+</html>
