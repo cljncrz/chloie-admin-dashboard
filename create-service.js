@@ -5,13 +5,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const vehicleTypeSelect = document.getElementById('vehicle-type-select');
     const serviceNotesInput = document.getElementById('service-notes'); // Get the notes input
 
-    const imagePreview = document.getElementById('image-preview');
-    const imagePreviewImage = imagePreview.querySelector('.image-preview-image');
-    const imageUploaderPlaceholder = imagePreview ? imagePreview.querySelector('.image-uploader-placeholder') : null;
-    const uploadOverlay = imagePreview.querySelector('.upload-overlay');
-
     // Only run if the form exists on the page
     if (!createServiceForm) return;
+
+    const imagePreview = document.getElementById('image-preview');
+    const imagePreviewImage = imagePreview ? imagePreview.querySelector('.image-preview-image') : null;
+    const imageUploaderPlaceholder = imagePreview ? imagePreview.querySelector('.image-uploader-placeholder') : null;
+    const uploadOverlay = imagePreview ? imagePreview.querySelector('.upload-overlay') : null;
 
     // --- Image Preview Logic ---
     imageInput.addEventListener('change', function () {
