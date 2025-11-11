@@ -23,10 +23,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 servicesData = snapshot.docs.map(doc => {
                     const data = doc.data();
                     const imageUrl = data.imageUrl || data.image || data.bannerUrl || null;
+                    
+                    // Extract pricing values from the dynamic pricing object
+                    const pricingObj = data.pricing || {};
+                    const pricingEntries = Object.entries(pricingObj);
+                    const pricingValues = pricingEntries.filter(([key, v]) => v !== null && v !== undefined && !isNaN(v));
+                    
+                    // Map the pricing values to small, medium, large, xLarge
+                    const small = pricingValues[0]?.[1] ?? null;
+                    const medium = pricingValues[1]?.[1] ?? null;
+                    const large = pricingValues[2]?.[1] ?? null;
+                    const xLarge = pricingValues[3]?.[1] ?? null;
+                    
+                    // Extract pricing labels for display
+                    const pricingLabel1 = pricingValues[0]?.[0] ?? null;
+                    const pricingLabel2 = pricingValues[1]?.[0] ?? null;
+                    
                     console.log('Service data from Firestore:', doc.id, {
                         service: data.service || data.serviceName,
-                        imageUrl: imageUrl,
-                        allData: data
+                        pricingObject: pricingObj,
+                        extractedPrices: { small, medium, large, xLarge },
+                        pricingLabels: { pricingLabel1, pricingLabel2 },
+                        imageUrl: imageUrl
                     });
                     return {
                         serviceId: doc.id,
@@ -35,10 +53,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         imageUrl: imageUrl,
                         featured: data.featured || false,
                         availability: data.availability || 'Available',
-                        small: data.small || null,
-                        medium: data.medium || null,
-                        large: data.large || null,
-                        xLarge: data.xLarge || null,
+                        small: small,
+                        medium: medium,
+                        large: large,
+                        xLarge: xLarge,
+                        pricingLabel1: pricingLabel1,
+                        pricingLabel2: pricingLabel2,
                         pricingScheme: data.pricingScheme || 'Car Sizes',
                         notes: data.notes || '',
                         ...data
@@ -108,39 +128,47 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = document.createElement('tr');
         row.dataset.serviceId = service.serviceId;
 
-        // --- Create Specific Price Breakdown ---
-        const formatPrice = (price) => price ? `₱${price.toLocaleString()}` : '<span class="text-muted">—</span>';
-        let priceBreakdownHTML = '';
-        let hasSpecificPrices = false;
+        // --- Calculate Price Range ---
+        const getPriceRange = (service) => {
+            // Convert all prices to numbers, filtering out null, undefined, and 0
+            const prices = [service.small, service.medium, service.large, service.xLarge]
+                .map(p => {
+                    if (p === null || p === undefined || p === '') return null;
+                    const numPrice = typeof p === 'string' ? parseFloat(p) : p;
+                    return !isNaN(numPrice) && numPrice > 0 ? numPrice : null;
+                })
+                .filter(p => p !== null);
+            
+            if (prices.length === 0) {
+                return '<span class="text-muted">—</span>';
+            }
+            
+            if (prices.length === 1) {
+                // Single price with label
+                const label = service.pricingLabel1 ? `<br/><small style="font-size: 0.75em; color: #999;">(${service.pricingLabel1})</small>` : '';
+                return `₱${prices[0].toLocaleString()}${label}`;
+            }
+            
+            const minPrice = Math.min(...prices);
+            const maxPrice = Math.max(...prices);
+            
+            if (minPrice === maxPrice) {
+                const label = service.pricingLabel1 ? `<br/><small style="font-size: 0.75em; color: #999;">(${service.pricingLabel1})</small>` : '';
+                return `₱${minPrice.toLocaleString()}${label}`;
+            }
+            
+            // Price range with both labels
+            let label = '';
+            if (service.pricingLabel1 && service.pricingLabel2) {
+                label = `<br/><small style="font-size: 0.75em; color: #999;">(${service.pricingLabel1} - ${service.pricingLabel2})</small>`;
+            }
+            
+            return `₱${minPrice.toLocaleString()} - ₱${maxPrice.toLocaleString()}${label}`;
+        };
 
-        if (service.pricingScheme === 'Car Sizes' || !service.pricingScheme) { // Default to Car Sizes if not set
-            if (service.small) { priceBreakdownHTML += `<div><small>5-Seater:</small> <strong>${formatPrice(service.small)}</strong></div>`; hasSpecificPrices = true; }
-            if (service.medium) { priceBreakdownHTML += `<div><small>7-Seater:</small> <strong>${formatPrice(service.medium)}</strong></div>`; hasSpecificPrices = true; }
-        } else if (service.pricingScheme === 'Motorcycle CCs') {
-            if (service.small) { priceBreakdownHTML += `<div><small>399cc below:</small> <strong>${formatPrice(service.small)}</strong></div>`; hasSpecificPrices = true; }
-            if (service.medium) { priceBreakdownHTML += `<div><small>400cc above:</small> <strong>${formatPrice(service.medium)}</strong></div>`; hasSpecificPrices = true; }
-        } else if (service.pricingScheme === 'Custom') {
-            // For custom, just display all available prices with generic labels
-            if (service.small) { priceBreakdownHTML += `<div><small>Small:</small> <strong>${formatPrice(service.small)}</strong></div>`; hasSpecificPrices = true; }
-            if (service.medium) { priceBreakdownHTML += `<div><small>Medium:</small> <strong>${formatPrice(service.medium)}</strong></div>`; hasSpecificPrices = true; }
-            if (service.large) { priceBreakdownHTML += `<div><small>Large:</small> <strong>${formatPrice(service.large)}</strong></div>`; hasSpecificPrices = true; }
-            if (service.xLarge) { priceBreakdownHTML += `<div><small>X-Large:</small> <strong>${formatPrice(service.xLarge)}</strong></div>`; hasSpecificPrices = true; }
-        }
+        const priceContent = getPriceRange(service);
+        const hasSpecificPrices = !priceContent.includes('text-muted');
 
-        let priceContent;
-        if (service.pricingScheme === 'No Specific Prices' && service.notes) {
-            priceContent = `<div class="price-notes">${service.notes}</div>`;
-        } else if (hasSpecificPrices) {
-            priceContent = `<div class="price-breakdown">${priceBreakdownHTML}</div>`;
-        } else if (service.notes && service.notes.includes(':')) { // Fallback for old data or if notes are structured
-            priceContent = `<div class="price-notes">${service.notes}</div>`;
-        } else {
-            priceContent = '<span class="text-muted">—</span>';
-        }
-
-        // Use notes as fallback if no specific prices exist
-        // The logic above already handles this, so we can simplify.
-        // const hasSpecificPrices = service.small || service.medium; // This is now handled by the hasSpecificPrices flag
 
         // --- Create Featured Toggle Switch ---
         const featuredToggle = `
@@ -175,7 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${(service.pricingScheme === 'No Specific Prices' && service.notes) || (!hasSpecificPrices && service.notes && service.pricingScheme !== 'No Specific Prices') ? `<small class="text-muted">${service.notes}</small>` : ''}
                 </div>
             </td>
-            <td>${priceContent}</td>
+            <td>
+                <div class="price-cell">${priceContent}</div>
+            </td>
             <td>${service.category}</td>
             <td class="text-center">${availedCounts[service.service] || 0}</td>
             <td class="text-center">${featuredToggle}</td>
@@ -276,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const title = willBeFeatured ? 'Feature Service' : 'Unfeature Service';
                 const message = `Are you sure you want to ${action} the service "${service.service}"?`;
 
-                openGenericConfirmModal(title, message, () => {
+                openGenericConfirmModal(title, message, async () => {
                     // --- This runs only on confirmation ---
                     // 1. Visually update the toggle
                     featuredToggleInput.checked = willBeFeatured;
@@ -284,7 +314,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     // 2. Update the data model
                     service.featured = willBeFeatured;
 
-                    // 3. Show a success message
+                    // 3. Save to Firestore
+                    try {
+                        await db.collection('services').doc(serviceId).update({
+                            featured: willBeFeatured
+                        });
+                        console.log(`Service ${serviceId} featured status updated in Firestore`);
+                    } catch (error) {
+                        console.error('Error updating featured status in Firestore:', error);
+                        alert('Error updating service. Please try again.');
+                    }
+
+                    // 4. Show a success message
                     const successMessage = willBeFeatured
                         ? `"${service.service}" is now featured.`
                         : `"${service.service}" is no longer featured.`;
@@ -299,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    servicesTbody.addEventListener('change', (e) => {
+    servicesTbody.addEventListener('change', async (e) => {
         const statusSelect = e.target.closest('.status-select');
         if (statusSelect) {
             const row = statusSelect.closest('tr');
@@ -313,6 +354,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Update the dropdown's class to change its color
                 statusSelect.className = `technician-select status-select ${newStatus.toLowerCase()}`;
+
+                // Save to Firestore
+                try {
+                    await db.collection('services').doc(serviceId).update({
+                        availability: newStatus
+                    });
+                    console.log(`Service ${serviceId} availability updated in Firestore`);
+                } catch (error) {
+                    console.error('Error updating availability in Firestore:', error);
+                    alert('Error updating service status. Please try again.');
+                }
 
                 // Show a success message
                 const message = `"${service.service}" status updated to ${newStatus}.`;

@@ -19,9 +19,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const pricingContainer = document.getElementById('profile-pricing-details');
     const imageInput = document.getElementById('service-image-input');
     const imageElement = document.getElementById('profile-service-image');
+    const imageUploadSpinner = document.getElementById('image-upload-spinner');
+    const imageUploaderContainer = document.getElementById('service-image-preview');
+
+    // Create a simple inline progress bar element (hidden by default)
+    const uploadProgressContainer = document.createElement('div');
+    uploadProgressContainer.style.display = 'none';
+    uploadProgressContainer.style.width = '100%';
+    uploadProgressContainer.style.height = '8px';
+    uploadProgressContainer.style.background = '#e6e6e6';
+    uploadProgressContainer.style.borderRadius = '4px';
+    uploadProgressContainer.style.overflow = 'hidden';
+    uploadProgressContainer.style.marginTop = '0.75rem';
+
+    const uploadProgressBar = document.createElement('div');
+    uploadProgressBar.style.width = '0%';
+    uploadProgressBar.style.height = '100%';
+    uploadProgressBar.style.background = '#4caf50';
+    uploadProgressBar.style.transition = 'width 150ms linear';
+
+    uploadProgressContainer.appendChild(uploadProgressBar);
+    if (imageUploaderContainer) imageUploaderContainer.appendChild(uploadProgressContainer);
     const chooseFromManagerBtn = document.querySelector('.choose-from-manager-btn');
     const saveDraftBtn = document.getElementById('save-draft-btn');
     const serviceIdSubtitle = document.getElementById('service-id-subtitle');
+
+    // --- UI helpers ---
+    const successToast = document.getElementById('success-toast');
+    const showSuccessToast = (msg) => {
+        if (successToast) {
+            const p = successToast.querySelector('p');
+            if (p) p.textContent = msg;
+            successToast.style.display = 'flex';
+            setTimeout(() => successToast.style.display = 'none', 2000);
+        } else {
+            console.log(msg);
+        }
+    };
 
     // --- Populate Form Fields ---
     if (serviceIdSubtitle) serviceIdSubtitle.textContent = `ID: ${serviceData.serviceId}`;
@@ -107,15 +141,127 @@ document.addEventListener('DOMContentLoaded', () => {
         imageElement.onerror = () => { imageElement.src = placeholderUrl; };
     };
 
+    const showImageLoading = () => {
+        if (imageUploadSpinner) imageUploadSpinner.style.display = 'block';
+        if (imageElement) imageElement.style.opacity = '0.5'; // Dim the image
+    };
+
+    const hideImageLoading = () => {
+        if (imageUploadSpinner) imageUploadSpinner.style.display = 'none';
+        if (imageElement) imageElement.style.opacity = '1';
+    };
+
     imageInput.addEventListener('change', function() {
         const file = this.files[0];
-        if (file) {
+        if (!file) return;
+
+        // Ensure we have a serviceId to reference in Storage and Firestore
+        if (!serviceData.serviceId) {
+            alert('Service identifier not found. Cannot upload image.');
+            this.value = '';
+            return;
+        }
+
+        showImageLoading();
+
+        // Prefer server-side upload to avoid CORS errors. The project includes a Node endpoint at /api/upload
+        try {
+            // Read file as base64
             const reader = new FileReader();
-            reader.onload = function(e) {
-                serviceData.imageUrl = e.target.result; // Store as base64 for saving
-                renderImage();
+            reader.onload = () => {
+                const base64 = reader.result.split(',')[1];
+
+                // Build payload
+                const payload = {
+                    fileName: file.name,
+                    fileData: base64,
+                    fileType: file.type || 'application/octet-stream',
+                };
+
+                // Use XMLHttpRequest to get upload progress events
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/upload', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+
+                xhr.upload.onprogress = (evt) => {
+                    if (evt.lengthComputable) {
+                        const percent = (evt.loaded / evt.total) * 100;
+                        if (uploadProgressContainer) uploadProgressContainer.style.display = 'block';
+                        if (uploadProgressBar) uploadProgressBar.style.width = `${Math.round(percent)}%`;
+                    }
+                };
+
+                xhr.onreadystatechange = async () => {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                const resp = JSON.parse(xhr.responseText);
+                                const downloadURL = resp.url || resp.downloadURL || resp.url || resp.message && resp.url;
+                                // Fallback: try resp.url
+                                const url = resp.url || resp.downloadURL || resp.url || null;
+                                if (url) {
+                                    serviceData.imageUrl = url;
+                                    if (imageElement) imageElement.src = url;
+                                    // Update services doc with new image URL
+                                    try {
+                                        const db = firebase.firestore();
+                                        await db.collection('services').doc(serviceData.serviceId).update({
+                                            imageUrl: url,
+                                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                        });
+                                        showSuccessToast('Image uploaded and saved.');
+                                    } catch (dbErr) {
+                                        console.warn('Saved on server but failed to update service doc:', dbErr);
+                                        showSuccessToast('Image uploaded (server).');
+                                    }
+                                } else {
+                                    console.warn('Upload response did not include URL', resp);
+                                    alert('Upload succeeded but no URL returned. Check server logs.');
+                                }
+                            } catch (parseErr) {
+                                console.error('Failed to parse upload response:', parseErr, xhr.responseText);
+                                alert('Upload succeeded but response invalid. See console.');
+                            }
+                        } else {
+                            console.error('Server upload failed', xhr.status, xhr.responseText);
+                            alert(`Server upload failed: ${xhr.status}`);
+                        }
+
+                        hideImageLoading();
+                        imageInput.value = '';
+                        if (uploadProgressContainer) {
+                            setTimeout(() => {
+                                uploadProgressContainer.style.display = 'none';
+                                if (uploadProgressBar) uploadProgressBar.style.width = '0%';
+                            }, 500);
+                        }
+                    }
+                };
+
+                xhr.onerror = () => {
+                    console.error('XHR upload error');
+                    alert('Upload failed (network).');
+                    hideImageLoading();
+                    imageInput.value = '';
+                    if (uploadProgressContainer) uploadProgressContainer.style.display = 'none';
+                };
+
+                xhr.send(JSON.stringify(payload));
             };
+
+            reader.onerror = (err) => {
+                console.error('FileReader error', err);
+                alert('Failed to read file.');
+                hideImageLoading();
+                imageInput.value = '';
+            };
+
             reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('Unexpected error during server upload fallback:', error);
+            alert('Unexpected error during upload. See console for details.');
+            hideImageLoading();
+            this.value = '';
         }
     });
 
@@ -147,6 +293,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     window.addEventListener('storage', handleMediaSelection);
+
+    // Also listen for postMessage from picker windows (more direct)
+    const handleMessage = (event) => {
+        // event.data should contain { selectedMedia: { url, openerId } }
+        if (!event || !event.data) return;
+        const data = event.data;
+        const selectedMedia = data.selectedMedia || data;
+        if (!selectedMedia) return;
+        // If openerId matches this uploader, update image
+        if (selectedMedia.openerId === 'service-profile-uploader') {
+            if (imageElement) {
+                serviceData.imageUrl = selectedMedia.url;
+                renderImage();
+            }
+        }
+    };
+    window.addEventListener('message', handleMessage, false);
 
     // --- Helper function to gather form data ---
     const getFormData = () => {
@@ -188,27 +351,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Form Submission (Update) Logic ---
-    editServiceForm.addEventListener('submit', (e) => {
+    editServiceForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // Create the updated service object
+        // Gather form data and format for Firestore
+        const formData = getFormData();
         const updatedService = {
-            ...serviceData, // Keep original ID and other unchanged properties
-            ...getFormData(),
-            status: 'Published' // Mark as published
+            ...serviceData,
+            ...formData,
+            status: 'Published',
+            name: formData.service, // Firestore field for service name
+            pricing: {
+                small: formData.small,
+                medium: formData.medium,
+                large: formData.large,
+                xLarge: formData.xLarge,
+            },
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         };
 
         // Store the updated service to be picked up by the services page
         sessionStorage.setItem('updatedServiceData', JSON.stringify(updatedService));
-
-        // Clean up the edit data
         sessionStorage.removeItem('selectedServiceData');
-
-        // IMPORTANT: Remove the event listener when we are done with this page.
         window.removeEventListener('storage', handleMediaSelection);
 
-        // Redirect back to the services list
-        window.location.href = 'services.html';
+        // Save to Firestore
+        try {
+            const db = firebase.firestore();
+            const { serviceId, ...dataToSave } = updatedService;
+            await db.collection('services').doc(serviceId).update(dataToSave);
+            if (typeof showSuccessToast === 'function') {
+                showSuccessToast('Service updated successfully!');
+            } else {
+                alert('Service updated successfully!');
+            }
+        } catch (error) {
+            console.error('Error updating service in Firestore:', error);
+            alert('Error saving service to Firestore. Changes saved locally but may not persist.');
+        }
+
+        // Redirect back to the services list after short delay
+        setTimeout(() => {
+            window.location.href = 'services.html';
+        }, 1200);
     });
 
     // --- Populate Analytics ---

@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Form Submission Logic ---
-    createServiceForm.addEventListener('submit', (e) => {
+    createServiceForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         // Get price values, converting empty strings to null
@@ -122,6 +122,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Store the new service in sessionStorage to be picked up by the services.js script
         sessionStorage.setItem('newlyCreatedService', JSON.stringify(newService));
+
+        // Save to Firestore
+        try {
+            const db = firebase.firestore();
+            const { serviceId, ...dataToSave } = newService; // Remove serviceId to avoid storing it as a field
+            
+            await db.collection('services').doc(newService.serviceId).set({
+                ...dataToSave,
+                createdAt: new Date(),
+                status: 'Published'
+            });
+            console.log('Service created in Firestore successfully!');
+        } catch (error) {
+            console.error('Error creating service in Firestore:', error);
+            alert('Error saving service to Firestore. Changes saved locally but may not persist.');
+        }
 
         // Redirect back to the services list
         window.location.href = 'services.html';

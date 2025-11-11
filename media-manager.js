@@ -116,7 +116,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         url: mediaItem.url,
                         openerId: openerId
                     };
-                    sessionStorage.setItem('selectedMedia', JSON.stringify(selectedMedia));
+                    // First try to postMessage to the opener window directly (more reliable)
+                    try {
+                        if (window.opener && !window.opener.closed) {
+                            window.opener.postMessage({ selectedMedia }, '*');
+                        }
+                    } catch (err) {
+                        console.warn('postMessage to opener failed', err);
+                    }
+
+                    // Fallback: use localStorage so the opener window receives a storage event
+                    try {
+                        localStorage.setItem('selectedMedia', JSON.stringify(selectedMedia));
+                        // Remove the key shortly after to avoid lingering state
+                        setTimeout(() => localStorage.removeItem('selectedMedia'), 500);
+                    } catch (err) {
+                        console.warn('localStorage set failed in picker', err);
+                    }
+
                     window.close(); // Close the picker window
                 } else {
                     // Open the details modal in normal mode
