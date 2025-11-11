@@ -34,6 +34,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    const updateDashboardInsights = () => {
+        const salesEl = document.querySelector('#dashboard .insights .card.sales h1');
+        const bookingsEl = document.querySelector('#dashboard .insights .card.bookings h1');
+        const completedEl = document.querySelector('#dashboard .insights .card.completed h1');
+
+        // Ensure we are on the dashboard and elements exist
+        if (!salesEl || !bookingsEl || !completedEl) {
+            return;
+        }
+
+        const allAppointments = [
+            ...(window.appData.appointments || []),
+            ...(window.appData.walkins || [])
+        ];
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1); // Start of tomorrow
+
+        let totalSalesToday = 0;
+        let todaysBookingsCount = 0;
+        let servicesCompletedToday = 0;
+
+        allAppointments.forEach(appt => {
+            const apptDate = appt.datetimeRaw ? new Date(appt.datetimeRaw) : null;
+
+            // Check if the appointment is for today
+            if (apptDate && apptDate >= today && apptDate < tomorrow) {
+                todaysBookingsCount++;
+
+                if (appt.status && appt.status.toLowerCase() === 'completed') {
+                    servicesCompletedToday++;
+                    totalSalesToday += parseFloat(appt.price) || 0;
+                }
+            }
+        });
+
+        salesEl.dataset.value = totalSalesToday;
+        bookingsEl.dataset.value = todaysBookingsCount;
+        completedEl.dataset.value = servicesCompletedToday;
+
+        // Animate the numbers after updating their values
+        animateInsightNumbers();
+    };
+
     // --- Pagination State for Dashboard Tables ---
     let appointmentsCurrentPage = 1;
     const appointmentsRowsPerPage = 5;
@@ -50,53 +96,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const db = firebase.firestore();
-            const snapshot = await db.collection('bookings').orderBy('dateTime', 'desc').get();
+            // Fetch both bookings and walkins in parallel
+            const [bookingsSnapshot, walkinsSnapshot] = await Promise.all([
+                db.collection('bookings').get(),
+                db.collection('walkins').get()
+            ]);
 
             let scheduledAppointments = [];
             let walkinAppointments = [];
 
-            if (snapshot.empty) {
-                console.log('No booking documents found in Firestore for dashboard.');
+            // Process scheduled appointments from 'bookings'
+            if (bookingsSnapshot.empty) {
+                console.log('No booking documents found.');
                 window.appData.appointments = [];
-                window.appData.walkins = [];
             } else {
-                snapshot.docs.forEach(doc => {
-                    const data = doc.data();
-                    const scheduleDate = data.scheduleDate?.toDate(); // Corrected from dateTime
+                bookingsSnapshot.docs.forEach(doc => {
+                    const data = doc.data() || {};
+                    // Skip documents that are marked as walk-ins, as they are handled by the 'walkins' collection
+                    if (data.isWalkin) return;
+
+                    const scheduleDate = data.scheduleDate?.toDate();
                     const formattedDateTime = scheduleDate
                         ? scheduleDate.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ' -')
                         : 'No Date';
 
-                    const commonData = {
+                    scheduledAppointments.push({
                         ...data,
+                        datetimeRaw: scheduleDate ? scheduleDate.getTime() : 0, // Add a raw timestamp for sorting
                         serviceId: doc.id,
                         plate: data.plateNumber,
                         service: data.serviceNames,
                         datetime: formattedDateTime,
-                    };
-
-                    if (data.isWalkin) { // Assuming a field 'isWalkin' exists in your Firestore booking documents
-                        walkinAppointments.push({
-                            ...commonData,
-                            customerName: data.customerName || 'Walk-in Customer', // Use customerName for walk-ins
-                        });
-                    } else {
-                        scheduledAppointments.push({
-                            ...commonData,
-                            customer: data.customerName, // Use 'customer' for scheduled appointments
-                        });
-                    }
+                        customer: data.userId,
+                    });
                 });
+                scheduledAppointments.sort((a, b) => b.datetimeRaw - a.datetimeRaw); // Sort by date descending
                 window.appData.appointments = scheduledAppointments;
+            }
+
+            // Process walk-in appointments from 'walkins' collection
+            if (walkinsSnapshot.empty) {
+                console.log('No walk-in documents found.');
+                window.appData.walkins = [];
+            } else {
+                walkinAppointments = walkinsSnapshot.docs.map(doc => {
+                    const data = doc.data() || {};
+                    const scheduleDate = data.dateTime?.toDate ? data.dateTime.toDate() : (data.dateTime ? new Date(data.dateTime) : null);
+                    return { 
+                        ...data, 
+                        id: doc.id, // Add the document ID to each walk-in object
+                        datetimeRaw: scheduleDate ? scheduleDate.getTime() : 0 // Add raw timestamp for sorting
+                    }; 
+                });
+                // Sort walk-ins by date descending. Handle cases where dateTime might be missing.
+                walkinAppointments.sort((a, b) => b.datetimeRaw - a.datetimeRaw);
                 window.appData.walkins = walkinAppointments;
             }
         } catch (error) {
-            console.error("Error fetching bookings for dashboard:", error);
+            console.error("Error fetching dashboard data from Firestore:", error);
         } finally {
             if (loader) loader.style.display = 'none';
-            // Now that data is fetched, populate the tables
+            // Populate tables with the newly fetched data
             populateAppointmentsTable();
             populateWalkinsTable();
+            updateDashboardInsights(); // Update the top widget stats
         }
     };
 
@@ -138,14 +201,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const customerProfilePic = './images/redicon.png';
             row.innerHTML = `
                 <td class="customer-cell">
-                    <div class="profile-photo"><img src="${customerProfilePic}" alt="${appt.customer}"></div>
                     <span>${appt.customer}</span>
                 </td>
-                <td>${appt.plate}</td>
-                <td>${appt.service}</td>
+                <td>${appt.plateNumber}</td>
+                <td>${appt.serviceNames}</td>
                 <td class="text-center"><span class="${statusClass}">${appt.status}</span></td>
             `;
             fragment.appendChild(row);
+
         });
 
         tableBody.innerHTML = ''; // Clear existing rows before prepending
@@ -201,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = document.createElement('tr');
             const statusClass = walkin.status.toLowerCase().replace(/\s+/g, '-');
             row.innerHTML = `
-                <td>${walkin.customerName}</td>
+                <td>${walkin.id}</td>
                 <td>${walkin.plate}</td>
                 <td>${walkin.service}</td>
                 <td class="text-center"><span class="${statusClass}">${walkin.status}</span></td>
@@ -400,13 +463,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const appointmentData = (window.appData.appointments || []).find(appt => appt.serviceId === appointmentId);
 
                 if (appointmentData) {
-                    // **THE FIX**: Clear previous session data *before* setting the new one.
-                    sessionStorage.removeItem('selectedProfileData');
+                    // Clear any potentially conflicting session data before setting the new one.
+                    sessionStorage.removeItem('selectedAppointmentData');
                     // Store the current page URL to enable a correct "back" navigation
                     sessionStorage.setItem('previousPage', window.location.href);
-                    // The customer-profile.js script expects data in sessionStorage with this key
-                    sessionStorage.setItem('selectedProfileData', JSON.stringify(appointmentData));
-                    window.location.href = 'customer-profile.html';
+                    // The appointment-details.js script expects data in sessionStorage with this key
+                    sessionStorage.setItem('selectedAppointmentData', JSON.stringify(appointmentData));
+                    window.location.href = 'appointment-details.html';
                 }
             }
         });
@@ -420,7 +483,6 @@ document.addEventListener('DOMContentLoaded', () => {
         populateStatusFilters();
         await fetchDashboardData(); // Fetch data first
         populateServiceReviews();
-        animateInsightNumbers();
         setupRowClickNavigation(); // Set up the click listener
     };
 
