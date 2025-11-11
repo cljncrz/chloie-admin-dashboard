@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const techData = JSON.parse(storedData);
-    const currentRole = techData.role || 'Detailing Technician'; // Default if no role is set
+    let currentRole = techData.role || 'Detailing Technician'; // Default if no role is set
 
     // Populate the profile page with the technician's data
     const profileName = document.getElementById('profile-name');
@@ -26,32 +26,133 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Role Dropdown Functionality ---
     if (profileDetailsRoleContainer) {
-        const roles = ['Detailing Technician', 'Senior Technician', 'Trainee', 'Team Lead'];
+        // Expanded role options requested by user
+        const roles = [
+            'Vehicle Prepper / Wash Technician',
+            'Tunnel Operator',
+            'Finisher / Wipe-Down Attendant',
+            'Car Detailer / Auto Detail Technician',
+            'Lot Attendant / Vehicle Mover'
+        ];
+        let selectedRole = currentRole;
+        let isEditMode = false;
 
-        // Create and populate the select element
-        const select = document.createElement('select');
-        select.classList.add('technician-select'); // Re-use existing styles
-        select.id = 'role-select';
+        // Create initial role display with edit button
+        const roleDisplay = document.createElement('div');
+        roleDisplay.id = 'role-display';
+        roleDisplay.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span id="role-value">${currentRole}</span>
+                <button id="role-edit-btn" class="btn-icon" title="Edit Role" style="background: none; border: none; padding: 0; cursor: pointer; color: var(--color-primary);">
+                    <span class="material-symbols-outlined" style="font-size: 1.2rem;">edit</span>
+                </button>
+            </div>
+        `;
 
-        roles.forEach(role => {
-            const option = document.createElement('option');
-            option.value = role;
-            option.textContent = role;
-            if (role === currentRole) {
-                option.selected = true;
-            }
-            select.appendChild(option);
+        profileDetailsRoleContainer.innerHTML = ''; // Clear the element
+        profileDetailsRoleContainer.appendChild(roleDisplay);
+
+        const editBtn = document.getElementById('role-edit-btn');
+        const cancelBtn = document.getElementById('role-cancel-btn');
+        const saveBtn = document.getElementById('role-save-btn');
+        const roleEditActions = document.getElementById('role-edit-actions');
+
+        // Toggle edit mode
+        editBtn.addEventListener('click', () => {
+            isEditMode = true;
+            selectedRole = currentRole;
+
+            // Hide display and edit button
+            roleDisplay.style.display = 'none';
+            roleEditActions.style.display = 'flex';
+
+            // Create and show select dropdown
+            const select = document.createElement('select');
+            select.id = 'role-select';
+            select.classList.add('technician-select');
+            select.style.marginBottom = '0';
+
+            roles.forEach(role => {
+                const option = document.createElement('option');
+                option.value = role;
+                option.textContent = role;
+                if (role === currentRole) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            // Insert select before the action buttons
+            roleEditActions.parentElement.insertBefore(select, roleEditActions);
+
+            // Update selectedRole on change
+            select.addEventListener('change', (e) => {
+                selectedRole = e.target.value;
+            });
         });
 
-        // Replace the <p> with the <select>
-        profileDetailsRoleContainer.innerHTML = ''; // Clear the element
-        profileDetailsRoleContainer.appendChild(select);
+        // Cancel button
+        cancelBtn.addEventListener('click', () => {
+            isEditMode = false;
+            roleDisplay.style.display = 'block';
+            roleEditActions.style.display = 'none';
+            const select = document.getElementById('role-select');
+            if (select) select.remove();
+        });
 
-        // Add event listener to handle changes
-        select.addEventListener('change', (e) => {
-            const newRole = e.target.value;
-            updateTechnicianRole(techData, newRole);
-            if (typeof showSuccessToast === 'function') showSuccessToast(`${techData.name}'s role updated to ${newRole}.`);
+        // Save button
+        saveBtn.addEventListener('click', async () => {
+            // Prevent double-click
+            saveBtn.disabled = true;
+            try {
+                const db = firebase.firestore();
+
+                // Update in Firestore
+                await db.collection('technicians').doc(techData.id).update({
+                    role: selectedRole,
+                    description: selectedRole  // Also update description to match role
+                });
+
+                // Update local data
+                currentRole = selectedRole;
+                techData.role = selectedRole;
+                updateTechnicianRole(techData, selectedRole);
+
+                // Update UI
+                const roleValueEl = document.getElementById('role-value');
+                if (roleValueEl) roleValueEl.textContent = selectedRole;
+                if (profileHeaderRole) profileHeaderRole.textContent = selectedRole;
+
+                // Hide edit mode
+                isEditMode = false;
+                roleDisplay.style.display = 'block';
+                roleEditActions.style.display = 'none';
+                const select = document.getElementById('role-select');
+                if (select) select.remove();
+
+                // Show success feedback then reload the page so other pages reflect the change
+                if (typeof showSuccessToast === 'function') {
+                    showSuccessToast(`Role updated to ${selectedRole}`);
+                } else {
+                    // Fallback alert for environments without the toast helper
+                    alert(`Role updated to ${selectedRole}`);
+                }
+
+                // Wait a short moment to let the toast appear, then reload the page
+                setTimeout(() => {
+                    // reload current page so UI/data refreshes across the app
+                    window.location.reload();
+                }, 900);
+            } catch (error) {
+                console.error('Error updating role:', error);
+                // Re-enable save button so user can retry
+                saveBtn.disabled = false;
+                if (typeof showSuccessToast === 'function') {
+                    showSuccessToast('Failed to update role. Please try again.');
+                } else {
+                    alert('Failed to update role. Please try again.');
+                }
+            }
         });
     }
 

@@ -54,12 +54,7 @@ const sampleRescheduleRequests = [
 
 // --- Sample Technicians ---
 const sampleTechnicians = [
-    { id: 'TCH-000', name: 'Unassigned', status: 'System', tasks: 0, rating: 0, role: 'System' },
-    { id: 'TCH-001', name: 'Bisu Go', status: 'Active', tasks: 3, rating: 4.8, role: 'Senior Technician' },
-    { id: 'TCH-001', name: 'Bisu Go', status: 'Active', tasks: 3, rating: 4.8, role: 'Senior Technician' },
-    { id: 'TCH-002', name: 'Mike Perez', status: 'Active', tasks: 5, rating: 4.5, role: 'Technician' },
-
-    
+    { id: 'TCH-000', name: 'Unassigned', status: 'System', tasks: 0, rating: 0, role: 'System' }
 ];
 
 // Expose data globally through the appData object for consistent access

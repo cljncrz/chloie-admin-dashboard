@@ -1,46 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Populate Technician Table / Card Grid on technicians.html ---
-    const technicianTableBody = document.getElementById('technicians-table-body');
+    // Firebase services are globally available from firebase-config.js
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // --- DOM Elements ---
     const cardsContainer = document.getElementById('technician-cards-grid');
-    if ((technicianTableBody || cardsContainer) && window.appData && window.appData.technicians) {
-        const technicians = window.appData.technicians; // Get data from the central source
+    const searchInput = document.getElementById('technician-search'); // Assuming there's a search input for technicians
+    const loader = document.querySelector('#technicians-table-container .table-loader');
+    const noResultsEl = document.querySelector('#technician-cards-grid + .no-results-row'); // Assuming a no-results row for cards
 
-        // Filter out "Unassigned" for the main list view
-        const displayableTechnicians = technicians.filter(tech => tech && tech.name !== 'Unassigned'); 
-        
-        const addTechnicianToTable = (tech) => {
-            if (!technicianTableBody) return; // table removed — skip
-            const row = document.createElement('tr');
-            row.dataset.technicianId = tech.id;
-            row.classList.add('clickable-row');
+    // --- Data State ---
+    window.appData.technicians = window.appData.technicians || []; // Ensure it's initialized
+    let technicians = window.appData.technicians; // Reference to the global array
 
-            const statusBadgeClass = tech.status === 'Active' ? 'tech-active' : 'tech-on-leave';
-            const starRatingHTML = createStarRating(tech.rating);
-
-            row.innerHTML = `
-                <td class="technician-table-info">
-                    <div class="profile-photo"><img src="./images/redicon.png" alt="${tech.name}"></div>
-                    <span>${tech.name}</span>
-                </td>
-                <td class="text-center">${tech.tasks}</td>
-                <td class="text-center">${starRatingHTML}</td>
-                <td>
-                    <select class="status-select status-badge ${statusBadgeClass}" data-tech-id="${tech.id}">
-                        <option value="Active" ${tech.status === 'Active' ? 'selected' : ''}>Active</option>
-                        <option value="On Leave" ${tech.status === 'On Leave' ? 'selected' : ''}>On Leave</option>
-                    </select>
-                </td>
-                <td class="text-center">
-                    <button class="action-icon-btn view-profile-btn" title="View Profile"><span class="material-symbols-outlined">visibility</span></button>
-                    <button class="action-icon-btn delete-tech-btn" title="Delete Technician">
-                        <span class="material-symbols-outlined">delete</span>
-                    </button>
-                </td>
-            `;
-            technicianTableBody.prepend(row); // Add new technician to the top
-        };
-
-        const fragment = document.createDocumentFragment();
+    // --- Helper Functions ---
 
         const createStarRating = (rating) => {
             let stars = '';
@@ -60,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Card view renderer: creates a card DOM element for a technician
                 const createTechnicianCard = (tech) => {
+                    // Defensive check for valid data
                         const card = document.createElement('div');
                         card.className = 'tech-card';
                         card.dataset.technicianId = tech.id;
@@ -91,71 +65,56 @@ document.addEventListener('DOMContentLoaded', () => {
                         return card;
                 };
   
-        displayableTechnicians.forEach(tech => {
-            // Defensive check for valid data
-            if (tech && tech.name) {
-                // table row (if table exists)
-                addTechnicianToTable(tech);
-                // card (if card container exists)
-                if (cardsContainer) {
-                    const card = createTechnicianCard(tech);
-                    cardsContainer.appendChild(card);
-                }
+    // --- Main Fetch and Render Function ---
+    const fetchAndPopulateTechnicians = async () => {
+        if (loader) loader.classList.add('loading');
+        if (cardsContainer) cardsContainer.innerHTML = ''; // Clear existing cards
+    
+        try {
+            // Fetch all documents from the 'technicians' collection
+            const snapshot = await db.collection('technicians').get();
+
+            if (snapshot.empty) {
+                if (noResultsEl) noResultsEl.style.display = 'block';
+                console.log('No technician documents found in Firestore.');
+                technicians = []; // Clear local data if no technicians found
+                window.appData.technicians = technicians; // Update the global data source
+                return;
             }
-        });
-  
-        // Add event listener for row clicks using event delegation (only if table exists)
-        if (technicianTableBody) {
-            technicianTableBody.addEventListener('click', (e) => {
-                const row = e.target.closest('tr');
-                if (!row || row.classList.contains('no-results-row')) return;
 
-                const techId = row.dataset.technicianId;
-                const tech = technicians.find(t => t.id === techId);
-                if (!tech) return;
+            // Map Firestore documents to local technician objects
+            technicians = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            window.appData.technicians = technicians; // Update the global data source
 
-                // Check if the click was on an action button or the status dropdown
-                const isStatusSelect = e.target.classList.contains('status-select');
-                const isDeleteButton = e.target.closest('.delete-tech-btn');
-                const isViewButton = e.target.closest('.view-profile-btn');
+            // Filter out "Unassigned" for the main list view (if it exists in Firestore)
+            // The "Unassigned" technician is a system entry and should not be displayed in the main list.
+            const displayableTechnicians = technicians.filter(tech => tech && tech.name !== 'Unassigned');
 
-                if (isStatusSelect) {
-                    // Handled by the 'change' event listener
-                    return;
-                }
-
-                if (isDeleteButton) {
-                    openDeleteConfirmModal(tech);
-                    return;
-                }
-
-                // If the click was on the view button or anywhere else on the row, navigate
-                if (isViewButton || !isDeleteButton) {
-                    sessionStorage.setItem('selectedTechnicianData', JSON.stringify(tech));
-                    window.location.href = `technician-profile.html?id=${tech.id}`;
+            const fragment = document.createDocumentFragment();
+                displayableTechnicians.forEach(tech => {
+                if (tech && tech.name) {
+                    const card = createTechnicianCard(tech);
+                    fragment.appendChild(card);
                 }
             });
-        }
+            if (cardsContainer) cardsContainer.appendChild(fragment);
 
-        // Add a 'change' event listener for the status dropdowns (if table exists)
-        if (technicianTableBody) {
-            technicianTableBody.addEventListener('change', (e) => {
-                if (e.target.classList.contains('status-select')) {
-                    const select = e.target;
-                    const techId = select.dataset.techId;
-                    const newStatus = select.value;
-                    const tech = technicians.find(t => t.id === techId);
-                    if (tech) tech.status = newStatus;
+            if (noResultsEl) noResultsEl.style.display = displayableTechnicians.length === 0 ? 'block' : 'none';
 
-                    select.className = `status-select status-badge ${newStatus === 'Active' ? 'tech-active' : 'tech-on-leave'}`;
-                }
-            });
+        } catch (error) {
+            console.error("Error fetching technicians from Firestore:", error);
+            if (noResultsEl) {
+                noResultsEl.style.display = 'block';
+                noResultsEl.querySelector('td').textContent = 'Error loading technicians.';
+            }
+        } finally {
+            if (loader) loader.classList.remove('loading');
         }
+    };
 
         // Card container: handle clicks for view/delete and card body click
-        const cardsContainerEl = document.getElementById('technician-cards-grid');
-        if (cardsContainerEl) {
-            cardsContainerEl.addEventListener('click', (e) => {
+        if (cardsContainer) {
+            cardsContainer.addEventListener('click', (e) => {
                 const viewBtn = e.target.closest('.action-view');
                 const deleteBtn = e.target.closest('.action-delete');
                 const cardEl = e.target.closest('.tech-card');
@@ -178,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // clicking on card area opens profile
-                if (cardEl && !e.target.closest('.action-delete') && !e.target.closest('.action-view')) {
+                if (cardEl && !viewBtn && !deleteBtn) { // Ensure click wasn't on a button
                     const id = cardEl.dataset.technicianId;
                     const tech = technicians.find(t => t.id === id);
                     if (tech) {
@@ -188,8 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-
-        // --- Delete Confirmation Modal Logic ---
         const confirmOverlay = document.getElementById('delete-confirm-overlay');
         const confirmMessage = document.getElementById('delete-confirm-message');
         const confirmBtn = document.getElementById('delete-confirm-btn');
@@ -200,9 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!confirmOverlay) return;
             confirmMessage.innerHTML = `Are you sure you want to delete <strong>${tech.name}</strong>? This action cannot be undone.`;
             confirmOverlay.classList.add('show');
-
-            confirmBtn.onclick = () => {
-                deleteTechnician(tech.id);
+            confirmBtn.onclick = async () => { // Make onclick async
+                await deleteTechnician(tech.id); // Await deletion
                 closeDeleteConfirmModal();
             };
         };
@@ -211,21 +167,33 @@ document.addEventListener('DOMContentLoaded', () => {
             if (confirmOverlay) confirmOverlay.classList.remove('show');
         };
 
-        const deleteTechnician = (techId) => {
-            const techIndex = technicians.findIndex(t => t.id === techId);
-            if (techIndex > -1) {
-                technicians.splice(techIndex, 1); // Remove from data array
-                // remove from table if present
-                if (technicianTableBody) {
-                    const row = technicianTableBody.querySelector(`tr[data-technician-id="${techId}"]`);
-                    if (row) row.remove();
+        const deleteTechnician = async (techId) => {
+            try {
+                // 1. Delete from Firestore
+                await db.collection('technicians').doc(techId).delete();
+                
+                // 2. Remove from local data array
+                const techIndex = technicians.findIndex(t => t.id === techId);
+                if (techIndex > -1) {
+                    technicians.splice(techIndex, 1);
                 }
-                // remove card if present
+                
+                // 3. Remove card from UI if present
                 if (cardsContainer) {
                     const card = cardsContainer.querySelector(`.tech-card[data-technician-id="${techId}"]`);
                     if (card) card.remove();
                 }
+                
+                // 4. Log the activity
+                if (firebase.auth().currentUser) {
+                    await logAdminActivity(firebase.auth().currentUser.uid, 'Deleted Technician', `Deleted technician with ID: ${techId}`);
+                }
+                
+                // 5. Show success message
                 if (typeof showSuccessToast === 'function') showSuccessToast('Technician deleted successfully!');
+            } catch (error) {
+                console.error("Error deleting technician from Firestore:", error);
+                if (typeof showSuccessToast === 'function') showSuccessToast('Failed to delete technician. Please try again.');
             }
         };
 
@@ -281,52 +249,115 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (addTechnicianForm) {
-            addTechnicianForm.addEventListener('submit', (e) => {
+            addTechnicianForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const nameInput = document.getElementById('technician-name');
                 const descriptionInput = document.getElementById('technician-description');
                 const newName = nameInput.value.trim();
                 const newDesc = descriptionInput ? descriptionInput.value.trim() : '';
 
-                if (newName) {
-                    const newId = `TCH-${String(Date.now()).slice(-4)}`;
-                    const newTechnician = {
-                        id: newId,
+                if (!newName) {
+                    // Consider implementing a dedicated showErrorToast for better UX
+                    if (typeof showSuccessToast === 'function') showSuccessToast('Please enter a technician name.');
+                    return;
+                }
+
+                // Disable submit button and show loading indicator (optional but good UX)
+                const submitButton = addTechnicianForm.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.textContent;
+                submitButton.textContent = 'Adding...';
+                submitButton.disabled = true;
+
+                try {
+                    // 1. Generate a new document ID beforehand
+                    const newTechDocRef = db.collection('technicians').doc(); // Get a new document reference with an auto-generated ID
+                    const newTechId = newTechDocRef.id;
+
+                    let avatarDownloadURL = './images/redicon.png'; // Default avatar
+
+                    // Helper function to convert data URL to Blob
+                    const dataURLtoBlob = (dataurl) => {
+                        const arr = dataurl.split(',');
+                        const mime = arr[0].match(/:(.*?);/)[1];
+                        const bstr = atob(arr[1]);
+                        let n = bstr.length;
+                        const u8arr = new Uint8Array(n);
+                        while (n--) {
+                            u8arr[n] = bstr.charCodeAt(n);
+                        }
+                        return new Blob([u8arr], { type: mime });
+                    };
+
+                    // 2. Handle avatar upload to Firebase Storage if a custom avatar is selected
+                    if (selectedAvatarDataURL && selectedAvatarDataURL !== './images/redicon.png') {
+                        try {
+                            const avatarBlob = dataURLtoBlob(selectedAvatarDataURL);
+                            const avatarFileName = `technician_avatars/${newTechId}_${Date.now()}`;
+                            const avatarRef = storage.ref().child(avatarFileName);
+                            const uploadTask = await avatarRef.put(avatarBlob);
+                            avatarDownloadURL = await uploadTask.ref.getDownloadURL();
+                        } catch (uploadError) {
+                            console.error("Error uploading avatar to Firebase Storage:", uploadError);
+                            // Fallback to default avatar if upload fails
+                            // Consider implementing a dedicated showErrorToast for better UX
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to upload avatar. Technician will be added with a default avatar.');
+                        }
+                    }
+
+                    // 3. Create the technician object for Firestore
+                    const technicianData = {
                         name: newName,
+                        fullName: newName,
+                        description: newDesc,
+                        role: 'technician',
                         status: 'Active',
                         tasks: 0,
                         rating: 0,
-                        description: newDesc,
-                        avatar: selectedAvatarDataURL || './images/redicon.png'
+                        avatar: avatarDownloadURL, // Use the uploaded URL or default
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
-                    technicians.push(newTechnician); // Add to the main data array
-                    addTechnicianToTable(newTechnician);
+
+                    // 4. Save to Firestore using the pre-generated ID
+                    await db.collection('technicians').doc(newTechId).set(technicianData);
+
+                    // 5. Create the local object with the new Firestore ID
+                    const newTechnicianForUI = { ...technicianData, id: newTechId };
+
+                    // 6. Update the local state and UI
+                    technicians.push(newTechnicianForUI);
                     if (cardsContainer) {
-                        const newCard = createTechnicianCard(newTechnician);
+                        const newCard = createTechnicianCard(newTechnicianForUI);
                         cardsContainer.prepend(newCard);
                     }
                     
-                    // Reset and close
+                    // 7. Log the activity
+                    if (firebase.auth().currentUser) {
+                        await logAdminActivity(firebase.auth().currentUser.uid, 'Created Technician', `Added new technician: ${newName} to technicians collection`);
+                    }
+
+                    // 8. Reset form and close modal
                     selectedAvatarDataURL = null;
                     if (avatarPreviewImg) avatarPreviewImg.src = './images/redicon.png';
                     addTechnicianForm.reset();
-                    // Close modal
                     const modalOverlay = document.getElementById('modal-overlay');
                     if (modalOverlay) {
                         modalOverlay.classList.remove('show');
                         document.body.classList.remove('modal-open');
-                        const modalContents = modalOverlay.querySelectorAll('.modal-content');
-                        modalContents.forEach(content => content.classList.remove('active'));
+                        modalOverlay.querySelectorAll('.modal-content').forEach(content => content.classList.remove('active'));
                     }
                     if (typeof showSuccessToast === 'function') showSuccessToast('New technician added successfully!');
+                } catch (error) {
+                    console.error("Error adding technician to Firestore: ", error);
+                    // Consider implementing a dedicated showErrorToast for better UX
+                    if (typeof showSuccessToast === 'function') showSuccessToast('Failed to add technician. Please check the console for details.');
+                } finally {
+                    // Re-enable submit button
+                    submitButton.textContent = originalButtonText;
+                    submitButton.disabled = false;
                 }
             });
-        }
-  
-        // Initialize table functionality for search and pagination
-        if (typeof window.initializeTableFunctionality === 'function') {
-            window.initializeTableFunctionality('#technicians-table-container');
-        }
     }
-  });
-  
+
+    // --- Initial Load ---
+        fetchAndPopulateTechnicians();
+});
