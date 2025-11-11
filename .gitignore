@@ -27,3 +27,6 @@ build/
 # Logs
 logs/
 *.log
+
+# Config files with secrets
+firebase-config.js
