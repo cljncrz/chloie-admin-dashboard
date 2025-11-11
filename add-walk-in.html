@@ -120,47 +120,93 @@
             <!-- ========== Page Content ========== -->
             <div class="page-content">
                 <section id="add-walk-in-page" class="page active">
-                    <div class="editor-page-container" style="max-width: 800px;">
-                        <form id="new-walk-in-form" class="modal-form editor-card" style="padding: 1.5rem;">
-                            <div class="editor-card-content">
-                                <div class="form-group">
-                                    <label for="walkin-customer-name">Customer Name</label>
-                                    <input type="text" id="walkin-customer-name" placeholder="e.g., Juan Dela Cruz" required />
-                                </div>
-                                <div class="form-group">
-                                    <label for="walkin-car-plate">Car Plate Number</label>
-                                    <input type="text" id="walkin-car-plate" placeholder="e.g., ABC 1234" required />
-                                </div>
-                                <div class="form-group">
-                                    <label for="walkin-customer-phone">Customer Phone</label>
-                                    <input type="tel" id="walkin-customer-phone" placeholder="e.g., 09171234567" required />
-                                </div>
-                                <div class="form-group">
-                                    <label for="walkin-car-name">Car Name</label>
-                                    <input type="text" id="walkin-car-name" placeholder="e.g., Toyota Vios" required />
-                                </div>
-                                <div class="form-group">
-                                    <label for="walkin-car-type">Car Type</label>
-                                    <input type="text" id="walkin-car-type" placeholder="e.g., Sedan" required />
-                                </div>
-                                <div class="form-group">
-                                    <label for="walkin-service">Service</label>
-                                    <select id="walkin-service" required></select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="walkin-price">Price (₱)</label>
-                                    <input type="number" id="walkin-price" placeholder="e.g., 250" required />
-                                </div>
-                                <div class="form-group">
-                                    <label for="walkin-date">Date & Time</label>
-                                    <div class="form-row" style="display: flex; gap: 1rem;">
-                                        <input type="date" id="walkin-date" required style="flex: 1;" />
-                                        <input type="time" id="walkin-time" required style="flex: 1;" />
+                    <div class="editor-page-container">
+                        <form id="new-walk-in-form">
+                            <div class="profile-page-grid">
+                                <!-- Left Column: Customer & Vehicle Info -->
+                                <div class="profile-main-column">
+                                    <div class="editor-card">
+                                        <div class="editor-card-header">
+                                            <h3>Customer & Vehicle Information</h3>
+                                        </div>
+                                        <div class="editor-card-content">
+                                            <div class="form-group">
+                                                <label for="walkin-customer-name">Customer Name</label>
+                                                <input type="text" id="walkin-customer-name" placeholder="e.g., Juan Dela Cruz" required />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="walkin-customer-phone">Customer Phone</label>
+                                                <input type="tel" id="walkin-customer-phone" placeholder="e.g., 09171234567" required />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="walkin-car-plate">Car Plate Number</label>
+                                                <input type="text" id="walkin-car-plate" placeholder="e.g., ABC 1234" required />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="walkin-car-name">Car Name</label>
+                                                <input type="text" id="walkin-car-name" placeholder="e.g., Toyota Vios" required />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="walkin-car-type">Car Type</label>
+                                                <input type="text" id="walkin-car-type" placeholder="e.g., Sedan" required />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <small class="text-muted">Defaults to the current date and time.</small>
+                                </div>
+
+                                <!-- Right Column: Service & Scheduling -->
+                                <div class="profile-aside-column">
+                                    <div class="editor-card">
+                                        <div class="editor-card-header">
+                                            <h3>Service Details</h3>
+                                        </div>
+                                        <div class="editor-card-content">
+                                            <div class="form-group">
+                                                <label for="walkin-vehicle-type">Vehicle Type</label>
+                                                <select id="walkin-vehicle-type" required>
+                                                    <option value="Car" selected>Car</option>
+                                                    <option value="Motorcycle">Motorcycle</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Vehicle Size</label>
+                                                <div class="radio-group-horizontal" id="walkin-vehicle-size-group">
+                                                    <div class="radio-option">
+                                                        <input type="checkbox" id="size-small" name="vehicle-size" value="small" checked>
+                                                        <label for="size-small" id="vehicle-size-small-label">5-Seater</label>
+                                                    </div>
+                                                    <div class="radio-option">
+                                                        <input type="checkbox" id="size-medium" name="vehicle-size" value="medium">
+                                                        <label for="size-medium" id="vehicle-size-medium-label">7-Seater</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Services</label>
+                                                <div id="walkin-services-container" style="display: flex; flex-direction: column; gap: 1rem;">
+                                                    <!-- Service dropdowns will be injected here by JS -->
+                                                </div>
+                                                <button type="button" id="add-service-btn" class="btn-secondary-outline" style="margin-top: 1rem; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                                    <span class="material-symbols-outlined">add</span> Add another service
+                                                </button>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="walkin-price">Total Price (₱)</label>
+                                                <input type="number" id="walkin-price" placeholder="0.00" required />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="walkin-date">Date & Time</label>
+                                                <div class="form-row" style="display: flex; gap: 1rem;">
+                                                    <input type="date" id="walkin-date" required style="flex: 1;" />
+                                                    <input type="time" id="walkin-time" required style="flex: 1;" />
+                                                </div>
+                                                <small class="text-muted">Defaults to the current date and time.</small>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                             <div class="editor-form-footer" style="margin:0; padding: 1.5rem; border-top: 1px solid var(--color-light);">
+                            <div class="editor-form-footer">
                                 <a href="appointment.html" class="btn-secondary">Cancel</a>
                                 <button type="submit" class="btn-primary">Add to Queue</button>
                             </div>

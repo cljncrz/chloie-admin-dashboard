@@ -5161,6 +5161,26 @@ input[type="checkbox"]:checked::after {
   animation: card-update-flash 0.7s ease-in-out;
 }
 
+/* ================== RADIO BUTTON GROUP ================== */
+.radio-group-horizontal {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    background: var(--color-light);
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-1);
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.radio-option label {
+    cursor: pointer;
+}
+
 /* ================== FOOTER ================== */
 .main-footer-content {
     margin-top: 2rem;

@@ -42,12 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Pending Approvals Logic ---
     const updatePendingApprovalsCount = () => {
         const pendingAppointments = (window.appData.appointments || []).filter(appt => appt.status === 'Pending');
-        const rescheduleRequests = window.appData.rescheduleRequests || [];
+        const rescheduleRequests = (window.appData.rescheduleRequests || []).filter(req => req.status === 'Pending');
         const totalPending = pendingAppointments.length + rescheduleRequests.length;
 
         if (pendingApprovalsBadge) {
             pendingApprovalsBadge.textContent = totalPending;
-            pendingApprovalsBadge.style.display = totalPending > 0 ? 'flex' : 'none';
+            pendingApprovalsBadge.style.display = totalPending > 0 ? 'inline-flex' : 'none';
         }
     };
 
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!pendingApprovalsList) return;
 
         const pendingAppointments = (window.appData.appointments || []).filter(appt => appt.status === 'Pending');
-        const rescheduleRequests = window.appData.rescheduleRequests || [];
+        const rescheduleRequests = (window.appData.rescheduleRequests || []).filter(req => req.status === 'Pending');
 
         pendingApprovalsList.innerHTML = ''; // Clear previous content
         const fragment = document.createDocumentFragment();
@@ -72,13 +72,21 @@ document.addEventListener('DOMContentLoaded', () => {
             itemEl.classList.add('approval-item');
             itemEl.dataset.type = 'appointment';
             itemEl.dataset.id = appt.serviceId;
+
+            // Create the technician dropdown. 'Unassigned' is the default.
+            // The dropdown will be populated with active technicians.
+            const technicianDropdownHTML = window.appData.createTechnicianDropdown('Unassigned');
+
             itemEl.innerHTML = `
                 <div class="item-details">
                     <p><b>New Booking:</b> ${appt.customer} for ${appt.service}</p>
                     <small class="text-muted">${appt.datetime}</small>
                 </div>
+                <div class="item-assignment">
+                    ${technicianDropdownHTML}
+                </div>
                 <div class="item-actions">
-                    <button class="btn-primary-outline approve-appt-btn" data-id="${appt.serviceId}">Approve</button>
+                    <button class="btn-primary-outline approve-appt-btn" data-id="${appt.serviceId}" disabled>Approve</button>
                     <button class="btn-danger-outline deny-appt-btn" data-id="${appt.serviceId}">Deny</button>
                 </div>
             `;
@@ -94,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
             itemEl.innerHTML = `
                 <div class="item-details">
                     <p><b>Reschedule Request:</b> ${req.customer} for ${req.service}</p>
-                    <small class="text-muted">Original: ${req.originalDatetime} &bull; Reason: ${req.reason}</small></p>
+                    <small class="text-muted">Original: ${new Date(req.originalDatetime.seconds * 1000).toLocaleString()} &bull; Reason: ${req.reason}</small>
                 </div>
                 <div class="item-actions">
                     <button class="btn-primary-outline review-reschedule-btn" data-request-id="${req.requestId}" data-service-id="${req.serviceId}">Review & Reschedule</button>
@@ -106,8 +114,82 @@ document.addEventListener('DOMContentLoaded', () => {
 
         pendingApprovalsList.appendChild(fragment);
         updatePendingApprovalsCount(); // Update badge after rendering
+
+        // Add event listeners for the new dropdowns
+        pendingApprovalsList.querySelectorAll('.technician-select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const approvalItem = e.target.closest('.approval-item');
+                const approveBtn = approvalItem.querySelector('.approve-appt-btn');
+                
+                // Enable the 'Approve' button only if a technician other than "Unassigned" is selected.
+                if (e.target.value && e.target.value !== 'Unassigned') {
+                    approveBtn.disabled = false;
+                } else {
+                    approveBtn.disabled = true;
+                }
+            });
+        });
     };
     window.renderPendingApprovalsModalContent = renderPendingApprovalsModalContent; // Expose globally
+
+    // --- Handle Actions within the Pending Approvals Modal ---
+    if (pendingApprovalsList) {
+        pendingApprovalsList.addEventListener('click', async (e) => {
+            const approveBtn = e.target.closest('.approve-appt-btn');
+            const denyBtn = e.target.closest('.deny-appt-btn');
+            const reviewBtn = e.target.closest('.review-reschedule-btn');
+
+            if (approveBtn) {
+                approveBtn.disabled = true; // Prevent double clicks
+                const itemEl = approveBtn.closest('.approval-item');
+                const serviceId = approveBtn.dataset.id;
+                const technicianSelect = itemEl.querySelector('.technician-select');
+                const selectedTechnician = technicianSelect.value;
+
+                // Find the appointment in the global data
+                const appointment = (window.appData.appointments || []).find(a => a.serviceId === serviceId);
+
+                if (!appointment) {
+                    alert('Error: Could not find the appointment to approve.');
+                    approveBtn.disabled = false;
+                    return;
+                }
+
+                try {
+                    const db = firebase.firestore();
+                    // Update the booking in Firestore with the new status and technician
+                    await db.collection('bookings').doc(serviceId).update({
+                        status: 'Approved', // Or 'Scheduled', depending on your workflow
+                        technician: selectedTechnician
+                    });
+
+                    // Update the local data model
+                    appointment.status = 'Approved';
+                    appointment.technician = selectedTechnician;
+
+                    // Remove the item from the modal and update counts
+                    itemEl.remove();
+                    updatePendingApprovalsCount();
+
+                    // Optionally, update the main appointments table if it's on the same page
+                    // This is more complex and might be better handled by a page reload or a more robust state management system.
+
+                    if (typeof showSuccessToast === 'function') {
+                        showSuccessToast(`Appointment for ${appointment.customer} approved and assigned to ${selectedTechnician}.`);
+                    }
+
+                } catch (error) {
+                    console.error("Error approving appointment:", error);
+                    alert('Failed to approve appointment. Please try again.');
+                    approveBtn.disabled = false; // Re-enable button on failure
+                }
+            }
+
+            // Note: Handlers for denyBtn and reviewBtn can be added here as well
+            // for better event delegation, but we'll leave them as is for now
+            // to stick to the user's request.
+        });
+    }
 
 
     /**
@@ -334,10 +416,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Reschedule Logic ---
     const renderRescheduleRequests = () => {
-        if (!rescheduleListContainer) return;
+        if (!rescheduleListContainer) return; // Exit if the element isn't on the page
 
-        const requests = window.appData.rescheduleRequests || [];
-        rescheduleListContainer.innerHTML = '';
+        const requests = (window.appData.rescheduleRequests || []).filter(req => req.status === 'Pending');
+        rescheduleListContainer.innerHTML = ''; // Clear existing content
 
         if (requests.length === 0) {
             rescheduleListContainer.innerHTML = '<p class="text-muted">No pending reschedule requests.</p>';
@@ -350,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
             itemEl.innerHTML = `
                 <div class="reschedule-item-info">
                     <strong>${req.customer}</strong>
-                    <small>Wants to reschedule: <strong>${req.service}</strong> from ${new Date(req.originalDatetime).toLocaleString()}</small>
+                    <small>Wants to reschedule: <strong>${req.service}</strong> from ${new Date(req.originalDatetime.seconds * 1000).toLocaleString()}</small>
                     <p class="reason text-muted">Reason: "${req.reason}"</p>
                 </div>
                 <div class="reschedule-item-actions">
@@ -367,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleRescheduleClick = (requestId) => {
-        const request = window.appData.rescheduleRequests.find(r => r.requestId === requestId);
+        const request = (window.appData.rescheduleRequests || []).find(r => r.requestId === requestId);
         if (!request) return;
 
         // Find the original appointment to be updated later
@@ -635,7 +717,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const removeRescheduleRequest = (requestId) => {
-        const requests = window.appData.rescheduleRequests || [];
+        const requests = (window.appData.rescheduleRequests || []);
         const index = requests.findIndex(r => r.requestId === requestId);
         if (index > -1) {
             requests.splice(index, 1);
@@ -650,7 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- RESCHEDULE LOGIC ---
         if (reschedulingAppointment) {
-            const originalRequestId = window.appData.rescheduleRequests.find(r => r.serviceId === reschedulingAppointment.serviceId)?.requestId;
+            const originalRequestId = (window.appData.rescheduleRequests || []).find(r => r.serviceId === reschedulingAppointment.serviceId)?.requestId;
             if (!originalRequestId) {
                 alert('Error: Could not find the original reschedule request.');
                 closeBookingModal();
@@ -691,6 +773,27 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- NEW APPOINTMENT LOGIC ---
         // Validate that all fields are selected for a new booking
         if (!selectedTimeSlot || !selectedCustomerName || !selectedServiceName) {
+            // If it's a reschedule, only the time slot is needed.
+            if (reschedulingAppointment) {
+                if (!selectedTimeSlot) {
+                    alert('Please select a new time slot to reschedule.');
+                    return;
+                }
+            } else {
+                alert('Please select a customer, a service, and a time slot to book an appointment.');
+                return;
+            }
+        }
+
+        // This part of the logic was slightly misplaced. It should be inside the reschedule block.
+        // Moving it up to ensure it runs correctly.
+        if (reschedulingAppointment && !selectedTimeSlot) {
+            alert('Please select a new time slot to reschedule.');
+            return;
+        }
+
+        // Re-validating for new appointments after the reschedule check.
+        if (!reschedulingAppointment && (!selectedTimeSlot || !selectedCustomerName || !selectedServiceName)) {
             alert('Please select a customer, a service, and a time slot to book an appointment.');
             return;
         }
@@ -706,7 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 carName: "N/A", // This info isn't in the customer object, default it
                 carType: "N/A", // This info isn't in the customer object, default it
                 service: selectedServiceName,
-                technician: findAndAssignLeastBusyTechnician(),
+                technician: 'Unassigned', // Default to Unassigned
                 status: 'Pending',
                 // Format date to match "Oct 28, 2025 - 2:00 PM"
                 datetime: `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${selectedTimeSlot}`,
@@ -895,9 +998,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const fetchRescheduleRequests = async () => {
+        try {
+            const db = firebase.firestore();
+            const snapshot = await db.collection('rescheduleRequests').where('status', '==', 'Pending').get();
+            window.appData.rescheduleRequests = snapshot.docs.map(doc => ({ requestId: doc.id, ...doc.data() }));
+        } catch (error) {
+            console.error("Error fetching reschedule requests:", error);
+            window.appData.rescheduleRequests = []; // Ensure it's an empty array on error
+        }
+    };
+
     // --- Initial Render ---
-    renderCalendar();
-    renderRescheduleRequests();
+    const initializeScheduler = async () => {
+        await fetchRescheduleRequests(); // Fetch live data first
+        renderCalendar(); // This will call renderTimeSlots and renderQueue
+        renderRescheduleRequests();
+        updatePendingApprovalsCount(); // Update the badge with the correct count
+    };
+
+    initializeScheduler();
 }
 
 );

@@ -77,6 +77,24 @@ document.addEventListener('DOMContentLoaded', () => {
         animateInsightNumbers(cancelledEl);
     };
 
+    // This function will now be defined here to ensure it uses live data from Firestore
+    window.appData.createTechnicianDropdown = (selectedTechnician) => {
+        const technicians = window.appData.technicians || [];
+        // Filter for active technicians, and always include the currently selected one even if they are inactive
+        const activeTechnicians = technicians.filter(tech => tech.status === 'Active' || tech.name === selectedTechnician);
+
+        let options = '<option value="Unassigned">Unassigned</option>';
+        activeTechnicians.forEach(tech => {
+            // Skip the system "Unassigned" user if it exists in the collection
+            if (tech.name === 'Unassigned') return;
+            const isSelected = tech.name === selectedTechnician ? 'selected' : '';
+            options += `<option value="${tech.name}" ${isSelected}>${tech.name}</option>`;
+        });
+
+        return `<select class="technician-select">${options}</select>`;
+    };
+
+
     if (mainAppointmentsContainer) { // This condition now only checks if we are on the main appointments page
         // The previous updateAppointmentWidgets function is no longer needed
         // as the HTML structure and IDs have changed.
@@ -86,13 +104,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const tableBody = mainAppointmentsContainer.querySelector('tbody');
             const loader = mainAppointmentsContainer.querySelector('.table-loader');
             if (loader) loader.classList.add('loading');
-            tableBody.innerHTML = ''; // Clear existing static content
 
             try {
                 const db = firebase.firestore();
-                const snapshot = await db.collection('bookings').get();
+                // Fetch bookings and technicians simultaneously for better performance
+                const [bookingsSnapshot, techniciansSnapshot] = await Promise.all([
+                    db.collection('bookings').get(),
+                    db.collection('technicians').get()
+                ]);
 
-                if (snapshot.empty) {
+                // Process and store technicians data globally
+                window.appData.technicians = techniciansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // Process bookings data
+                if (bookingsSnapshot.empty) {
                     const noResultsRow = mainAppointmentsContainer.querySelector('.no-results-row');
                     if (noResultsRow) noResultsRow.style.display = 'table-row';
                     console.log('No booking documents found in Firestore.');
@@ -100,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Replace sample data with Firestore data
-                window.appData.appointments = snapshot.docs.map(doc => {
+                window.appData.appointments = bookingsSnapshot.docs.map(doc => {
                     const data = doc.data() || {};
 
                     // helper: parse various firestore-like date shapes into Date or null
@@ -190,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Initial population of tables
                 populateAppointmentsTable();
                 populateWalkinsTable(); // Assuming walk-ins might also come from bookings or a separate fetch
+                updateAppointmentPageStats(); // Update stats after fetching data
 
             } catch (error) {
                 console.error("Error fetching bookings from Firestore:", error);
@@ -265,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.dataset.service = appt.serviceNames;
                 row.dataset.datetime = appt.datetime;
                 row.dataset.price = appt.price;
-                row.dataset.technician = appt.technician;
+                row.dataset.technicians = appt.technicians;
                 row.dataset.status = appt.status;
                 row.dataset.paymentStatus = appt.paymentStatus;
 
@@ -402,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusClass = walkin.status.toLowerCase().replace(' ', '-');
                 // Add data attributes for modal functionality
                 row.dataset.plate = walkin.plate;
+                row.dataset.serviceId = walkin.id; // Use the unique walkin ID
                 row.dataset.carName = walkin.carName;
                 row.dataset.carType = walkin.carType;
                 row.dataset.service = walkin.service;
@@ -541,6 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const completeServiceButton = e.target.closest('.complete-service-btn');
                 const markPaidButton = e.target.closest('.mark-paid-btn');
                 const technicianSelect = e.target.closest('.technician-select');
+                const isActionButtonClick = startServiceButton || completeServiceButton || cancelButton || markPaidButton || technicianSelect;
                 const row = e.target.closest('tr');
 
                 if (!row || row.classList.contains('no-results-row')) return;
@@ -559,9 +587,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusCell.innerHTML = `<span class="in-progress">In Progress</span>`;
 
                         // Show success toast
-                        // Increase the technician's task count since they are now busy
-                        increaseTechnicianTaskCount(appointment.technician);
+                        // If the task was 'Pending', starting it now officially assigns it and increases the count.
+                        // We check for 'Pending' to avoid double-counting if the status was changed differently.
+                        if (originalStatus === 'Pending') increaseTechnicianTaskCount(appointment.technician);
 
+                        updateAppointmentPageStats(); // Refresh stats
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Service for ${appointment.customer} has started.`);
 
                         // Replace the start button with a complete button
@@ -587,6 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusCell.innerHTML = `<span class="completed">Completed</span>`;
 
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Service for ${appointment.customer} is complete.`);
+                        updateAppointmentPageStats(); // Refresh stats
                         completeServiceButton.remove();
 
                         // Decrease the technician's task count
@@ -618,6 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // Re-render the table to reflect filter/sort changes if needed
                         // Just re-render the table with current filters
+                        updateAppointmentPageStats(); // Refresh stats
                         populateAppointmentsTable();
                     } 
                     return;
@@ -643,8 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // If the click was on the row itself (but not on a button), show details overlay
-                const isActionButtonClick = startServiceButton || completeServiceButton || cancelButton || markPaidButton || technicianSelect;
-                if (!isActionButtonClick) {
+                if (row && !isActionButtonClick) {
                     const appointment = (window.appData.appointments || []).find(a => a.serviceId === row.dataset.serviceId);
  
                     if (appointment) {
@@ -659,36 +690,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             });
         }
-
-        // --- Handle Technician Re-assignment ---
-        appointmentTableBody.addEventListener('change', (e) => {
-            const technicianSelect = e.target.closest('.technician-select');
-            if (!technicianSelect) return;
-
-            const row = e.target.closest('tr');
-            if (!row || !row.dataset.serviceId) return;
-
-            const serviceId = row.dataset.serviceId;
-            const newTechnicianName = technicianSelect.value;
-
-            // Find the appointment in the global data
-            const appointment = window.appData.appointments.find(a => a.serviceId === serviceId);
-            if (!appointment) return;
-
-            const oldTechnicianName = appointment.technician;
-
-            // Update the data model
-            appointment.technician = newTechnicianName;
-            row.dataset.technician = newTechnicianName;
-
-            // If the task was already assigned, adjust task counts
-            if (appointment.status === 'Pending' || appointment.status === 'In Progress') {
-                decreaseTechnicianTaskCount(oldTechnicianName);
-                increaseTechnicianTaskCount(newTechnicianName);
-            }
-
-            if (typeof showSuccessToast === 'function') showSuccessToast(`Technician for ${appointment.customer} changed to ${newTechnicianName}.`);
-        });
 
         // --- Helper function to find and assign the least busy technician ---
         const findAndAssignLeastBusyTechnician = () => {
@@ -730,6 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const completeServiceButton = e.target.closest('.complete-service-btn');
                 const markPaidButton = e.target.closest('.mark-paid-btn');
                 const technicianSelect = e.target.closest('.technician-select');
+                const isActionButtonClick = startServiceButton || completeServiceButton || cancelButton || markPaidButton || technicianSelect;
                 const row = e.target.closest('tr');
 
                 if (!row || row.classList.contains('no-results-row')) return;
@@ -747,9 +749,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         const statusCell = row.querySelector('td:nth-last-child(3)'); // The 3rd cell from the end is Status
                         statusCell.innerHTML = `<span class="in-progress">In Progress</span>`;
 
-                        // Increase the technician's task count
-                        increaseTechnicianTaskCount(walkin.technician);
+                        // If the task was 'Pending', starting it now officially assigns it and increases the count.
+                        // We check for 'Pending' to avoid double-counting if the status was changed differently.
+                        if (originalStatus === 'Pending') increaseTechnicianTaskCount(walkin.technician);
 
+                        updateAppointmentPageStats(); // Refresh stats
                         // Show success toast
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Service for walk-in ${walkin.plate} has started.`);
 
@@ -776,6 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusCell.innerHTML = `<span class="completed">Completed</span>`;
 
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Service for walk-in ${walkin.plate} is complete.`);
+                        updateAppointmentPageStats(); // Refresh stats
                         completeServiceButton.remove();
 
                         // Decrease the technician's task count
@@ -806,6 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         
                         cancelButton.disabled = true;
+                        updateAppointmentPageStats(); // Refresh stats
                         // Re-render the table with current filters
                         populateWalkinsTable();
                     }
@@ -832,8 +838,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // If the click was on the row itself (but not on a button), show details overlay
-                const isActionButtonClick = startServiceButton || completeServiceButton || cancelButton || markPaidButton || technicianSelect;
-                if (!isActionButtonClick) {
+                if (row && !isActionButtonClick) {
                     const walkins = window.appData.walkins || [];
                     const walkin = walkins.find(w => w.plate === row.dataset.plate && w.service === row.dataset.service);
 
@@ -848,35 +853,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // --- Handle Technician Re-assignment for Walk-ins ---
-        walkinTableBody.addEventListener('change', (e) => {
-            const technicianSelect = e.target.closest('.technician-select');
-            if (!technicianSelect) return;
-
-            const row = e.target.closest('tr');
-            if (!row || !row.dataset.plate) return;
-
-            const plate = row.dataset.plate;
-            const service = row.dataset.service;
-            const newTechnicianName = technicianSelect.value;
-
-            // Find the walk-in in the global data
-            const walkin = window.appData.walkins.find(w => w.plate === plate && w.service === service);
-            if (!walkin) return;
-
-            const oldTechnicianName = walkin.technician;
-
-            // Update the data model
-            walkin.technician = newTechnicianName;
-            row.dataset.technician = newTechnicianName;
-
-            if (walkin.status === 'Pending' || walkin.status === 'In Progress') {
-                decreaseTechnicianTaskCount(oldTechnicianName);
-                increaseTechnicianTaskCount(newTechnicianName);
-            }
-            if (typeof showSuccessToast === 'function') showSuccessToast(`Technician for walk-in ${walkin.plate} changed to ${newTechnicianName}.`);
-        });
-
         // --- Event Listeners for Filters, Sorting, and Pagination ---
         const setupTableInteractions = () => {
             // Appointments Table
@@ -886,12 +862,93 @@ document.addEventListener('DOMContentLoaded', () => {
             apptContainer.querySelector('.table-pagination [data-action="prev"]').addEventListener('click', () => { if (apptCurrentPage > 1) { apptCurrentPage--; populateAppointmentsTable(); } });
             apptContainer.querySelector('.table-pagination [data-action="next"]').addEventListener('click', () => { apptCurrentPage++; populateAppointmentsTable(); });
 
+            // Handle Technician Re-assignment for Appointments
+            apptContainer.querySelector('tbody').addEventListener('change', async (e) => { // Make the event listener async
+                const technicianSelect = e.target.closest('.technician-select');
+                if (!technicianSelect) return;
+
+                const row = e.target.closest('tr');
+                if (!row || !row.dataset.serviceId) return;
+
+                const serviceId = row.dataset.serviceId;
+                const newTechnicianName = technicianSelect.value;
+
+                const appointment = window.appData.appointments.find(a => a.serviceId === serviceId);
+                if (!appointment) return;
+
+                const oldTechnicianName = appointment.technician;
+                appointment.technician = newTechnicianName;
+                row.dataset.technician = newTechnicianName;
+
+                try { // Add try...catch for the database operation
+                    // --- Firestore Update ---
+                    const db = firebase.firestore();
+                    await db.collection('bookings').doc(serviceId).update({
+                        technician: newTechnicianName
+                    });
+
+                    // Update task counts only after a successful database update
+                    if (appointment.status === 'Pending' || appointment.status === 'In Progress') {
+                        decreaseTechnicianTaskCount(oldTechnicianName);
+                        increaseTechnicianTaskCount(newTechnicianName);
+                    }
+
+                    if (typeof showSuccessToast === 'function') showSuccessToast(`Technician for ${appointment.customer} changed to ${newTechnicianName}.`);
+                } catch (error) {
+                    console.error("Error updating technician in Firestore:", error);
+                    // Revert local changes if DB update fails
+                    appointment.technician = oldTechnicianName;
+                    row.dataset.technician = oldTechnicianName;
+                    if (typeof showSuccessToast === 'function') showSuccessToast(`Error: Could not assign technician.`, 'error');
+                }
+            });
+
             // Walk-ins Table
             const walkinContainer = document.getElementById('walk-in-appointments-table-container');
             walkinContainer.querySelector('#walkin-appointment-search').addEventListener('input', () => { walkinCurrentPage = 1; populateWalkinsTable(); });
             walkinContainer.querySelector('.status-filter')?.addEventListener('change', () => { walkinCurrentPage = 1; populateWalkinsTable(); });
             walkinContainer.querySelector('.table-pagination [data-action="prev"]').addEventListener('click', () => { if (walkinCurrentPage > 1) { walkinCurrentPage--; populateWalkinsTable(); } });
             walkinContainer.querySelector('.table-pagination [data-action="next"]').addEventListener('click', () => { walkinCurrentPage++; populateWalkinsTable(); });
+
+            // Handle Technician Re-assignment for Walk-ins
+            walkinContainer.querySelector('tbody').addEventListener('change', async (e) => { // Make the event listener async
+                const technicianSelect = e.target.closest('.technician-select');
+                if (!technicianSelect) return;
+
+                const row = e.target.closest('tr');
+                if (!row || !row.dataset.serviceId) return; // Use serviceId which holds the unique ID
+
+                // Walk-ins are identified by their unique ID stored in the row's dataset
+                const walkinId = row.dataset.serviceId; // Assuming walk-in rows also have data-service-id
+                const walkin = window.appData.walkins.find(w => w.id === walkinId);
+                if (!walkin) return;
+
+                const oldTechnicianName = walkin.technician;
+                const newTechnicianName = technicianSelect.value;
+                walkin.technician = newTechnicianName;
+                row.dataset.technician = newTechnicianName;
+
+                try { // Add try...catch for the database operation
+                    // --- Firestore Update ---
+                    const db = firebase.firestore();
+                    await db.collection('walkins').doc(walkinId).update({
+                        technician: newTechnicianName
+                    });
+
+                    // Update task counts only after a successful database update
+                    if (walkin.status === 'Pending' || walkin.status === 'In Progress') {
+                        decreaseTechnicianTaskCount(oldTechnicianName);
+                        increaseTechnicianTaskCount(newTechnicianName);
+                    }
+                    if (typeof showSuccessToast === 'function') showSuccessToast(`Technician for walk-in ${walkin.plate} changed to ${newTechnicianName}.`);
+                } catch (error) {
+                    console.error("Error updating walk-in technician in Firestore:", error);
+                    // Revert local changes if DB update fails
+                    walkin.technician = oldTechnicianName;
+                    row.dataset.technician = oldTechnicianName;
+                    if (typeof showSuccessToast === 'function') showSuccessToast(`Error: Could not assign technician.`, 'error');
+                }
+            });
 
             // Sorting (applies to both tables)
             document.querySelectorAll('#appointments-page .sortable-header th[data-sortable="true"]').forEach(header => {
