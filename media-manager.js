@@ -1,8 +1,12 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to be initialized
+    await window.firebaseInitPromise;
+    
+    const db = window.firebase.firestore();
+    const auth = window.firebase.auth();
+    const storage = window.firebase.storage();
+    
     const mediaManagerContainer = document.querySelector('.media-manager-container');
-    // Firebase services are globally available from firebase-config.js
-    const db = firebase.firestore();
-    const storage = firebase.storage();
 
     // If the main container isn't on the page, don't run any of this script.
     if (!mediaManagerContainer) return;
@@ -314,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let successCount = 0;
 
         // Check if user is authenticated
-        const currentUser = firebase.auth().currentUser;
+        const currentUser = window.firebase.auth().currentUser;
         if (!currentUser) {
             if (typeof showErrorToast === 'function') {
                 showErrorToast('You must be logged in to upload files.');

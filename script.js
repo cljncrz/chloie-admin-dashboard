@@ -1,6 +1,6 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Firebase is initialized in firebase-config.js
-    // The 'auth', 'db', and 'storage' constants are globally available from that file.
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to initialize before continuing
+    await window.firebaseInitPromise;
 
     const sideMenu = document.querySelector('aside');
     const menuBtn = document.querySelector('#menu-btn');
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             // Firebase auth state change will be caught by auth-guard.js to redirect.
-            firebase.auth().signOut();
+            window.firebase.auth().signOut();
         });
     }
 
@@ -435,26 +435,29 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- Firebase Auth State Listener ---
-// This runs once the user's auth state is confirmed. Some pages don't load the
-// Firebase SDK (e.g., public pages). Guard against `firebase` being undefined
-// to avoid uncaught ReferenceErrors when `script.js` is included on those pages.
-if (typeof firebase !== 'undefined' && firebase && typeof firebase.auth === 'function') {
-    // This runs once the user's auth state is confirmed.
-    firebase.auth().onAuthStateChanged(user => {
-        if (user) {
-            // User is signed in.
-            console.log('Authenticated user found:', user.uid);
-            populateUserProfile(user);
-            initializeProfilePage(user);
-            populateAdminActivity(user);
+// Defer attaching the listener until Firebase initialization completes.
+window.firebaseInitPromise
+    .then(() => {
+        if (window.firebase && typeof window.firebase.auth === 'function') {
+            window.firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    // User is signed in.
+                    console.log('Authenticated user found:', user.uid);
+                    populateUserProfile(user);
+                    initializeProfilePage(user);
+                    populateAdminActivity(user);
+                } else {
+                    // User is signed out. Handled by auth-guard.js
+                    console.log('No authenticated user. Auth guard will redirect.');
+                }
+            });
         } else {
-            // User is signed out. Handled by auth-guard.js
-            console.log('No authenticated user. Auth guard will redirect.');
+            console.error('Firebase is not available to attach auth state listener.');
         }
+    })
+    .catch((err) => {
+        console.error('Error waiting for Firebase initialization before attaching auth listener:', err);
     });
-} else {
-    console.warn('Firebase is not available on this page. Skipping auth listener in script.js. If this page needs auth features, include the Firebase SDK and firebase-config.js before script.js.');
-}
 
 
 // --- Populate User Profile in Header and Profile Page ---
@@ -473,18 +476,22 @@ const populateUserProfile = (user) => {
     if (profilePagePicture && user.photoURL) profilePagePicture.src = user.photoURL;
 
     // You can also fetch from Firestore if you store more data there
-    db.collection('users').doc(user.uid).get().then(doc => {
-        if (doc.exists) {
-            const userData = doc.data();
-            // Override with Firestore data if it's more up-to-date
-            if (profileHeaderName) profileHeaderName.textContent = userData.name || 'Admin';
-            if (profilePageNameInput) profilePageNameInput.value = userData.name || '';
-            if (userData.photoURL) {
-                if (profileHeaderPhoto) profileHeaderPhoto.src = userData.photoURL;
-                if (profilePagePicture) profilePagePicture.src = userData.photoURL;
+    // Use window.firebase.firestore() to ensure it's initialized
+    if (window.firebase && typeof window.firebase.firestore === 'function') {
+        const db = window.firebase.firestore();
+        db.collection('users').doc(user.uid).get().then(doc => {
+            if (doc.exists) {
+                const userData = doc.data();
+                // Override with Firestore data if it's more up-to-date
+                if (profileHeaderName) profileHeaderName.textContent = userData.name || 'Admin';
+                if (profilePageNameInput) profilePageNameInput.value = userData.name || '';
+                if (userData.photoURL) {
+                    if (profileHeaderPhoto) profileHeaderPhoto.src = userData.photoURL;
+                    if (profilePagePicture) profilePagePicture.src = userData.photoURL;
+                }
             }
-        }
-    }).catch(error => console.error("Error fetching user data from Firestore:", error));
+        }).catch(error => console.error("Error fetching user data from Firestore:", error));
+    }
 };
 
 // --- Initialize Profile Page Functionality ---
@@ -527,9 +534,12 @@ const initializeProfilePage = (user) => {
             // 1. If a new picture is uploaded, handle it first
             if (newPictureFile) {
                 const filePath = `profile-pictures/${user.uid}/${newPictureFile.name}`;
-                const fileRef = storage.ref(filePath);
-                const uploadTask = await fileRef.put(newPictureFile);
-                photoURL = await uploadTask.ref.getDownloadURL();
+                if (window.firebase && typeof window.firebase.storage === 'function') {
+                    const storage = window.firebase.storage();
+                    const fileRef = storage.ref(filePath);
+                    const uploadTask = await fileRef.put(newPictureFile);
+                    photoURL = await uploadTask.ref.getDownloadURL();
+                }
             }
 
             // 2. Update Firebase Auth profile
@@ -539,17 +549,20 @@ const initializeProfilePage = (user) => {
             });
 
             // 3. Update Firestore 'users' collection
-            await db.collection('users').doc(user.uid).update({
-                name: newName,
-                photoURL: photoURL
-            });
+            if (window.firebase && typeof window.firebase.firestore === 'function') {
+                const db = window.firebase.firestore();
+                await db.collection('users').doc(user.uid).update({
+                    name: newName,
+                    photoURL: photoURL
+                });
+            }
 
             // 4. Log this activity
             await logAdminActivity(user.uid, 'Updated Profile', `Changed name to "${newName}".`);
 
             // 4. Update UI and show success
-            populateUserProfile(auth.currentUser); // Re-populate with fresh data
-            populateAdminActivity(auth.currentUser); // Refresh activity log
+            populateUserProfile(user); // Re-populate with fresh data
+            populateAdminActivity(user); // Refresh activity log
             successToast.querySelector('p').textContent = 'Profile updated successfully!';
             successToast.classList.add('show');
             setTimeout(() => successToast.classList.remove('show'), 3000);
@@ -584,7 +597,7 @@ const initializeProfilePage = (user) => {
                 await logAdminActivity(user.uid, 'Updated Security', 'Changed account password.');
 
                 passwordForm.reset();
-                populateAdminActivity(auth.currentUser); // Refresh activity log
+                populateAdminActivity(user); // Refresh activity log
                 successToast.querySelector('p').textContent = 'Password updated successfully!';
                 successToast.classList.add('show');
                 setTimeout(() => successToast.classList.remove('show'), 3000);
@@ -656,13 +669,18 @@ const initializeSettingsPage = () => {
 
 // --- Reusable function to log admin actions ---
 const logAdminActivity = async (adminId, action, details) => {
-    if (!db || !adminId) return;
+    if (!adminId) return;
     try {
+        if (!window.firebase || typeof window.firebase.firestore !== 'function') {
+            console.warn('Firebase Firestore is not available for logging activity');
+            return;
+        }
+        const db = window.firebase.firestore();
         await db.collection('activity_logs').add({
             adminId: adminId,
             action: action,
             details: details,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            timestamp: window.firebase.firestore().FieldValue.serverTimestamp()
         });
     } catch (error) {
         console.error("Error logging admin activity:", error);
@@ -672,7 +690,7 @@ const logAdminActivity = async (adminId, action, details) => {
 /**
  * Formats a Firestore timestamp into a user-friendly relative or absolute string.
  * e.g., "2 hours ago", "Yesterday at 5:30 PM", "Oct 29, 2023"
- * @param {firebase.firestore.Timestamp} firestoreTimestamp - The timestamp from Firestore.
+ * @param {Timestamp} firestoreTimestamp - The timestamp from Firestore.
  * @returns {string} A formatted date string.
  */
 const formatActivityTimestamp = (firestoreTimestamp) => {
@@ -721,6 +739,12 @@ const populateAdminActivity = async (user) => {
     logList.innerHTML = '<div class="spinner-small"></div>'; // Show a small loader
 
     try {
+        if (!window.firebase || typeof window.firebase.firestore !== 'function') {
+            logList.innerHTML = '<div class="activity-item-placeholder"><p class="text-muted">Firebase is not initialized yet.</p></div>';
+            return;
+        }
+
+        const db = window.firebase.firestore();
         const snapshot = await db.collection('activity_logs')
             .where('adminId', '==', user.uid)
             .orderBy('timestamp', 'desc')

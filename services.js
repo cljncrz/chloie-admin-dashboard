@@ -1,5 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const db = firebase.firestore();
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to be initialized
+    await window.firebaseInitPromise;
+    
+    const db = window.firebase.firestore();
     let servicesData = window.appData.services || [];
 
     const appointmentsData = window.appData.appointments || [];

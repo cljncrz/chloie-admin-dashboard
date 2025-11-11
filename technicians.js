@@ -1,8 +1,11 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Firebase services are globally available from firebase-config.js
-    const db = firebase.firestore();
-    const storage = firebase.storage();
-
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to be initialized
+    await window.firebaseInitPromise;
+    
+    const db = window.firebase.firestore();
+    const auth = window.firebase.auth();
+    const storage = window.firebase.storage();
+    
     // --- DOM Elements ---
     const cardsContainer = document.getElementById('technician-cards-grid');
     const searchInput = document.getElementById('technician-search'); // Assuming there's a search input for technicians
@@ -185,8 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 // 4. Log the activity
-                if (firebase.auth().currentUser) {
-                    await logAdminActivity(firebase.auth().currentUser.uid, 'Deleted Technician', `Deleted technician with ID: ${techId}`);
+                if (window.firebase.auth().currentUser) {
+                    await logAdminActivity(window.firebase.auth().currentUser.uid, 'Deleted Technician', `Deleted technician with ID: ${techId}`);
                 }
                 
                 // 5. Show success message
@@ -314,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         tasks: 0,
                         rating: 0,
                         avatar: avatarDownloadURL, // Use the uploaded URL or default
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        createdAt: window.firebase.firestore().FieldValue.serverTimestamp()
                     };
 
                     // 4. Save to Firestore using the pre-generated ID
@@ -331,8 +334,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     
                     // 7. Log the activity
-                    if (firebase.auth().currentUser) {
-                        await logAdminActivity(firebase.auth().currentUser.uid, 'Created Technician', `Added new technician: ${newName} to technicians collection`);
+                    if (window.firebase.auth().currentUser) {
+                        await logAdminActivity(window.firebase.auth().currentUser.uid, 'Created Technician', `Added new technician: ${newName} to technicians collection`);
                     }
 
                     // 8. Reset form and close modal

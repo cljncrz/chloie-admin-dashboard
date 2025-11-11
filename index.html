@@ -20,12 +20,10 @@
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css" />
 
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <!-- We will load Firebase via modules in our JS files -->
+    <!-- The 'defer' attribute is not strictly needed with type="module" as modules are deferred by default, but it's good practice. -->
 
+    <!-- Load Firebase initialization first (before any other scripts that depend on it) -->
     <script src="firebase-config.js"></script>
     <!-- Authentication Guard -->
     <script src="auth-guard.js"></script>

@@ -1,4 +1,7 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to initialize
+    await window.firebaseInitPromise;
+
     const schedulerContainer = document.querySelector('.scheduler-container');
     if (!schedulerContainer) return;
 

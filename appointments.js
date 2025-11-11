@@ -1,4 +1,7 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to initialize
+    await window.firebaseInitPromise;
+
     // This script is now for the main appointments page
     const mainAppointmentsContainer = document.getElementById('main-appointments-table');
 

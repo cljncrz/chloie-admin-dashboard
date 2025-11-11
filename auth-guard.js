@@ -1,15 +1,12 @@
 // auth-guard.js
 // Ensures pages that include this script are only accessible to authenticated admin users.
-// Depends on firebase being initialized (load firebase SDKs and firebase-config.js first).
+// Depends on firebase-config.js being loaded first.
 
-document.addEventListener('DOMContentLoaded', () => {
-  // If firebase isn't available yet, wait a short while (config should load before this script in HTML)
-  if (typeof firebase === 'undefined' || !firebase.auth) {
-    console.warn('auth-guard: Firebase not available when auth-guard ran. Ensure firebase-config.js is loaded before auth-guard.js.');
-    return;
-  }
+document.addEventListener('DOMContentLoaded', async () => {
+  // Wait for Firebase to initialize
+  await window.firebaseInitPromise;
 
-  firebase.auth().onAuthStateChanged(async (user) => {
+  window.firebase.auth().onAuthStateChanged(async (user) => {
     try {
       const onLoginPage = window.location.pathname.endsWith('login.html') || window.location.href.includes('login.html');
 
@@ -21,21 +18,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // User signed in — verify admin role in Firestore (defensive: only if Firestore is available)
-      if (firebase.firestore) {
-        const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-        const role = doc.exists ? doc.data().role : null;
-        if (role !== 'admin') {
-          console.warn('auth-guard: Signed-in user is not admin. Signing out and redirecting to login.');
-          await firebase.auth().signOut();
-          if (!onLoginPage) window.location.href = 'login.html';
-        }
+      // User signed in — verify admin role in Firestore
+      const db = window.firebase.firestore();
+      const docRef = db.collection('users').doc(user.uid);
+      const userDoc = await docRef.get();
+      const role = userDoc.exists ? userDoc.data().role : null;
+      
+      if (role !== 'admin') {
+        console.warn('auth-guard: Signed-in user is not admin. Signing out and redirecting to login.');
+        await window.firebase.auth().signOut();
+        if (!onLoginPage) window.location.href = 'login.html';
       }
     } catch (err) {
       console.error('auth-guard error:', err);
       // On error, be conservative and redirect to login to avoid exposing protected pages
       if (!window.location.href.includes('login.html')) {
-        try { await firebase.auth().signOut(); } catch (e) { /* ignore */ }
+        try { await window.firebase.auth().signOut(); } catch (e) { /* ignore */ }
         window.location.href = 'login.html';
       }
     }

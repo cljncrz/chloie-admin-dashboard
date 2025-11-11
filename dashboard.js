@@ -1,4 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to initialize
+    await window.firebaseInitPromise;
+    
+    const db = window.firebase.firestore();
     // This script contains functionality specific to the dashboard (index.html)
 
     // --- Animate Insight Cards on Load ---
@@ -95,7 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loader) loader.style.display = 'flex';
 
         try {
-            const db = firebase.firestore();
             // Fetch both bookings and walkins in parallel
             const [bookingsSnapshot, walkinsSnapshot] = await Promise.all([
                 db.collection('bookings').get(),

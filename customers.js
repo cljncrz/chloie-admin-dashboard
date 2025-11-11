@@ -1,9 +1,12 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to be initialized
+    await window.firebaseInitPromise;
+    
+    const db = window.firebase.firestore();
     const customersTable = document.getElementById('customers-table'); // This should be customers-table
 
     // Only run the script if the customers table and data exist on the page
-    if (customersTable && typeof firebase !== 'undefined' && firebase.firestore) {
-        const db = firebase.firestore();
+    if (customersTable) {
         const tableBody = customersTable.querySelector('tbody');
         let mobileCustomers = []; // This will hold the data from Firestore
         const searchInput = document.getElementById('customer-search');

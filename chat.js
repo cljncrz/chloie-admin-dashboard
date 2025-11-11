@@ -1,6 +1,11 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to be initialized
+    await window.firebaseInitPromise;
+    
+    const db = window.firebase.firestore();
+    const auth = window.firebase.auth();
+    
     const chatPageContainer = document.querySelector('.chat-page-container');
-    const db = firebase.firestore(); // Get Firestore instance
     if (!chatPageContainer) return;
     const chatListColumn = document.querySelector('.chat-page-list-column');
 
@@ -332,13 +337,13 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const text = messageInput.value.trim();
         if (!text || !currentConversationId) return;
-        const adminId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'admin';
+        const adminId = window.firebase.auth().currentUser ? window.firebase.auth().currentUser.uid : 'admin';
 
         const newMessage = {
             senderId: adminId, // Identify sender as admin
             type: 'text',
             text: text,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            timestamp: window.firebase.firestore().FieldValue.serverTimestamp(),
             status: 'sent' // Initial status is 'sent'
         };
 
@@ -351,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // After sending, update the parent chat document for the list view
                 return chatRef.update({
                     lastMessage: `You: ${text}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    timestamp: serverTimestamp(),
                     isUnreadForCustomer: true, // Mark as unread for the customer
                     isUnreadForAdmin: false // Admin just sent it, so it's read for them
                 });
