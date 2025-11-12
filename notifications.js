@@ -33,9 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
       sidebarLinks: document.querySelectorAll('.sidebar-menu a')
     };
 
-    // Exit if essential elements are not found
+    // Exit if essential elements are not found. Quietly skip initialization
+    // on pages that don't include a notification UI to avoid noisy console warnings.
     if (!dom.notificationBell || !dom.dropdownContainer) {
-      console.warn('Notification bell components not found. Skipping initialization.');
       return;
     }
 
