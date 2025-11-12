@@ -4,8 +4,12 @@
  * 
  * Setup:
  * 1. Install dependencies: npm install
- * 2. Run: npm start
+ * 2. Create .env file with Firebase credentials
+ * 3. Run: npm start
  */
+
+// Load environment variables from .env file
+require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
