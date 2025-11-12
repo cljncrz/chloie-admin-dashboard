@@ -1,6 +1,36 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    // Wait for Firebase to initialize before continuing
-    await window.firebaseInitPromise;
+    // Wait for Firebase to initialize before continuing.
+    // Some pages previously logged "Firebase is not available to attach auth state listener." when
+    // `window.firebaseInitPromise` was missing. Use a resilient helper that prefers the global
+    // promise but falls back to polling for the `window.firebase` shim.
+    const getFirebaseReadyPromise = (opts = {}) => {
+        const { timeout = 5000, interval = 100 } = opts;
+
+        // If a thenable init promise exists, use it.
+        if (window.firebaseInitPromise && typeof window.firebaseInitPromise.then === 'function') {
+            return window.firebaseInitPromise;
+        }
+
+        // Otherwise poll for the presence of window.firebase and its auth() function.
+        return new Promise((resolve, reject) => {
+            const start = Date.now();
+            const check = () => {
+                if (window.firebase && typeof window.firebase.auth === 'function') {
+                    resolve();
+                    return;
+                }
+                if (Date.now() - start > timeout) {
+                    // Resolve anyway to avoid blocking the UI; callers should still check availability.
+                    resolve();
+                    return;
+                }
+                setTimeout(check, interval);
+            };
+            check();
+        });
+    };
+
+    await getFirebaseReadyPromise();
 
     const sideMenu = document.querySelector('aside');
     const menuBtn = document.querySelector('#menu-btn');
@@ -435,10 +465,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // --- Firebase Auth State Listener ---
-// Defer attaching the listener until Firebase initialization completes.
-window.firebaseInitPromise
-    .then(() => {
-        if (window.firebase && typeof window.firebase.auth === 'function') {
+// Attach the auth state listener in a resilient way. If Firebase isn't ready yet we retry
+// silently rather than logging a noisy error.
+const attachAuthListener = () => {
+    if (window.firebase && typeof window.firebase.auth === 'function') {
+        try {
             window.firebase.auth().onAuthStateChanged((user) => {
                 if (user) {
                     // User is signed in.
@@ -451,13 +482,52 @@ window.firebaseInitPromise
                     console.log('No authenticated user. Auth guard will redirect.');
                 }
             });
-        } else {
-            console.error('Firebase is not available to attach auth state listener.');
+        } catch (error) {
+            // Firebase app not initialized yet, retry after a delay
+            console.debug('Firebase app not fully initialized yet; retrying shortly.', error);
+            setTimeout(attachAuthListener, 500);
         }
-    })
-    .catch((err) => {
-        console.error('Error waiting for Firebase initialization before attaching auth listener:', err);
+    } else {
+        // Not ready yet — retry shortly. This avoids noisy console.error when startup order
+        // varies between pages.
+        console.debug('Firebase not ready for auth listener; retrying shortly.');
+        setTimeout(() => {
+            if (window.firebase && typeof window.firebase.auth === 'function') {
+                attachAuthListener();
+            }
+        }, 500);
+    }
+};
+
+// Helper used outside DOMContentLoaded to wait for firebase readiness if available.
+const getFirebaseReadyPromiseTop = (opts = {}) => {
+    const { timeout = 5000, interval = 100 } = opts;
+    if (window.firebaseInitPromise && typeof window.firebaseInitPromise.then === 'function') {
+        return window.firebaseInitPromise;
+    }
+    return new Promise((resolve) => {
+        const start = Date.now();
+        const check = () => {
+            if (window.firebase && typeof window.firebase.auth === 'function') {
+                resolve();
+                return;
+            }
+            if (Date.now() - start > timeout) {
+                // Resolve to avoid blocking; attachAuthListener will perform its own checks.
+                resolve();
+                return;
+            }
+            setTimeout(check, interval);
+        };
+        check();
     });
+};
+
+getFirebaseReadyPromiseTop().then(attachAuthListener).catch((err) => {
+    console.error('Error waiting for Firebase initialization before attaching auth listener:', err);
+    // Fallback: attempt to attach after a short delay
+    setTimeout(attachAuthListener, 1000);
+});
 
 
 // --- Populate User Profile in Header and Profile Page ---

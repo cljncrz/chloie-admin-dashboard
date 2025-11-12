@@ -204,10 +204,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                     if (imageElement) imageElement.src = url;
                                     // Update services doc with new image URL
                                     try {
-                                        const db = firebase.firestore();
+                                        const db = window.firebase.firestore();
                                         await db.collection('services').doc(serviceData.serviceId).update({
                                             imageUrl: url,
-                                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                            updatedAt: window.firebase.firestore().FieldValue.serverTimestamp(),
                                         });
                                         showSuccessToast('Image uploaded and saved.');
                                     } catch (dbErr) {
@@ -377,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Save to Firestore
         try {
-            const db = firebase.firestore();
+            const db = window.firebase.firestore();
             const { serviceId, ...dataToSave } = updatedService;
             await db.collection('services').doc(serviceId).update(dataToSave);
             if (typeof showSuccessToast === 'function') {

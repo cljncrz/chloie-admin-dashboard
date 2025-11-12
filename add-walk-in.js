@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Fetch services from Firestore ---
         const fetchServices = async () => {
             try {
-                const db = firebase.firestore();
+                const db = window.firebase.firestore();
                 const snapshot = await db.collection('services').get();
                 window.appData.services = snapshot.docs.map(doc => ({ serviceId: doc.id, ...doc.data() }));
             } catch (error) {
@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             try {
-                const db = firebase.firestore();
+                const db = window.firebase.firestore();
                 await db.collection('walkins').add(newWalkinData);
 
                 if (typeof showSuccessToast === 'function') {

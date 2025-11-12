@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (loader) loader.classList.add('loading');
 
             try {
-                const db = firebase.firestore();
+                const db = window.firebase.firestore();
                 // Fetch bookings, walkins, and technicians simultaneously for better performance
                 const [bookingsSnapshot, walkinsSnapshot, techniciansSnapshot] = await Promise.all([
                     db.collection('bookings').get(),
@@ -952,7 +952,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 try { // Add try...catch for the database operation
                     // --- Firestore Update ---
-                    const db = firebase.firestore();
+                    const db = window.firebase.firestore();
                     await db.collection('bookings').doc(serviceId).update({
                         technician: newTechnicianName
                     });
@@ -1000,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 try { // Add try...catch for the database operation
                     // --- Firestore Update ---
-                    const db = firebase.firestore();
+                    const db = window.firebase.firestore();
                     await db.collection('walkins').doc(walkinId).update({
                         technician: newTechnicianName
                     });

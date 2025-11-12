@@ -94,14 +94,8 @@
       </form>
     </div>
 
-    <!-- Firebase SDK (v9 modular) -->
-  <!-- Firebase (compat) SDKs from CDN - keep these BEFORE your firebase-config.js file -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
-  <!-- Initialize Firebase FIRST before any other Firebase-dependent scripts -->
-  <script src="firebase-config.js"></script>
+    <!-- Initialize Firebase via module-based initializer (provides a compat shim) -->
+    <script type="module" src="firebase-setup.js"></script>
     <!-- Your authentication script -->
     <script src="auth.js"></script>
 

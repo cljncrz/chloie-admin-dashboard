@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 try {
-                    const db = firebase.firestore();
+                    const db = window.firebase.firestore();
                     // Update the booking in Firestore with the new status and technician
                     await db.collection('bookings').doc(serviceId).update({
                         status: 'Approved', // Or 'Scheduled', depending on your workflow
@@ -1003,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const fetchRescheduleRequests = async () => {
         try {
-            const db = firebase.firestore();
+            const db = window.firebase.firestore();
             const snapshot = await db.collection('rescheduleRequests').where('status', '==', 'Pending').get();
             window.appData.rescheduleRequests = snapshot.docs.map(doc => ({ requestId: doc.id, ...doc.data() }));
         } catch (error) {

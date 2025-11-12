@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Save to Firestore
         try {
-            const db = firebase.firestore();
+            const db = window.firebase.firestore();
             const { serviceId, ...dataToSave } = newService; // Remove serviceId to avoid storing it as a field
             
             await db.collection('services').doc(newService.serviceId).set({

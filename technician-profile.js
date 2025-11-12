@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Prevent double-click
             saveBtn.disabled = true;
             try {
-                const db = firebase.firestore();
+                const db = window.firebase.firestore();
 
                 // Update in Firestore
                 await db.collection('technicians').doc(techData.id).update({

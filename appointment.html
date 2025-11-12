@@ -20,9 +20,8 @@
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Firebase SDK (v9 modular) -->
-  <!-- Load Firebase initialization first (before any other scripts that depend on it) -->
-  <script src="firebase-config.js"></script>
+  <!-- Initialize Firebase via module-based initializer (provides a compat shim) -->
+  <script type="module" src="firebase-setup.js"></script>
   <!-- Authentication Guard -->
   <script src="auth-guard.js"></script>
   </head>
