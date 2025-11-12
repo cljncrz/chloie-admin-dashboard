@@ -2,9 +2,44 @@
 // Depends on firebase-config.js being loaded first
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Wait for Firebase to initialize
-  await window.firebaseInitPromise;
-  
+  // Wait for Firebase to initialize. Some pages use the compat SDK and a
+  // small shim in `firebase-config.js` exposes `window.firebaseInitPromise`.
+  // Fallback to polling `window.firebase && firebase.apps` to avoid races.
+  async function waitForFirebaseInit(timeoutMs = 5000) {
+    // If the shim provided a promise, prefer that
+    if (window.firebaseInitPromise && typeof window.firebaseInitPromise.then === 'function') {
+      try {
+        await window.firebaseInitPromise;
+        return;
+      } catch (e) {
+        // fall through to polling so we surface a clearer error
+        console.warn('firebaseInitPromise rejected, will poll for firebase.apps', e);
+      }
+    }
+
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (window.firebase && window.firebase.app) {
+        // compat SDK exposes firebase.app and firebase.apps
+        if (Array.isArray(window.firebase.apps) ? window.firebase.apps.length > 0 : true) return;
+      }
+      // also check global `firebase` (CDN script may set this)
+      if (window.firebase && window.firebase.initializeApp && (window.firebase.apps && window.firebase.apps.length > 0)) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('Firebase did not initialize within timeout. Ensure firebase-config.js runs before auth.js and the compat SDK is loaded.');
+  }
+
+  try {
+    await waitForFirebaseInit(7000);
+  } catch (err) {
+    console.error(err);
+    // Show user-facing error if desired, then abort further initialization to avoid unhandled rejections
+    const loginError = document.getElementById('login-error');
+    if (loginError) loginError.textContent = 'Unable to initialize authentication. Please reload the page.';
+    return;
+  }
+
   initializeAuthHandlers();
 
   function initializeAuthHandlers() {
