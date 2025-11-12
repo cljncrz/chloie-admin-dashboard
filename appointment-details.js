@@ -1,5 +1,26 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const db = firebase.firestore();
+    // Wait for the Firebase initialization promise (created in firebase-config.js)
+    const ensureFirebaseReady = async () => {
+        if (window.firebaseInitPromise) {
+            try {
+                await window.firebaseInitPromise;
+            } catch (e) {
+                console.warn('window.firebaseInitPromise rejected or failed:', e);
+            }
+        }
+
+        if (!window.firebase || typeof window.firebase.firestore !== 'function') {
+            // If the compat-style wrapper wasn't created, throw a helpful error
+            console.error("Firebase not initialized or compat wrapper missing. Check firebase-config.js");
+            return null;
+        }
+
+        return window.firebase;
+    };
+
+    ensureFirebaseReady().then((firebaseWrapper) => {
+        if (!firebaseWrapper) return; // abort if firebase unavailable
+        const db = firebaseWrapper.firestore();
 
     // --- DOM Elements ---
     const customerNameEl = document.getElementById('detail-customer-name');
@@ -176,11 +197,12 @@ document.addEventListener('DOMContentLoaded', () => {
         backBtn.addEventListener('click', handleBackClick);
     }
 
-    // --- Initial Load ---
-    // Ensure Firebase is ready before we try to use it.
-    firebase.auth().onAuthStateChanged((user) => {
-        if (user) {
-            initializePage();
-        }
+        // --- Initial Load ---
+        // Ensure Firebase is ready before we try to use it.
+        firebaseWrapper.auth().onAuthStateChanged((user) => {
+            if (user) {
+                initializePage();
+            }
+        });
     });
 });

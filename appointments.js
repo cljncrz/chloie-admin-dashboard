@@ -110,9 +110,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 const db = firebase.firestore();
-                // Fetch bookings and technicians simultaneously for better performance
-                const [bookingsSnapshot, techniciansSnapshot] = await Promise.all([
+                // Fetch bookings, walkins, and technicians simultaneously for better performance
+                const [bookingsSnapshot, walkinsSnapshot, techniciansSnapshot] = await Promise.all([
                     db.collection('bookings').get(),
+                    db.collection('walkins').get(),
                     db.collection('technicians').get()
                 ]);
 
@@ -124,7 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const noResultsRow = mainAppointmentsContainer.querySelector('.no-results-row');
                     if (noResultsRow) noResultsRow.style.display = 'table-row';
                     console.log('No booking documents found in Firestore.');
-                    return;
+                    // Continue — we still want to process walkins and technicians if available
                 }
 
                 // Replace sample data with Firestore data
@@ -214,6 +215,72 @@ document.addEventListener('DOMContentLoaded', async () => {
                         datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
                     };
                 });
+
+                // --- Process walk-ins data ---
+                if (!walkinsSnapshot.empty) {
+                    window.appData.walkins = walkinsSnapshot.docs.map(doc => {
+                        const data = doc.data() || {};
+
+                        // Reuse the same parseFirestoreDate helper defined above
+                        const parseFirestoreDate = (val) => {
+                            if (!val && val !== 0) return null;
+                            try {
+                                if (val && typeof val.toDate === 'function') return val.toDate();
+                                if (val && (typeof val.seconds === 'number')) {
+                                    const nanos = val.nanoseconds ?? val.nanosecond ?? val.nanos ?? 0;
+                                    return new Date(val.seconds * 1000 + Math.floor(nanos / 1e6));
+                                }
+                                if (val instanceof Date) return val;
+                                if (typeof val === 'number') {
+                                    if (val < 1e12) return new Date(val * 1000);
+                                    return new Date(val);
+                                }
+                                if (typeof val === 'string') {
+                                    const parsed = new Date(val);
+                                    if (!isNaN(parsed)) return parsed;
+                                }
+                            } catch (e) {
+                                console.debug('parseFirestoreDate error', e);
+                            }
+                            return null;
+                        };
+
+                        const possibleDateFields = ['scheduleDate', 'dateTime', 'datetime', 'date', 'scheduledAt', 'appointmentDate', 'timestamp', 'bookingDate'];
+                        let dateSource = null;
+                        for (const f of possibleDateFields) {
+                            if (data[f] !== undefined && data[f] !== null) {
+                                dateSource = data[f];
+                                break;
+                            }
+                        }
+                        if (!dateSource) {
+                            for (const [k, v] of Object.entries(data)) {
+                                const maybe = parseFirestoreDate(v);
+                                if (maybe) {
+                                    dateSource = v;
+                                    break;
+                                }
+                            }
+                        }
+
+                        const scheduleDateObj = parseFirestoreDate(dateSource);
+                        const formattedDateTime = scheduleDateObj
+                            ? scheduleDateObj.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ' -')
+                            : 'No Date';
+
+                        return {
+                            id: doc.id,
+                            ...data,
+                            plate: data.plateNumber || data.plate || '',
+                            service: data.serviceNames || data.service || data.serviceName || '',
+                            datetime: formattedDateTime,
+                            datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
+                        };
+                    });
+                } else {
+                    // Ensure walkins is at least an empty array when there are no documents
+                    window.appData.walkins = [];
+                }
 
                 // Initial population of tables
                 populateAppointmentsTable();
