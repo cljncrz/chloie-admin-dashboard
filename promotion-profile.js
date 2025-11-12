@@ -1,4 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to be initialized
+    await window.firebaseInitPromise;
+    
+    const db = window.firebase.firestore();
     const editPromotionForm = document.getElementById('edit-promotion-form');
     const storedData = sessionStorage.getItem('selectedPromotionData');
 
@@ -61,19 +65,62 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Fetch and Populate Service Checklist ---
+    const populateServiceChecklist = async () => {
+        try {
+            // Fetch services from Firebase
+            const servicesSnapshot = await db.collection('services').get();
+            
+            let allServices = [];
+            if (!servicesSnapshot.empty) {
+                allServices = servicesSnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        serviceId: doc.id,
+                        service: data.service || data.serviceName || 'Unknown Service',
+                        ...data
+                    };
+                });
+                console.log('Services fetched from Firebase:', allServices);
+            } else {
+                // Fallback to appData if Firebase is empty
+                allServices = window.appData.services || [];
+            }
+            
+            // Clear existing checkboxes
+            serviceChecklist.innerHTML = '';
+            
+            // Populate Service Checklist
+            allServices.forEach(service => {
+                const isChecked = (promoData.services || []).includes(service.service);
+                const itemHtml = `
+                    <div class="checklist-item">
+                        <input type="checkbox" id="service-${service.serviceId}" value="${service.service}" ${isChecked ? 'checked' : ''}>
+                        <label for="service-${service.serviceId}">${service.service}</label>
+                    </div>
+                `;
+                serviceChecklist.insertAdjacentHTML('beforeend', itemHtml);
+            });
+        } catch (error) {
+            console.error('Error fetching services from Firebase:', error);
+            // Fallback to appData if there's an error
+            const allServices = window.appData.services || [];
+            serviceChecklist.innerHTML = '';
+            allServices.forEach(service => {
+                const isChecked = (promoData.services || []).includes(service.service);
+                const itemHtml = `
+                    <div class="checklist-item">
+                        <input type="checkbox" id="service-${service.serviceId}" value="${service.service}" ${isChecked ? 'checked' : ''}>
+                        <label for="service-${service.serviceId}">${service.service}</label>
+                    </div>
+                `;
+                serviceChecklist.insertAdjacentHTML('beforeend', itemHtml);
+            });
+        }
+    };
 
-    // Populate Service Checklist
-    const allServices = window.appData.services || [];
-    allServices.forEach(service => {
-        const isChecked = (promoData.services || []).includes(service.service);
-        const itemHtml = `
-            <div class="checklist-item">
-                <input type="checkbox" id="service-${service.serviceId}" value="${service.service}" ${isChecked ? 'checked' : ''}>
-                <label for="service-${service.serviceId}">${service.service}</label>
-            </div>
-        `;
-        serviceChecklist.insertAdjacentHTML('beforeend', itemHtml);
-    });
+    // Call the function to populate services
+    await populateServiceChecklist();
 
     // Populate Image
     const renderImage = () => {
@@ -109,24 +156,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Save as Draft Logic ---
     if (saveDraftBtn) {
-        saveDraftBtn.addEventListener('click', () => {
+        saveDraftBtn.addEventListener('click', async () => {
             const draftPromotion = {
                 ...getFormData(),
                 status: 'Draft' // Mark this as a draft
             };
 
-            // Save to localStorage
-            let promotionDrafts = JSON.parse(localStorage.getItem('promotionDrafts')) || [];
-            const existingIndex = promotionDrafts.findIndex(d => d.promoId === draftPromotion.promoId);
-            if (existingIndex > -1) {
-                promotionDrafts[existingIndex] = draftPromotion;
-            } else {
-                // If it wasn't a draft before, it's a new draft.
-                // If it was a live promo, we need to remove it from the live list when saving as draft.
-                // For simplicity now, we just add it. A more complex system would handle this.
-                promotionDrafts.push(draftPromotion);
+            // Save to Firebase
+            try {
+                await db.collection('promotions').doc(draftPromotion.promoId).update({
+                    title: draftPromotion.title,
+                    description: draftPromotion.description,
+                    promoPrices: draftPromotion.promoPrices,
+                    originalPrices: draftPromotion.originalPrices,
+                    expiryDate: draftPromotion.expiryDate,
+                    publishDate: draftPromotion.publishDate,
+                    services: draftPromotion.services,
+                    imageUrl: draftPromotion.imageUrl,
+                    status: 'Draft',
+                    updatedAt: new Date().toISOString()
+                });
+                console.log('Promotion saved as draft in Firebase:', draftPromotion.promoId);
+            } catch (error) {
+                console.error('Error saving promotion as draft in Firebase:', error);
+                alert('Failed to save draft. Please try again.');
+                return;
             }
-            localStorage.setItem('promotionDrafts', JSON.stringify(promotionDrafts));
             
             // Redirect back, optionally with a success message
             sessionStorage.setItem('toastMessage', 'Promotion saved as a draft.');
@@ -137,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Form Submission (Update) Logic ---
-    editPromotionForm.addEventListener('submit', (e) => {
+    editPromotionForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = getFormData();
 
@@ -155,14 +210,34 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (expiryDate < now) updatedPromotion.status = 'Expired';
         else updatedPromotion.status = 'Active';
 
-        // Store the updated promotion to be picked up by the promotions page
-        sessionStorage.setItem('updatedPromotionData', JSON.stringify(updatedPromotion));
-
-        // Clean up the edit data
-        sessionStorage.removeItem('selectedPromotionData');
-
-        // Redirect back to the promotions list
-        window.location.href = 'promotions.html';
+        // Save to Firebase
+        try {
+            await db.collection('promotions').doc(updatedPromotion.promoId).update({
+                title: updatedPromotion.title,
+                description: updatedPromotion.description,
+                promoPrices: updatedPromotion.promoPrices,
+                originalPrices: updatedPromotion.originalPrices,
+                expiryDate: updatedPromotion.expiryDate,
+                publishDate: updatedPromotion.publishDate,
+                services: updatedPromotion.services,
+                imageUrl: updatedPromotion.imageUrl,
+                status: updatedPromotion.status,
+                updatedAt: new Date().toISOString()
+            });
+            console.log('Promotion updated in Firebase:', updatedPromotion.promoId);
+            
+            // Store the updated promotion to be picked up by the promotions page
+            sessionStorage.setItem('updatedPromotionData', JSON.stringify(updatedPromotion));
+            
+            // Clean up the edit data
+            sessionStorage.removeItem('selectedPromotionData');
+            
+            // Redirect back to the promotions list
+            window.location.href = 'promotions.html';
+        } catch (error) {
+            console.error('Error updating promotion in Firebase:', error);
+            alert('Failed to save promotion. Please try again.');
+        }
     });
 
     // Set min date for date inputs
