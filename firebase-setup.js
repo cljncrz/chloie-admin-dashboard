@@ -32,7 +32,9 @@ import {
   writeBatch,
   serverTimestamp,
   Timestamp,
-  increment
+  increment,
+  arrayUnion,
+  arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 import {
   getStorage,
@@ -92,6 +94,11 @@ window.firebase = {
         const snap = await getDocs(query(collection(db, collectionName), ...queryConstraints));
         return buildQuerySnapshot(snap);
       },
+      async add(data) {
+        // Add a new document with auto-generated ID
+        const ref = await addDoc(collection(db, collectionName), data);
+        return { id: ref.id };
+      },
       doc: (id) => ({
         async get() {
           const ref = fsDoc(db, collectionName, id);
@@ -119,7 +126,9 @@ window.firebase = {
       // helpers
       FieldValue: {
         serverTimestamp: () => serverTimestamp(),
-        increment: (n) => increment(n)
+        increment: (n) => increment(n),
+        arrayUnion: (elements) => arrayUnion(...(Array.isArray(elements) ? elements : [elements])),
+        arrayRemove: (elements) => arrayRemove(...(Array.isArray(elements) ? elements : [elements]))
       },
       Timestamp: Timestamp,
       // very small batch stub to avoid runtime errors where batch is referenced
