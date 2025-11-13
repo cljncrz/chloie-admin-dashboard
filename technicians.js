@@ -160,6 +160,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!confirmOverlay) return;
             confirmMessage.innerHTML = `Are you sure you want to delete <strong>${tech.name}</strong>? This action cannot be undone.`;
             confirmOverlay.classList.add('show');
+            document.body.classList.add('delete-modal-open');
             confirmBtn.onclick = async () => { // Make onclick async
                 await deleteTechnician(tech.id); // Await deletion
                 closeDeleteConfirmModal();
@@ -168,6 +169,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const closeDeleteConfirmModal = () => {
             if (confirmOverlay) confirmOverlay.classList.remove('show');
+            document.body.classList.remove('delete-modal-open');
         };
 
         const deleteTechnician = async (techId) => {

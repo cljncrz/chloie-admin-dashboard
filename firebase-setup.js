@@ -92,6 +92,11 @@ window.firebase = {
         const snap = await getDocs(query(collection(db, collectionName), ...queryConstraints));
         return buildQuerySnapshot(snap);
       },
+      async add(data) {
+        const colRef = collection(db, collectionName);
+        const docRef = await addDoc(colRef, data);
+        return { id: docRef.id };
+      },
       doc: (id) => ({
         async get() {
           const ref = fsDoc(db, collectionName, id);

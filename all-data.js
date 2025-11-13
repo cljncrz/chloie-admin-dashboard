@@ -32,16 +32,7 @@ const sampleMedia = [
 ];
 
 // --- Sample Notifications ---
-const sampleNotifications = [
-    {
-        id: 'notif-001',
-        type: 'New Booking',
-        message: '<b>Angelo Reyes</b> just booked a <b>Ceramic Coating</b> service.',
-        timestamp: '15 minutes ago',
-        isUnread: true,
-        link: 'appointment.html'
-    },
-];
+const sampleNotifications = [];
 
 // --- Sample Reschedule Requests from Mobile App ---
 const sampleRescheduleRequests = [

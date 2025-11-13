@@ -1,34 +1,34 @@
 /**
  * Cloud Function to handle file uploads to Firebase Storage
  * Deploy with: firebase deploy --only functions
- * 
+ *
  * This function handles uploads server-side, bypassing CORS restrictions
  */
 
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const cors = require('cors')({ origin: true });
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const cors = require("cors")({origin: true});
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 
 exports.uploadMedia = functions.https.onRequest((req, res) => {
   // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({error: "Method not allowed"});
   }
 
   return cors(req, res, async () => {
     try {
-      const { fileName, fileData, fileType } = req.body;
+      const {fileName, fileData, fileType} = req.body;
 
       if (!fileName || !fileData || !fileType) {
-        return res.status(400).json({ error: 'Missing required fields: fileName, fileData, fileType' });
+        return res.status(400).json({error: "Missing required fields: fileName, fileData, fileType"});
       }
 
       // Decode base64 file data
-      const buffer = Buffer.from(fileData, 'base64');
-      
+      const buffer = Buffer.from(fileData, "base64");
+
       // Create storage path
       const filePath = `media/${Date.now()}-${fileName}`;
       const bucket = admin.storage().bucket();
@@ -50,12 +50,12 @@ exports.uploadMedia = functions.https.onRequest((req, res) => {
         name: fileName,
         url: downloadURL,
         storagePath: filePath,
-        type: fileType.startsWith('image') ? 'image' : 'video',
-        size: Math.round(buffer.length / 1024) + ' KB',
+        type: fileType.startsWith("image") ? "image" : "video",
+        size: Math.round(buffer.length / 1024) + " KB",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
-      const docRef = await admin.firestore().collection('media').add(mediaDoc);
+      const docRef = await admin.firestore().collection("media").add(mediaDoc);
 
       res.status(200).json({
         success: true,
@@ -63,8 +63,8 @@ exports.uploadMedia = functions.https.onRequest((req, res) => {
         ...mediaDoc,
       });
     } catch (error) {
-      console.error('Error uploading file:', error);
-      res.status(500).json({ error: error.message });
+      console.error("Error uploading file:", error);
+      res.status(500).json({error: error.message});
     }
   });
 });

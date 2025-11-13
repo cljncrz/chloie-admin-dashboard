@@ -34,26 +34,65 @@ document.addEventListener('DOMContentLoaded', async () => {
     let activeDropdownOriginalParent = null; // Stores the original parent of the activeDropdown
     let unsubscribeMessages = null; // To stop listening to old message streams
     let isSelectionModeActive = false;
+    let usersData = {}; // Store user data fetched from Firebase for quick lookup
 
     // --- Functions ---
+
+    /**
+     * Fetches all users who signed up in the mobile app from Firestore.
+     * This ensures we have access to customer data for chat initialization.
+     */
+    const fetchMobileAppUsers = async () => {
+        try {
+            const usersSnapshot = await db.collection('users').get();
+            usersData = {}; // Reset user data storage
+            
+            usersSnapshot.forEach(doc => {
+                const userData = doc.data();
+                usersData[doc.id] = {
+                    uid: doc.id,
+                    name: userData.name || userData.customerName || 'Unknown User',
+                    email: userData.email || '',
+                    phone: userData.phone || '',
+                    profilePic: userData.profilePic || userData.customerProfilePic || './images/redicon.png',
+                    isVerified: userData.isVerified || false,
+                    createdAt: userData.createdAt || userData.registrationDate || null,
+                };
+            });
+            
+            console.log(`Fetched ${Object.keys(usersData).length} users from Firebase`, usersData);
+            return usersData;
+        } catch (error) {
+            console.error("Error fetching mobile app users:", error);
+            return {};
+        }
+    };
 
     /**
      * Listens for real-time updates to the conversations list from Firestore.
      */
     const listenForConversations = () => {
         // Order by the timestamp of the last message to show recent chats first
-        db.collection('chats').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+        const chatsRef = db.collection('chats');
+        const q = chatsRef.orderBy('timestamp', 'desc');
+        
+        q.onSnapshot(snapshot => {
             const newChats = [];
             snapshot.forEach(doc => {
                 const data = doc.data();
+                // Get user info from the usersData cache, fallback to chat document data
+                const userInfo = usersData[doc.id] || {};
+                
                 newChats.push({
                     id: doc.id, // The document ID is the chatId (e.g., customer's UID)
-                    customerName: data.customerName,
-                    profilePic: data.customerProfilePic || './images/redicon.png', // Fallback avatar
+                    customerName: userInfo.name || data.customerName || 'Unknown Customer',
+                    profilePic: userInfo.profilePic || data.customerProfilePic || './images/redicon.png', // Fallback avatar
                     lastMessage: data.lastMessage || '...',
                     // Convert Firestore timestamp to a readable string
                     timestamp: data.timestamp ? formatTimestamp(data.timestamp) : '',
                     isUnread: data.isUnreadForAdmin || false,
+                    isVerified: userInfo.isVerified || data.isVerified || false,
+                    phone: userInfo.phone || data.phone || '',
                     // Messages will be fetched separately
                 });
             });
@@ -173,19 +212,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             // The UI will update automatically due to the `listenForConversations` snapshot listener.
         }
 
-        // Get full customer data to check verification status
-        // We use the chat.id (which is the customer's UID) to fetch from the 'users' collection
-        let customerData = null;
-        db.collection('users').doc(conversationId).get().then(doc => {
-            if (doc.exists) customerData = doc.data();
-        });
+        // Get full customer data from the usersData cache
+        const customerData = usersData[conversationId];
         let verificationBadgeHTML = '';
-        if (customerData) {
-            if (customerData.isVerified) {
-                verificationBadgeHTML = `<span class="status-badge verified small">Verified App User</span>`;
-            } else {
-                verificationBadgeHTML = `<span class="status-badge not-verified small">Not Verified</span>`;
-            }
+        if (customerData && customerData.isVerified) {
+            verificationBadgeHTML = `<span class="status-badge verified small">Verified App User</span>`;
+        } else if (customerData) {
+            verificationBadgeHTML = `<span class="status-badge not-verified small">Not Verified</span>`;
         }
 
         // Update header
@@ -222,44 +255,57 @@ document.addEventListener('DOMContentLoaded', async () => {
         messageListEl.innerHTML = '';
 
         // Listen for new messages in this conversation's subcollection
-        unsubscribeMessages = db.collection('chats').doc(conversationId).collection('messages').orderBy('timestamp', 'asc')
-            .onSnapshot(snapshot => {
-                messageListEl.innerHTML = ''; // Clear and re-render on every update
-                const fragment = document.createDocumentFragment();
-                snapshot.forEach(doc => {
-                    const msg = doc.data();
-                    const msgEl = document.createElement('div');
-                    let messageContentHTML = `<p>${msg.text || ''}</p>`; // Default to text
+        const messagesRef = db.collection('chats').doc(conversationId).collection('messages');
+        const messagesQuery = messagesRef.orderBy('timestamp', 'asc');
+        
+        unsubscribeMessages = messagesQuery.onSnapshot(snapshot => {
+            messageListEl.innerHTML = ''; // Clear and re-render on every update
+            const fragment = document.createDocumentFragment();
+            snapshot.forEach(doc => {
+                const msg = doc.data();
+                const msgEl = document.createElement('div');
+                let messageContentHTML = `<p>${msg.text || ''}</p>`; // Default to text
 
-                    // Determine sender class ('admin' or 'customer')
-                    const senderClass = msg.senderId === 'admin' ? 'admin' : 'customer';
+                // Determine sender class ('admin' or 'customer')
+                const senderClass = msg.senderId === 'admin' ? 'admin' : 'customer';
 
-                    if (msg.type === 'image') {
-                        messageContentHTML = `<a href="${msg.mediaUrl}" target="_blank" title="View full image"><img src="${msg.mediaUrl}" alt="Customer image" class="chat-media-image"></a>`;
-                    } else if (msg.type === 'video') {
-                        messageContentHTML = `<video src="${msg.mediaUrl}" controls class="chat-media-video"></video>`;
-                    }
+                if (msg.type === 'image') {
+                    messageContentHTML = `<a href="${msg.mediaUrl}" target="_blank" title="View full image"><img src="${msg.mediaUrl}" alt="Customer image" class="chat-media-image"></a>`;
+                } else if (msg.type === 'video') {
+                    messageContentHTML = `<video src="${msg.mediaUrl}" controls class="chat-media-video"></video>`;
+                }
 
-                    let statusIndicator = '';
-                    if (senderClass === 'admin' && msg.status) {
-                        statusIndicator = `<small class="message-status">${msg.status}</small>`;
-                    }
+                let statusIndicator = '';
+                if (senderClass === 'admin' && msg.status) {
+                    statusIndicator = `<small class="message-status">${msg.status}</small>`;
+                }
 
-                    msgEl.className = `chat-message ${senderClass}`;
-                    msgEl.innerHTML = `
-                        ${messageContentHTML}
-                        <div class="message-meta">
-                            <small class="message-timestamp">${formatTimestamp(msg.timestamp)}</small>${statusIndicator}
+                // Add admin name and email if message is from admin
+                let senderInfoHTML = '';
+                if (senderClass === 'admin' && msg.senderName) {
+                    senderInfoHTML = `
+                        <div class="admin-sender-info">
+                            <strong>${msg.senderName}</strong>
+                            ${msg.senderEmail ? `<small class="admin-email">${msg.senderEmail}</small>` : ''}
                         </div>`;
-                    fragment.appendChild(msgEl);
-                });
-                messageListEl.appendChild(fragment);
-                // Scroll to the bottom on new message
-                messageListEl.scrollTop = messageListEl.scrollHeight;
-            }, error => {
-                console.error("Error fetching messages:", error);
-                messageListEl.innerHTML = '<p class="text-muted" style="text-align:center;">Could not load messages.</p>';
+                }
+
+                msgEl.className = `chat-message ${senderClass}`;
+                msgEl.innerHTML = `
+                    ${senderInfoHTML}
+                    ${messageContentHTML}
+                    <div class="message-meta">
+                        <small class="message-timestamp">${formatTimestamp(msg.timestamp)}</small>${statusIndicator}
+                    </div>`;
+                fragment.appendChild(msgEl);
             });
+            messageListEl.appendChild(fragment);
+            // Scroll to the bottom on new message
+            messageListEl.scrollTop = messageListEl.scrollHeight;
+        }, error => {
+            console.error("Error fetching messages:", error);
+            messageListEl.innerHTML = '<p class="text-muted" style="text-align:center;">Could not load messages.</p>';
+        });
 
         // Scroll to the bottom
         messageListEl.scrollTop = messageListEl.scrollHeight;
@@ -289,8 +335,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (viewProfileBtn) {
             e.preventDefault();
             const chat = chats.find(c => c.id === currentConversationId);
-            if (chat) { // chat.id is the customer's UID
-                const customerData = (window.appData.customers || []).find(c => c.phone === customerPhone);
+            if (chat) {
+                // Get customer data from usersData cache (already loaded from Firebase)
+                const customerData = usersData[currentConversationId];
                 if (customerData) {
                     sessionStorage.setItem('selectedProfileData', JSON.stringify(customerData));
                     sessionStorage.setItem('previousPage', window.location.href);
@@ -330,6 +377,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     /**
+     * Fetches admin data from Firestore.
+     */
+    const fetchAdminData = async () => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return null;
+            
+            const adminDoc = await db.collection('admins').doc(currentUser.uid).get();
+            if (adminDoc.exists) {
+                return {
+                    uid: currentUser.uid,
+                    name: adminDoc.data().name || currentUser.displayName || 'Admin',
+                    email: adminDoc.data().email || currentUser.email || '',
+                    profilePic: adminDoc.data().profilePic || './images/redicon.png',
+                    role: adminDoc.data().role || 'Admin'
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error("Error fetching admin data:", error);
+            return null;
+        }
+    };
+
+    let currentAdminData = null; // Store current admin data
+
+    /**
      * Handles the submission of the message form.
      * @param {Event} e - The form submission event.
      */
@@ -341,6 +415,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const newMessage = {
             senderId: adminId, // Identify sender as admin
+            senderName: currentAdminData?.name || 'Admin',
+            senderEmail: currentAdminData?.email || '',
+            senderProfilePic: currentAdminData?.profilePic || './images/redicon.png',
             type: 'text',
             text: text,
             timestamp: window.firebase.firestore().FieldValue.serverTimestamp(),
@@ -657,9 +734,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     messageForm.addEventListener('submit', handleSendMessage);
 
     // --- Initialization ---
-    const init = () => {
-        initializeChats();
-        renderConversationList();
+    const init = async () => {
+        try {
+            // Fetch current admin data
+            currentAdminData = await fetchAdminData();
+            console.log('Current Admin:', currentAdminData);
+            
+            // Fetch all mobile app users
+            await fetchMobileAppUsers();
+            
+            // Then listen for conversations with user data populated
+            listenForConversations();
+        } catch (error) {
+            console.error("Error initializing chat:", error);
+        }
     };
 
     init();

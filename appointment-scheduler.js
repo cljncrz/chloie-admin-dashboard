@@ -174,6 +174,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                     itemEl.remove();
                     updatePendingApprovalsCount();
 
+                    // Send notification to customer about approval
+                    try {
+                        if (typeof NotificationService !== 'undefined') {
+                            await NotificationService.notifyAppointmentConfirmed(
+                                appointment.customerId || appointment.customer,
+                                {
+                                    id: serviceId,
+                                    serviceName: appointment.service,
+                                    dateTime: appointment.datetime,
+                                    technician: selectedTechnician
+                                }
+                            );
+                            NotificationService.showToast(
+                                `Notification sent to ${appointment.customer}`,
+                                'success'
+                            );
+                        }
+                    } catch (notifError) {
+                        console.warn('⚠️ Could not send notification, but appointment was approved:', notifError);
+                    }
+
                     // Optionally, update the main appointments table if it's on the same page
                     // This is more complex and might be better handled by a page reload or a more robust state management system.
 
@@ -188,7 +209,66 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
 
-            // Note: Handlers for denyBtn and reviewBtn can be added here as well
+            if (denyBtn) {
+                denyBtn.disabled = true; // Prevent double clicks
+                const itemEl = denyBtn.closest('.approval-item');
+                const serviceId = denyBtn.dataset.id;
+
+                // Find the appointment in the global data
+                const appointment = (window.appData.appointments || []).find(a => a.serviceId === serviceId);
+
+                if (!appointment) {
+                    alert('Error: Could not find the appointment to deny.');
+                    denyBtn.disabled = false;
+                    return;
+                }
+
+                try {
+                    const db = window.firebase.firestore();
+                    // Update the booking status to Denied
+                    await db.collection('bookings').doc(serviceId).update({
+                        status: 'Denied'
+                    });
+
+                    // Update the local data model
+                    appointment.status = 'Denied';
+
+                    // Remove the item from the modal and update counts
+                    itemEl.remove();
+                    updatePendingApprovalsCount();
+
+                    // Send notification to customer about denial
+                    try {
+                        if (typeof NotificationService !== 'undefined') {
+                            await NotificationService.notifyAppointmentCancelled(
+                                appointment.customerId || appointment.customer,
+                                {
+                                    id: serviceId,
+                                    serviceName: appointment.service,
+                                    reason: 'Your appointment request was not approved'
+                                }
+                            );
+                            NotificationService.showToast(
+                                `Cancellation notification sent to ${appointment.customer}`,
+                                'info'
+                            );
+                        }
+                    } catch (notifError) {
+                        console.warn('⚠️ Could not send notification, but appointment was denied:', notifError);
+                    }
+
+                    if (typeof showSuccessToast === 'function') {
+                        showSuccessToast(`Appointment for ${appointment.customer} denied.`);
+                    }
+
+                } catch (error) {
+                    console.error("Error denying appointment:", error);
+                    alert('Failed to deny appointment. Please try again.');
+                    denyBtn.disabled = false; // Re-enable button on failure
+                }
+            }
+
+            // Note: Handlers for reviewBtn can be added here as well
             // for better event delegation, but we'll leave them as is for now
             // to stick to the user's request.
         });
@@ -481,7 +561,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    const handleDenyRequestClick = (requestId, serviceId) => {
+    const handleDenyRequestClick = async (requestId, serviceId) => {
         const appointmentToCancel = window.appData.appointments.find(a => a.serviceId === serviceId);
         if (!appointmentToCancel) {
             alert('Error: Could not find the original appointment to cancel.');
@@ -521,7 +601,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             logAdminActivity(user.uid, 'Denied Reschedule', logDetails);
         }
 
-        // 6. Send a cancellation notification to the customer (simulated by adding to admin notifications)
+        // 6. Send a cancellation notification to the customer
+        try {
+            if (typeof NotificationService !== 'undefined') {
+                await NotificationService.notifyAppointmentStatusChange({
+                    customerIds: [appointmentToCancel.customerId || appointmentToCancel.customer],
+                    status: 'cancelled',
+                    appointmentId: serviceId,
+                    reason: 'Your reschedule request was denied. The original appointment has been cancelled.',
+                    serverUrl: window.serverUrl || 'http://localhost:5000'
+                });
+            }
+        } catch (notifError) {
+            console.warn('⚠️ Could not send cancellation notification:', notifError);
+        }
+
+        // 7. Admin notification
         if (typeof window.addNewNotification === 'function') {
             const newNotification = {
                 id: `notif-cancel-${Date.now()}`,

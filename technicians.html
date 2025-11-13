@@ -19,55 +19,6 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
-  <!-- Small page-specific styles for technician cards -->
-  <style>
-    /* Technician cards grid (page-specific overrides) */
-    .tech-card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.6rem;
-      margin-top: 1rem;
-    }
-    .tech-card {
-      background: var(--color-white);
-      padding: 1.6rem;
-      border-radius: 0.9rem;
-      box-shadow: var(--box-shadow);
-      color: var(--color-info-dark);
-      position: relative;
-      border: 1px solid rgba(255,255,255,0.03);
-    }
-    .dark-theme-variables .tech-card { background: #222528; }
-    .tech-card .profile-photo { width: 90px; height: 90px; margin: 0 auto; border-radius: 50%; overflow: hidden; box-shadow: 0 6px 12px rgba(0,0,0,0.45); }
-    .tech-card .profile-photo img { width: 100%; height: 100%; object-fit: cover; display:block }
-    .tech-card .status-badge { position: absolute; top: 14px; right: 14px; background: #2ecc71; color: white; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; }
-    .tech-card .tech-name { text-align:center; margin-top: 0.8rem; font-weight:700; }
-    .tech-card .tech-desc { text-align:center; color: var(--color-info-dark); font-size:0.86rem; margin-bottom: 1rem; }
-    .tech-card hr { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 1rem 0; }
-    .tech-card .summary { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem }
-    .tech-card .summary .label { color: var(--color-info-dark); font-size:0.85rem }
-    .tech-card .card-actions { display:flex; gap:0.6rem; justify-content:center }
-    .tech-card .btn { padding: 0.55rem 0.9rem; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer; background:transparent; color:var(--color-info-dark) }
-    .tech-card .btn-primary { background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06) }
-    .review-rating { display:flex; gap:0.2rem; align-items:center; justify-content:center }
-    .review-rating .filled { color: var(--color-star-rating); }
-    /* Modal: Add Technician form styles */
-    .modal-content #add-technician-form-content {
-      padding: 0.6rem 0;
-    }
-    .modal-form { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
-    .avatar-upload { display:flex; flex-direction:column; align-items:center; gap:0.6rem; }
-    .avatar-preview { width: 120px; height: 120px; border-radius: 50%; overflow:hidden; background:#2a2d30; display:flex; align-items:center; justify-content:center; }
-    .avatar-preview img { width:100%; height:100%; object-fit:cover; display:block }
-    .avatar-upload-label { display:inline-flex; gap:0.5rem; align-items:center; cursor:pointer; color:var(--color-primary); }
-    .modal-form .form-group input[type="text"],
-    .modal-form .form-group textarea {
-      width:100%; padding:0.8rem; border-radius:8px; background: rgba(255,255,255,0.02); color:var(--color-info-dark); border:1px solid rgba(255,255,255,0.04);
-    }
-    .modal-form .form-actions { display:flex; gap:0.8rem; justify-content:flex-start; margin-top:0.8rem }
-    .btn-secondary { background:#2a2d30; color:var(--color-info-dark); padding:0.6rem 1rem; border-radius:6px; border:1px solid rgba(255,255,255,0.03); }
-    .btn-primary.create-tech { background: var(--color-primary); color:#fff; padding:0.6rem 1rem; border-radius:6px; border: none }
-  </style>
 
   <!-- Firebase (compat) SDKs from CDN - required by the compat initializer -->
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -142,10 +93,7 @@
             <span class="material-symbols-outlined">location_on</span>
             <h3>Geofencing</h3>
           </a>
-          <a href="damage-reviews.html">
-            <span class="material-symbols-outlined">car_crash</span>
-            <h3>Damage Reviews</h3>
-          </a>
+          
         </div>
       </aside>
       <!-- ========== End of Sidebar ========== -->
@@ -234,15 +182,14 @@
             <div class="recent-appointments" id="technicians-table-container">
               <div class="table-header">
                 <h2>All Technicians</h2>
-                <button
-                  class="btn-primary open-modal-btn"
+                <a
+                  href="add-new-technician.html"
+                  class="btn-primary"
                   id="add-new-technician-btn"
-                  data-modal-title="Add New Technician"
-                  data-content-id="add-technician-form-content"
                 >
                   <span class="material-symbols-outlined">add</span>
                   New Technician
-                </button>
+                </a>
               </div>
               <div class="table-controls">
                 <div class="table-search-container">
@@ -294,14 +241,16 @@
           </button>
         </div>
         <div class="modal-body">
-          <p id="delete-confirm-message">
-            Are you sure you want to delete this technician? This action cannot
-            be undone.
-          </p>
-        </div>
-        <div class="modal-actions">
-          <button class="btn-secondary" id="delete-cancel-btn">Cancel</button>
-          <button class="btn-danger" id="delete-confirm-btn">Delete</button>
+          <div class="message" style="flex:1; padding-right:1rem;">
+            <p id="delete-confirm-message">
+              Are you sure you want to delete <strong id="delete-confirm-name">this technician</strong>? This action cannot be undone.
+            </p>
+            <div class="divider" aria-hidden="true"></div>
+          </div>
+          <div class="actions-inline">
+            <button class="btn-secondary" id="delete-cancel-btn">Cancel</button>
+            <button class="btn-danger" id="delete-confirm-btn">Delete</button>
+          </div>
         </div>
       </div>
     </div>
@@ -310,7 +259,7 @@
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal" id="app-modal">
         <div class="modal-header">
-          <h2 id="modal-title">Quick Action</h2>
+          <h2 id="modal-title" style="font-size: 1.3rem; font-weight: 700; margin: 0;">Add New Technician</h2>
           <button class="modal-close" id="modal-close-btn">
             <span class="material-symbols-outlined">close</span>
           </button>
@@ -329,9 +278,8 @@
                 <div class="avatar-preview" id="avatar-preview">
                   <img src="./images/redicon.png" alt="Avatar Preview" id="avatar-preview-img" />
                 </div>
-                <label class="avatar-upload-label" for="technician-avatar-input">
+                <label class="avatar-upload-label" for="technician-avatar-input" title="Upload Photo">
                   <span class="material-symbols-outlined">file_upload</span>
-                  <span>Upload</span>
                 </label>
                 <input type="file" id="technician-avatar-input" accept="image/*" style="display:none" />
               </div>

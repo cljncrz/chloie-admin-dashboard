@@ -34,6 +34,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateCount();
     };
 
+    // --- Get current logged-in user's full name (if available) ---
+    let currentUserFullName = null;
+    let currentUserRole = null;
+    let currentUserUid = null;
+    const fetchCurrentUserFullName = async () => {
+        try {
+            const auth = window.firebase.auth();
+            if (!auth || !auth.currentUser) return null;
+            const uid = auth.currentUser.uid;
+            currentUserUid = uid;
+            const db = window.firebase.firestore();
+            const userDoc = await db.collection('users').doc(uid).get();
+            if (userDoc.exists) {
+                const data = userDoc.data() || {};
+                currentUserFullName = data.fullName || null;
+                currentUserRole = data.role || null;
+                // expose globally in case other scripts want to use it
+                window.currentUserFullName = currentUserFullName;
+                window.currentUserRole = currentUserRole;
+                window.currentUserUid = currentUserUid;
+                return currentUserFullName;
+            }
+        } catch (e) {
+            console.warn('Could not fetch current user full name', e);
+        }
+        return null;
+    };
     // --- New function to update the quick stats on the appointment page ---
     const updateAppointmentPageStats = () => {
         if (!document.getElementById('total-appointments-stat')) return; // Only run on appointments page
@@ -81,7 +108,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // This function will now be defined here to ensure it uses live data from Firestore
-    window.appData.createTechnicianDropdown = (selectedTechnician) => {
+    window.appData.createTechnicianDropdown = (selectedTechnician, disabled = false) => {
         const technicians = window.appData.technicians || [];
         // Filter for active technicians, and always include the currently selected one even if they are inactive
         const activeTechnicians = technicians.filter(tech => tech.status === 'Active' || tech.name === selectedTechnician);
@@ -94,7 +121,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             options += `<option value="${tech.name}" ${isSelected}>${tech.name}</option>`;
         });
 
-        return `<select class="technician-select">${options}</select>`;
+        const disabledAttr = disabled ? 'disabled' : '';
+        return `<select class="technician-select" ${disabledAttr}>${options}</select>`;
     };
 
 
@@ -379,7 +407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </button>`;
                 }
 
-                const technicianDropdown = window.appData.createTechnicianDropdown(appt.technician);
+                const technicianDropdown = window.appData.createTechnicianDropdown(appt.technician, appt.status !== 'Pending');
 
                 const paymentStatus = appt.paymentStatus || 'Unpaid'; // Default to 'Unpaid' if undefined
                 const paymentStatusClass = paymentStatus.toLowerCase();
@@ -521,7 +549,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </button>`;
                 }
 
-                const technicianDropdown = window.appData.createTechnicianDropdown(walkin.technician);
+                const technicianDropdown = window.appData.createTechnicianDropdown(walkin.technician, walkin.status !== 'Pending');
 
                 const paymentStatusClass = walkin.paymentStatus.toLowerCase();
                 const paymentBadge = `<span class="payment-status-badge ${paymentStatusClass}">${walkin.paymentStatus}</span>`;
@@ -632,7 +660,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // --- Open Appointment Details Modal on Row Click ---
         const appointmentTableBody = mainAppointmentsContainer.querySelector('tbody');
         if (appointmentTableBody) {
-            appointmentTableBody.addEventListener('click', (e) => {
+            appointmentTableBody.addEventListener('click', async (e) => {
                 const cancelButton = e.target.closest('.cancel-btn');
                 const startServiceButton = e.target.closest('.start-service-btn');
                 const completeServiceButton = e.target.closest('.complete-service-btn');
@@ -648,6 +676,39 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
 
                     if (appointment && appointment.status === 'Pending') {
+                        // Ensure we know who is logged in (name + role)
+                        await fetchCurrentUserFullName();
+
+                        // Admins may start regardless; others must be assigned technician
+                        if (!appointment.technician || appointment.technician === 'Unassigned') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Cannot start service: no technician assigned.', 'error');
+                            else alert('Cannot start service: no technician assigned.');
+                            return;
+                        }
+
+                        if (currentUserFullName !== appointment.technician && window.currentUserRole !== 'admin') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Only the assigned technician can start this service.', 'error');
+                            else alert('Only the assigned technician can start this service.');
+                            return;
+                        }
+
+                        const originalStatus = appointment.status; // Capture original status
+                        const db = window.firebase.firestore();
+                        try {
+                            // Persist change to Firestore first so mobile app updates
+                            await db.collection('bookings').doc(appointment.serviceId).update({
+                                status: 'In Progress',
+                                startTime: window.firebase.firestore().FieldValue.serverTimestamp(),
+                                technician: appointment.technician
+                            });
+                        } catch (err) {
+                            console.error('Error updating booking to In Progress:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to start service (database error).', 'error');
+                            else alert('Failed to start service (database error).');
+                            return;
+                        }
+
+                        // Local/UI updates after successful DB update
                         const startTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); // prettier-ignore
                         appointment.status = 'In Progress';
                         appointment.startTime = startTime;
@@ -656,13 +717,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const statusCell = row.querySelector('td:nth-last-child(3)'); // The 3rd cell from the end is Status
                         statusCell.innerHTML = `<span class="in-progress">In Progress</span>`;
 
-                        // Show success toast
-                        // If the task was 'Pending', starting it now officially assigns it and increases the count.
-                        // We check for 'Pending' to avoid double-counting if the status was changed differently.
                         if (originalStatus === 'Pending') increaseTechnicianTaskCount(appointment.technician);
 
                         updateAppointmentPageStats(); // Refresh stats
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Service for ${appointment.customer} has started.`);
+
+                        // --- Send notification to mobile app user ---
+                        sendServiceStartedNotification(appointment);
 
                         // Replace the start button with a complete button
                         const actionsCell = startServiceButton.parentElement;
@@ -672,6 +733,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <span class="material-symbols-outlined">check</span>
                             </button>
                         `);
+
+                        // Disable technician select and cancel button for this row to make status immutable
+                        const techSelect = row.querySelector('.technician-select');
+                        if (techSelect) techSelect.disabled = true;
+                        const cancelBtn = row.querySelector('.cancel-btn');
+                        if (cancelBtn) cancelBtn.disabled = true;
                     }
                     return;
                 }
@@ -681,6 +748,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
 
                     if (appointment && appointment.status === 'In Progress') {
+                        await fetchCurrentUserFullName();
+                        // Admins may complete; otherwise only assigned technician
+                        if (currentUserFullName !== appointment.technician && window.currentUserRole !== 'admin') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Only the assigned technician can complete this service.', 'error');
+                            else alert('Only the assigned technician can complete this service.');
+                            return;
+                        }
+
+                        const db = window.firebase.firestore();
+                        try {
+                            await db.collection('bookings').doc(appointment.serviceId).update({
+                                status: 'Completed',
+                                completedAt: window.firebase.firestore().FieldValue.serverTimestamp()
+                            });
+                        } catch (err) {
+                            console.error('Error updating booking to Completed:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to complete service (database error).', 'error');
+                            else alert('Failed to complete service (database error).');
+                            return;
+                        }
+
                         appointment.status = 'Completed';
                         row.dataset.status = 'Completed';
                         const statusCell = row.querySelector('td:nth-last-child(3)'); // The 3rd cell from the end is Status
@@ -692,6 +780,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                         // Decrease the technician's task count
                         decreaseTechnicianTaskCount(appointment.technician);
+
+                        // --- Send notification to mobile app user ---
+                        sendServiceCompletedNotification(appointment);
                     }
                     return;
                 }
@@ -703,6 +794,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     if (appointment) {
                         const originalStatus = appointment.status;
+
+                        // Prevent cancelling once service is In Progress
+                        if (originalStatus === 'In Progress') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Cannot cancel service after it has started.', 'error');
+                            else alert('Cannot cancel service after it has started.');
+                            return;
+                        }
+
+                        const db = window.firebase.firestore();
+                        try {
+                            await db.collection('bookings').doc(appointment.serviceId).update({
+                                status: 'Cancelled',
+                                cancelledAt: window.firebase.firestore().FieldValue.serverTimestamp()
+                            });
+                        } catch (err) {
+                            console.error('Error updating booking to Cancelled:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to cancel service (database error).', 'error');
+                            else alert('Failed to cancel service (database error).');
+                            return;
+                        }
 
                         // Update status in data model
                         appointment.status = 'Cancelled';
@@ -716,6 +827,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (originalStatus === 'Pending' || originalStatus === 'In Progress') {
                             decreaseTechnicianTaskCount(appointment.technician);
                         }
+
+                        // --- Send notification to mobile app user ---
+                        sendAppointmentCancelledNotification(appointment);
 
                         // Re-render the table to reflect filter/sort changes if needed
                         // Just re-render the table with current filters
@@ -738,6 +852,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Appointment ${appointment.serviceId} marked as paid.`);
                         
+                        // --- Send notification to mobile app user ---
+                        sendPaymentReceivedNotification(appointment);
+
                         // Remove the button after it's clicked
                         markPaidButton.remove();
                     }
@@ -795,7 +912,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // --- Open Walk-in Details Modal & Handle Actions ---
         const walkinTableBody = document.querySelector('#walk-in-appointments-table tbody');
         if (walkinTableBody) {
-            walkinTableBody.addEventListener('click', (e) => {
+            walkinTableBody.addEventListener('click', async (e) => {
                 const cancelButton = e.target.closest('.cancel-btn');
                 const startServiceButton = e.target.closest('.start-service-btn');
                 const completeServiceButton = e.target.closest('.complete-service-btn');
@@ -811,6 +928,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const walkin = walkins.find(w => w.plate === row.dataset.plate && w.service === row.dataset.service);
 
                     if (walkin && walkin.status === 'Pending') {
+                        await fetchCurrentUserFullName();
+
+                        // Admins may start regardless; others must be assigned technician
+                        if (!walkin.technician || walkin.technician === 'Unassigned') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Cannot start service: no technician assigned.', 'error');
+                            else alert('Cannot start service: no technician assigned.');
+                            return;
+                        }
+
+                        if (currentUserFullName !== walkin.technician && window.currentUserRole !== 'admin') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Only the assigned technician can start this service.', 'error');
+                            else alert('Only the assigned technician can start this service.');
+                            return;
+                        }
+
+                        const originalStatus = walkin.status; // Capture original status
+                        const db = window.firebase.firestore();
+                        try {
+                            await db.collection('walkins').doc(walkin.id).update({
+                                status: 'In Progress',
+                                startTime: window.firebase.firestore().FieldValue.serverTimestamp(),
+                                technician: walkin.technician
+                            });
+                        } catch (err) {
+                            console.error('Error updating walkin to In Progress:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to start walk-in (database error).', 'error');
+                            else alert('Failed to start walk-in (database error).');
+                            return;
+                        }
+
                         const startTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); // prettier-ignore
                         walkin.status = 'In Progress';
                         walkin.startTime = startTime;
@@ -819,12 +966,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const statusCell = row.querySelector('td:nth-last-child(3)'); // The 3rd cell from the end is Status
                         statusCell.innerHTML = `<span class="in-progress">In Progress</span>`;
 
-                        // If the task was 'Pending', starting it now officially assigns it and increases the count.
-                        // We check for 'Pending' to avoid double-counting if the status was changed differently.
                         if (originalStatus === 'Pending') increaseTechnicianTaskCount(walkin.technician);
 
                         updateAppointmentPageStats(); // Refresh stats
-                        // Show success toast
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Service for walk-in ${walkin.plate} has started.`);
 
                         // Replace the start button with a complete button
@@ -835,6 +979,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <span class="material-symbols-outlined">check</span>
                             </button>
                         `);
+
+                        // Disable technician select and cancel button for this row to make status immutable
+                        const techSelect = row.querySelector('.technician-select');
+                        if (techSelect) techSelect.disabled = true;
+                        const cancelBtn = row.querySelector('.cancel-btn');
+                        if (cancelBtn) cancelBtn.disabled = true;
                     }
                     return;
                 }
@@ -844,6 +994,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const walkin = walkins.find(w => w.plate === row.dataset.plate && w.service === row.dataset.service);
 
                     if (walkin && walkin.status === 'In Progress') {
+                        await fetchCurrentUserFullName();
+                        if (currentUserFullName !== walkin.technician && window.currentUserRole !== 'admin') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Only the assigned technician can complete this service.', 'error');
+                            else alert('Only the assigned technician can complete this service.');
+                            return;
+                        }
+
+                        const db = window.firebase.firestore();
+                        try {
+                            await db.collection('walkins').doc(walkin.id).update({
+                                status: 'Completed',
+                                completedAt: window.firebase.firestore().FieldValue.serverTimestamp()
+                            });
+                        } catch (err) {
+                            console.error('Error updating walkin to Completed:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to complete walk-in (database error).', 'error');
+                            else alert('Failed to complete walk-in (database error).');
+                            return;
+                        }
+
                         walkin.status = 'Completed';
                         row.dataset.status = 'Completed';
                         const statusCell = row.querySelector('td:nth-last-child(3)'); // The 3rd cell from the end is Status
@@ -866,6 +1036,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     if (walkin) {
                         const originalStatus = walkin.status;
+
+                        // Prevent cancelling once service is In Progress
+                        if (originalStatus === 'In Progress') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Cannot cancel service after it has started.', 'error');
+                            else alert('Cannot cancel service after it has started.');
+                            return;
+                        }
+
+                        const db = window.firebase.firestore();
+                        try {
+                            await db.collection('walkins').doc(walkin.id).update({
+                                status: 'Cancelled',
+                                cancelledAt: window.firebase.firestore().FieldValue.serverTimestamp()
+                            });
+                        } catch (err) {
+                            console.error('Error updating walkin to Cancelled:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to cancel walk-in (database error).', 'error');
+                            else alert('Failed to cancel walk-in (database error).');
+                            return;
+                        }
 
                         // Update status in data model
                         walkin.status = 'Cancelled';
@@ -947,6 +1137,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!appointment) return;
 
                 const oldTechnicianName = appointment.technician;
+                // Prevent changing technician once service is in progress or completed
+                if (appointment.status === 'In Progress' || appointment.status === 'Completed') {
+                    technicianSelect.value = oldTechnicianName;
+                    if (typeof showSuccessToast === 'function') showSuccessToast('Cannot change technician after service started or completed.', 'error');
+                    return;
+                }
+
                 appointment.technician = newTechnicianName;
                 row.dataset.technician = newTechnicianName;
 
@@ -995,6 +1192,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const oldTechnicianName = walkin.technician;
                 const newTechnicianName = technicianSelect.value;
+                // Prevent changing technician once service is in progress or completed
+                if (walkin.status === 'In Progress' || walkin.status === 'Completed') {
+                    technicianSelect.value = oldTechnicianName;
+                    if (typeof showSuccessToast === 'function') showSuccessToast('Cannot change technician after service started or completed.', 'error');
+                    return;
+                }
+
                 walkin.technician = newTechnicianName;
                 row.dataset.technician = newTechnicianName;
 
@@ -1064,4 +1268,189 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
+
+    // ===== HELPER: GET CUSTOMER ID FROM NAME =====
+    /**
+     * Look up customer's Firestore ID using their name
+     * Queries the 'users' collection for a customer with matching fullName
+     */
+    const getCustomerIdFromName = async (customerName) => {
+        try {
+            if (!customerName || typeof customerName !== 'string') {
+                return null;
+            }
+
+            const db = window.firebase.firestore();
+            const usersSnapshot = await db.collection('users')
+                .where('fullName', '==', customerName.trim())
+                .where('role', '!=', 'admin')
+                .limit(1)
+                .get();
+
+            if (usersSnapshot.empty) {
+                console.warn(`⚠️ No customer found with name: ${customerName}`);
+                return null;
+            }
+
+            const customerId = usersSnapshot.docs[0].id;
+            console.log(`✅ Found customer ID: ${customerId} for name: ${customerName}`);
+            return customerId;
+        } catch (error) {
+            console.error(`❌ Error looking up customer ID: ${error.message}`);
+            return null;
+        }
+    };
+
+    // ===== NOTIFICATION FUNCTIONS TO SEND TO MOBILE USERS =====
+
+    /**
+     * Send "Service Started" notification to customer
+     */
+    const sendServiceStartedNotification = async (appointment) => {
+        try {
+            if (typeof NotificationService === 'undefined') {
+                console.warn('NotificationService not available');
+                return;
+            }
+
+            // Get customer ID from appointment data (could be any of these names)
+            const customerName = appointment.customer || appointment.customerName || appointment.fullName;
+            
+            if (!customerName) {
+                console.warn('⚠️ No customer name found in appointment data');
+                return;
+            }
+
+            // Look up the actual Firestore user ID using the customer name
+            const customerId = await getCustomerIdFromName(customerName);
+            
+            if (!customerId) {
+                console.warn(`⚠️ Could not find Firestore ID for customer: ${customerName}`);
+                return;
+            }
+
+            await NotificationService.notifyServiceStarted(customerId, {
+                id: appointment.serviceId,
+                serviceName: appointment.serviceNames || appointment.service,
+                technician: appointment.technician
+            });
+
+            console.log(`✅ Service started notification sent to ${customerId}`);
+        } catch (error) {
+            console.error('❌ Error sending service started notification:', error.message);
+        }
+    };
+
+    /**
+     * Send "Service Completed" notification to customer
+     */
+    const sendServiceCompletedNotification = async (appointment) => {
+        try {
+            if (typeof NotificationService === 'undefined') {
+                console.warn('NotificationService not available');
+                return;
+            }
+
+            // Get customer ID from appointment data
+            const customerName = appointment.customer || appointment.customerName || appointment.fullName;
+            
+            if (!customerName) {
+                console.warn('⚠️ No customer name found in appointment data');
+                return;
+            }
+
+            // Look up the actual Firestore user ID
+            const customerId = await getCustomerIdFromName(customerName);
+            
+            if (!customerId) {
+                console.warn(`⚠️ Could not find Firestore ID for customer: ${customerName}`);
+                return;
+            }
+
+            await NotificationService.notifyServiceCompleted(customerId, {
+                id: appointment.serviceId,
+                serviceName: appointment.serviceNames || appointment.service
+            });
+
+            console.log(`✅ Service completed notification sent to ${customerId}`);
+        } catch (error) {
+            console.error('❌ Error sending service completed notification:', error.message);
+        }
+    };
+
+    /**
+     * Send "Payment Received" notification to customer
+     */
+    const sendPaymentReceivedNotification = async (appointment) => {
+        try {
+            if (typeof NotificationService === 'undefined') {
+                console.warn('NotificationService not available');
+                return;
+            }
+
+            // Get customer ID from appointment data
+            const customerName = appointment.customer || appointment.customerName || appointment.fullName;
+            
+            if (!customerName) {
+                console.warn('⚠️ No customer name found in appointment data');
+                return;
+            }
+
+            // Look up the actual Firestore user ID
+            const customerId = await getCustomerIdFromName(customerName);
+            
+            if (!customerId) {
+                console.warn(`⚠️ Could not find Firestore ID for customer: ${customerName}`);
+                return;
+            }
+
+            await NotificationService.notifyPaymentReceived(customerId, {
+                id: appointment.serviceId,
+                amount: appointment.price,
+                serviceName: appointment.serviceNames || appointment.service
+            });
+
+            console.log(`✅ Payment received notification sent to ${customerId}`);
+        } catch (error) {
+            console.error('❌ Error sending payment received notification:', error.message);
+        }
+    };
+
+    /**
+     * Send "Appointment Cancelled" notification to customer
+     */
+    const sendAppointmentCancelledNotification = async (appointment) => {
+        try {
+            if (typeof NotificationService === 'undefined') {
+                console.warn('NotificationService not available');
+                return;
+            }
+
+            // Get customer ID from appointment data
+            const customerName = appointment.customer || appointment.customerName || appointment.fullName;
+            
+            if (!customerName) {
+                console.warn('⚠️ No customer name found in appointment data');
+                return;
+            }
+
+            // Look up the actual Firestore user ID
+            const customerId = await getCustomerIdFromName(customerName);
+            
+            if (!customerId) {
+                console.warn(`⚠️ Could not find Firestore ID for customer: ${customerName}`);
+                return;
+            }
+
+            await NotificationService.notifyAppointmentCancelled(customerId, {
+                id: appointment.serviceId,
+                serviceName: appointment.serviceNames || appointment.service,
+                reason: 'Your appointment was cancelled by the admin'
+            });
+
+            console.log(`✅ Appointment cancelled notification sent to ${customerId}`);
+        } catch (error) {
+            console.error('❌ Error sending appointment cancelled notification:', error.message);
+        }
+    };
 });
