@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <td class="text-center">${featuredToggle}</td>
             <td>${statusDropdown}</td>
             <td class="text-center">
-                <button class="action-icon-btn view-service-btn" title="View Service Profile"><span class="material-symbols-outlined">visibility</span></button>
+                <button type="button" class="action-icon-btn view-service-btn" title="View Service Profile"><span class="material-symbols-outlined">visibility</span></button>
             </td>
         `;
         return row;
@@ -285,6 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (viewBtn) {
+            e.preventDefault();
             const serviceId = row.dataset.serviceId;
             const service = servicesData.find(s => s.serviceId === serviceId);
 
@@ -380,67 +381,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const checkedBoxes = servicesTbody.querySelectorAll('.service-checkbox:checked');
         const count = checkedBoxes.length;
         if (count > 0) {
-            openDeleteConfirmModal(count, () => {
-                const idsToDelete = Array.from(checkedBoxes).map(cb => cb.closest('tr').dataset.serviceId);
-                deleteServices(idsToDelete);
-            });
+            const idsToDelete = Array.from(checkedBoxes).map(cb => cb.closest('tr').dataset.serviceId);
+            deleteServices(idsToDelete);
         }
     });
-
-    // --- Delete Modal Logic ---
-    const openDeleteConfirmModal = (count, confirmCallback) => {
-        if (!confirmOverlay) return;
-        confirmMessage.innerHTML = `Are you sure you want to delete <strong>${count} service(s)</strong>? This action cannot be undone.`;
-        confirmOverlay.classList.add('show');
-
-        // Use { once: true } to avoid attaching multiple listeners
-        confirmBtn.addEventListener('click', function handler() {
-            confirmCallback();
-            closeDeleteConfirmModal();
-            confirmBtn.removeEventListener('click', handler);
-        }, { once: true });
-    };
-
-    // --- Generic Modal Logic ---
-    const openGenericConfirmModal = (title, message, confirmCallback) => {
-        if (!genericConfirmOverlay) return;
-        genericConfirmTitle.textContent = title;
-        genericConfirmMessage.innerHTML = message;
-        genericConfirmOverlay.classList.add('show');
-
-        // Use { once: true } to avoid attaching multiple listeners
-        const confirmHandler = () => {
-            confirmCallback();
-            closeGenericConfirmModal();
-        };
-
-        genericConfirmBtn.addEventListener('click', confirmHandler, { once: true });
-        genericCancelBtn.addEventListener('click', closeGenericConfirmModal, { once: true });
-    };
-
-    const closeGenericConfirmModal = () => {
-        if (genericConfirmOverlay) genericConfirmOverlay.classList.remove('show');
-    };
-
-    const closeDeleteConfirmModal = () => {
-        if (confirmOverlay) confirmOverlay.classList.remove('show');
-    };
-
-    const deleteServices = (serviceIds) => {
-        let deletedCount = 0;
-        serviceIds.forEach(id => {
-            const serviceIndex = servicesData.findIndex(s => s.serviceId === id);
-            if (serviceIndex > -1) {
-                servicesData.splice(serviceIndex, 1);
-                deletedCount++;
-            }
-        });
-        if (deletedCount > 0) {
-            renderTable();
-            updateDeleteButtonState();
-            showSuccessToast(`${deletedCount} service(s) deleted successfully!`);
-        }
-    };
 
     // --- Success Toast Notification ---
     const showSuccessToast = (message) => {
@@ -453,10 +397,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             successToast.classList.remove('show');
         }, 3000); // Hide after 3 seconds
     };
-    
-    if (cancelBtn) cancelBtn.addEventListener('click', closeDeleteConfirmModal);
-    if (closeModalBtn) closeModalBtn.addEventListener('click', closeDeleteConfirmModal);
-    if (confirmOverlay) confirmOverlay.addEventListener('click', (e) => { if (e.target === confirmOverlay) closeDeleteConfirmModal(); });
 
     // --- Fetch data from Firestore and render table ---
     fetchServicesFromFirestore();

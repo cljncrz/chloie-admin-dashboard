@@ -16,15 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const noResultsRow = customersTable.querySelector('.no-results-row');
         const loader = document.querySelector('.customer-list-container .table-loader');
 
-        // Delete Modal Elements
-        const confirmOverlay = document.getElementById('delete-confirm-overlay');
-        const confirmModal = document.getElementById('delete-confirm-modal');
-        const confirmMessage = document.getElementById('delete-confirm-message');
-        const confirmBtn = document.getElementById('delete-confirm-btn');
-        const cancelBtn = document.getElementById('delete-cancel-btn');
-        const closeModalBtn = document.getElementById('delete-confirm-close-btn');
 
-        const successToast = document.getElementById('success-toast');
 
         // --- Fetch and Populate Table from Firestore ---
         const fetchAndPopulateCustomers = async () => {
@@ -84,10 +76,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="text-center">${customer.orders || 0}</td>
                     <td>${customer.createdAt ? new Date(customer.createdAt.seconds * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
                     <td class="text-center actions-cell">
-                        <button class="action-icon-btn view-btn" title="View Details">
+                        <button type="button" class="action-icon-btn view-btn" title="View Details">
                             <span class="material-symbols-outlined">info</span>
                         </button>
-                        <button class="action-icon-btn delete-btn" title="Delete Customer">
+                        <button type="button" class="action-icon-btn delete-btn" title="Delete Customer">
                             <span class="material-symbols-outlined">delete</span>
                         </button>
                     </td>
@@ -151,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
         // Delete Selected Functionality
-        const deleteSelectedCustomers = () => {
+        const deleteSelectedCustomers = async () => {
             const checkedBoxes = tableBody.querySelectorAll('.customer-checkbox:checked');
             const count = checkedBoxes.length;
 
@@ -161,43 +153,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            openConfirmModal(count);
-
-            // Use { once: true } to automatically remove the event listener after it's fired once.
-            confirmBtn.addEventListener('click', async () => {
-                const batch = db.batch();
-                const idsToDelete = [];
-                checkedBoxes.forEach(checkbox => {
-                    const row = checkbox.closest('tr');
-                    const docId = row.dataset.id;
-                    if (docId) {
-                        idsToDelete.push(docId);
-                        const docRef = db.collection('users').doc(docId);
-                        batch.delete(docRef);
-                    }
-                });
-
-                try {
-                    await batch.commit();
-                    // Remove from local state and re-render
-                    mobileCustomers = mobileCustomers.filter(cust => !idsToDelete.includes(cust.id));
-                    renderTable(mobileCustomers);
-                    showSuccessToast(`${count} customer(s) successfully deleted.`);
-                } catch (error) {
-                    console.error("Error deleting customers: ", error);
-                    alert('An error occurred while deleting customers. Please try again.');
-                } finally {
-                    closeConfirmModal();
-                    updateDeleteButtonState();
-                    selectAllCheckbox.checked = false;
+            const batch = db.batch();
+            const idsToDelete = [];
+            checkedBoxes.forEach(checkbox => {
+                const row = checkbox.closest('tr');
+                const docId = row.dataset.id;
+                if (docId) {
+                    idsToDelete.push(docId);
+                    const docRef = db.collection('users').doc(docId);
+                    batch.delete(docRef);
                 }
-            }, {
-                once: true
             });
 
-            cancelBtn.addEventListener('click', () => {
-                closeConfirmModal();
-            }, { once: true });
+            try {
+                await batch.commit();
+                // Remove from local state and re-render
+                mobileCustomers = mobileCustomers.filter(cust => !idsToDelete.includes(cust.id));
+                renderTable(mobileCustomers);
+                showSuccessToast(`${count} customer(s) successfully deleted.`);
+            } catch (error) {
+                console.error("Error deleting customers: ", error);
+                alert('An error occurred while deleting customers. Please try again.');
+            } finally {
+                updateDeleteButtonState();
+                selectAllCheckbox.checked = false;
+            }
         };
 
         // Event Listeners
@@ -221,6 +201,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const row = e.target.closest('tr');
 
             if (!row || row.classList.contains('no-results-row')) return;
+
+            // Prevent default for action buttons to avoid accidental form submits
+            if (viewButton || deleteButton) e.preventDefault();
 
             // If the click was on the row itself or the view button (but not on another action button/checkbox), navigate to the profile page
             const isActionClick = deleteButton || checkbox;
@@ -246,12 +229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // Delete Modal event listeners
-        cancelBtn.addEventListener('click', closeConfirmModal);
-        closeModalBtn.addEventListener('click', closeConfirmModal);
-        confirmOverlay.addEventListener('click', (e) => {
-            if (e.target === confirmOverlay) closeConfirmModal();
-        });
+
 
         // Initial Population
         fetchAndPopulateCustomers();

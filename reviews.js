@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td class="text-center">${starRatingHTML}</td>
                         <td>${review.date}</td>
                         <td class="text-center actions-cell">
-                            <button class="action-icon-btn view-btn" title="View Full Details">
+                            <button type="button" class="action-icon-btn view-btn" title="View Full Details">
                                 <span class="material-symbols-outlined">visibility</span>
                             </button>
                         </td>
@@ -172,50 +172,32 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteSelectedBtn.disabled = checkedBoxes.length === 0;
     };
 
-    const openConfirmModal = (count, onConfirm) => {
-        confirmMessage.textContent = `Are you sure you want to delete ${count} selected review(s)? This action cannot be undone.`;
-        confirmOverlay.classList.add('show');
-
-        const confirmHandler = () => {
-            onConfirm();
-            closeConfirmModal();
-            confirmBtn.removeEventListener('click', confirmHandler);
-        };
-        confirmBtn.addEventListener('click', confirmHandler, { once: true });
-    };
-
-    const closeConfirmModal = () => {
-        confirmOverlay.classList.remove('show');
-    };
-
     const deleteSelectedReviews = () => {
         const checkedBoxes = tableBody.querySelectorAll('.review-checkbox:checked');
         const count = checkedBoxes.length;
 
         if (count === 0) return;
 
-        openConfirmModal(count, () => {
-            const idsToDelete = [];
-            checkedBoxes.forEach(checkbox => {
-                const row = checkbox.closest('tr');
-                idsToDelete.push(row.dataset.reviewId);
-            });
-
-            // In a real app, you'd send `idsToDelete` to a server.
-            // Here, we filter the client-side array.
-            const initialCount = reviewsData.length;
-            reviewsData.splice(0, reviewsData.length, ...reviewsData.filter(r => !idsToDelete.includes(r.reviewId)));
-
-            calculateAndDisplayStats(); // Update stats after deletion
-            renderTablePage(); // Re-render the table with the updated data
-
-            if (typeof showSuccessToast === 'function') {
-                const deletedCount = initialCount - reviewsData.length;
-                if (deletedCount > 0) {
-                    showSuccessToast(`${deletedCount} review(s) successfully deleted.`);
-                }
-            }
+        const idsToDelete = [];
+        checkedBoxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            idsToDelete.push(row.dataset.reviewId);
         });
+
+        // In a real app, you'd send `idsToDelete` to a server.
+        // Here, we filter the client-side array.
+        const initialCount = reviewsData.length;
+        reviewsData.splice(0, reviewsData.length, ...reviewsData.filter(r => !idsToDelete.includes(r.reviewId)));
+
+        calculateAndDisplayStats(); // Update stats after deletion
+        renderTablePage(); // Re-render the table with the updated data
+
+        if (typeof showSuccessToast === 'function') {
+            const deletedCount = initialCount - reviewsData.length;
+            if (deletedCount > 0) {
+                showSuccessToast(`${deletedCount} review(s) successfully deleted.`);
+            }
+        }
     };
 
     // --- Event Listeners ---
@@ -238,11 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    cancelBtn?.addEventListener('click', closeConfirmModal);
-    closeModalBtn?.addEventListener('click', closeConfirmModal);
-    confirmOverlay?.addEventListener('click', (e) => {
-        if (e.target === confirmOverlay) closeConfirmModal();
-    });
+
 
     // --- Sorting Event Listener ---
     reviewsTable.querySelectorAll('th[data-sortable="true"]').forEach(header => {
@@ -279,6 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tableBody.addEventListener('click', (e) => {
         const viewBtn = e.target.closest('.view-btn');
         if (viewBtn) {
+            e.preventDefault();
             const row = viewBtn.closest('tr');
             const reviewId = row.dataset.reviewId;
             const review = reviewsData.find(r => r.reviewId === reviewId);

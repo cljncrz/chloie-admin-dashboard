@@ -60,8 +60,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     </div>
                                 </div>
                                 <div class="card-actions">
-                                    <button class="btn action-view btn-primary" data-tech-id="${tech.id}" title="View Profile"><span class="material-symbols-outlined">visibility</span> View Profile</button>
-                                    <button class="btn action-delete" data-tech-id="${tech.id}" title="Delete Technician"><span class="material-symbols-outlined">delete</span></button>
+                                    <button type="button" class="btn action-view btn-primary" data-tech-id="${tech.id}" title="View Profile"><span class="material-symbols-outlined">visibility</span> View Profile</button>
+                                    <button type="button" class="btn action-delete" data-tech-id="${tech.id}" title="Delete Technician"><span class="material-symbols-outlined">delete</span></button>
                                 </div>
                         `;
 
@@ -123,6 +123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const cardEl = e.target.closest('.tech-card');
 
                 if (viewBtn) {
+                    e.preventDefault();
                     const id = viewBtn.dataset.techId;
                     const tech = technicians.find(t => t.id === id);
                     if (tech) {
@@ -133,9 +134,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 if (deleteBtn) {
+                    e.preventDefault();
                     const id = deleteBtn.dataset.techId;
                     const tech = technicians.find(t => t.id === id);
-                    if (tech) openDeleteConfirmModal(tech);
+                    if (tech) deleteTechnician(tech.id);
                     return;
                 }
 
@@ -150,27 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
         }
-        const confirmOverlay = document.getElementById('delete-confirm-overlay');
-        const confirmMessage = document.getElementById('delete-confirm-message');
-        const confirmBtn = document.getElementById('delete-confirm-btn');
-        const cancelBtn = document.getElementById('delete-cancel-btn');
-        const closeModalBtn = document.getElementById('delete-confirm-close-btn');
 
-        const openDeleteConfirmModal = (tech) => {
-            if (!confirmOverlay) return;
-            confirmMessage.innerHTML = `Are you sure you want to delete <strong>${tech.name}</strong>? This action cannot be undone.`;
-            confirmOverlay.classList.add('show');
-            document.body.classList.add('delete-modal-open');
-            confirmBtn.onclick = async () => { // Make onclick async
-                await deleteTechnician(tech.id); // Await deletion
-                closeDeleteConfirmModal();
-            };
-        };
-
-        const closeDeleteConfirmModal = () => {
-            if (confirmOverlay) confirmOverlay.classList.remove('show');
-            document.body.classList.remove('delete-modal-open');
-        };
 
         const deleteTechnician = async (techId) => {
             try {
@@ -202,10 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         };
 
-        // Event listeners for the delete modal
-        if (cancelBtn) cancelBtn.addEventListener('click', closeDeleteConfirmModal);
-        if (closeModalBtn) closeModalBtn.addEventListener('click', closeDeleteConfirmModal);
-        if (confirmOverlay) confirmOverlay.addEventListener('click', (e) => { if (e.target === confirmOverlay) closeDeleteConfirmModal(); });
+
 
         // --- Handle New Technician Form Submission ---
         const addTechnicianForm = document.getElementById('add-technician-form');

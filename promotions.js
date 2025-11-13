@@ -7,13 +7,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const promotionsTbody = document.getElementById('promotions-tbody');
     const successToast = document.getElementById('success-toast');
 
-    // --- Delete Modal Elements ---
-    const confirmOverlay = document.getElementById('delete-confirm-overlay');
-    const confirmMessage = document.getElementById('delete-confirm-message');
-    const confirmBtn = document.getElementById('delete-confirm-btn');
-    const cancelBtn = document.getElementById('delete-cancel-btn');
-    const closeModalBtn = document.getElementById('delete-confirm-close-btn');
-
     if (!promotionsTbody) {
         return;
     }
@@ -178,8 +171,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ${statusDropdown}
             </td>
             <td class="text-center">
-                <button class="action-icon-btn edit-promo-btn" title="Edit Promotion"><span class="material-symbols-outlined">edit</span></button>
-                <button class="action-icon-btn delete-promo-btn" title="Delete Promotion"><span class="material-symbols-outlined">delete</span></button>
+                <button type="button" class="action-icon-btn edit-promo-btn" title="Edit Promotion"><span class="material-symbols-outlined">edit</span></button>
+                <button type="button" class="action-icon-btn delete-promo-btn" title="Delete Promotion"><span class="material-symbols-outlined">delete</span></button>
             </td>
         `;
         return row;
@@ -246,28 +239,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Delete Modal & Logic ---
     const openConfirmModal = (onConfirm) => {
-        confirmOverlay.classList.add('show');
-        document.body.classList.add('modal-open');
-
-        // Use { once: true } to ensure the handler only runs once and is self-cleaning
-        confirmBtn.addEventListener('click', () => {
-            onConfirm();
-            closeConfirmModal();
-        }, { once: true });
+        onConfirm();
     };
-
-    const closeConfirmModal = () => {
-        confirmOverlay.classList.remove('show');
-        document.body.classList.remove('modal-open');
-    };
-
-    if (cancelBtn) cancelBtn.addEventListener('click', closeConfirmModal);
-    if (closeModalBtn) closeModalBtn.addEventListener('click', closeConfirmModal);
-    if (confirmOverlay) {
-        confirmOverlay.addEventListener('click', (e) => {
-            if (e.target === confirmOverlay) closeConfirmModal();
-        });
-    }
 
     const deletePromotion = async (promoId) => {
         const index = promotionsData.findIndex(p => p.promoId === promoId);
@@ -335,6 +308,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const editBtn = e.target.closest('.edit-promo-btn');
         const deleteBtn = e.target.closest('.delete-promo-btn');
         if (editBtn) {
+            e.preventDefault();
             const row = editBtn.closest('tr');
             const promoId = row.dataset.promoId;
             const promoToEdit = promotionsData.find(p => p.promoId === promoId);

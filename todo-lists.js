@@ -11,12 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const noResultsMessage = listContainer.querySelector('.no-results-row');
     const addToDoForm = document.getElementById('add-todo-form');
     const archiveCompletedBtn = document.getElementById('archive-completed-btn');
-    // Confirmation Modal Elements
-    const deleteConfirmOverlay = document.getElementById('delete-confirm-overlay');
-    const deleteConfirmBtn = document.getElementById('delete-confirm-btn');
-    const deleteCancelBtn = document.getElementById('delete-cancel-btn');
-    const deleteConfirmCloseBtn = document.getElementById('delete-confirm-close-btn');
-    const deleteConfirmMessage = document.getElementById('delete-confirm-message');
 
     // --- State ---
     let todos = window.appData.todos || [];
@@ -121,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     ${unarchiveButtonHTML}
-                    <button class="delete-todo-btn action-icon-btn" title="Delete Task">
+                    <button type="button" class="delete-todo-btn action-icon-btn" title="Delete Task">
                         <span class="material-symbols-outlined">delete</span>
                     </button>
                 `;
@@ -220,36 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * Deletes a to-do item.
      * @param {string} id - The ID of the to-do item.
      */
-    const openDeleteConfirmation = (id) => {
-        const todo = todos.find(t => t.id === id);
-        if (!todo || !deleteConfirmOverlay) return;
-
-        todoIdToDelete = id;
-        deleteConfirmMessage.innerHTML = `Are you sure you want to delete the task "<b>${todo.text}</b>"? This action cannot be undone.`;
-        deleteConfirmOverlay.classList.add('show');
-        document.body.classList.add('modal-open');
-    };
-
-    /**
-     * Closes the delete confirmation modal.
-     */
-    const closeDeleteConfirmation = () => {
-        if (!deleteConfirmOverlay) return;
-        deleteConfirmOverlay.classList.remove('show');
-        document.body.classList.remove('modal-open');
-        todoIdToDelete = null;
-    };
-
-    /**
-     * Proceeds with the deletion after confirmation.
-     */
-    const proceedWithDeletion = () => {
-        if (!todoIdToDelete) return;
-
-        const itemEl = listContainer.querySelector(`.todo-item[data-id="${todoIdToDelete}"]`);
-        todos = todos.filter(t => t.id !== todoIdToDelete);
+    const deleteTodo = (id) => {
+        todos = todos.filter(t => t.id !== id);
         renderTodos();
-        closeDeleteConfirmation();
     };
 
     /**
@@ -318,7 +285,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Prioritize specific button clicks first to prevent unintended actions.
             if (e.target.closest('.delete-todo-btn')) {
-                openDeleteConfirmation(todoId);
+                e.preventDefault();
+                deleteTodo(todoId);
             } else if (e.target.closest('.icon-container')) { // Corrected to use the new class name for the checkbox area
                 toggleTodo(todoId);
             } else if (e.target.closest('h3')) { // Check if the text itself (or its container) was clicked
@@ -335,15 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Confirmation Modal Event Listeners ---
-    if (deleteConfirmOverlay) {
-        deleteConfirmBtn.addEventListener('click', proceedWithDeletion);
-        deleteCancelBtn.addEventListener('click', closeDeleteConfirmation);
-        deleteConfirmCloseBtn.addEventListener('click', closeDeleteConfirmation);
-        deleteConfirmOverlay.addEventListener('click', (e) => {
-            if (e.target === deleteConfirmOverlay) closeDeleteConfirmation();
-        });
-    }
+
 
     // Archive button listener
     if (archiveCompletedBtn) {
