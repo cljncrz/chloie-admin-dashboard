@@ -118,7 +118,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Skip documents that are marked as walk-ins, as they are handled by the 'walkins' collection
                     if (data.isWalkin) return;
 
-                    const scheduleDate = data.scheduleDate?.toDate();
+                    let scheduleDate = data.scheduleDate?.toDate();
+
+                    // Parse bookingTime if available
+                    if (scheduleDate && data.bookingTime) {
+                        const timeRange = data.bookingTime.split(' - ')[0]; // e.g., "1:20 PM"
+                        const timeMatch = timeRange.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                        if (timeMatch) {
+                            let hours = parseInt(timeMatch[1]);
+                            const minutes = parseInt(timeMatch[2]);
+                            const ampm = timeMatch[3].toUpperCase();
+                            if (ampm === 'PM' && hours !== 12) hours += 12;
+                            if (ampm === 'AM' && hours === 12) hours = 0;
+                            scheduleDate.setHours(hours, minutes, 0, 0);
+                        }
+                    }
+
                     const formattedDateTime = scheduleDate
                         ? scheduleDate.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ' -')
                         : 'No Date';

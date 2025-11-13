@@ -61,6 +61,26 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
+     * Parses different date/time string formats into a Date object.
+     * @param {string | object} dateInput The date input to parse.
+     * @returns {Date | null} A Date object or null if parsing fails.
+     */
+    const parseDate = (dateInput) => {
+        if (!dateInput) return null;
+        // Handle Firestore Timestamp objects
+        if (typeof dateInput === 'object' && dateInput.seconds) {
+            return new Date(dateInput.seconds * 1000);
+        }
+        // Handle ISO strings or other standard date strings
+        const date = new Date(String(dateInput).replace(' - ', ' '));
+        if (!isNaN(date)) {
+            return date;
+        }
+        return null;
+    };
+
+
+    /**
      * Finds and displays the service history for a given plate number.
      * @param {string} plateNumber The plate number to search for.
      */
@@ -77,9 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
 
         // Filter for services matching the plate number, excluding the current one being viewed
-        const serviceHistory = allServices.filter(service => 
-            service.plate === plateNumber && service.datetime !== walkinData.datetime
-        ).sort((a, b) => new Date(b.datetime) - new Date(a.datetime)); // Sort by most recent first
+        // and ensuring we only show completed services in the history.
+        const serviceHistory = allServices.filter(service =>
+            service.plate === plateNumber && service.status === 'Completed' && service.id !== walkinData.id
+        ).sort((a, b) => (parseDate(b.datetime) || 0) - (parseDate(a.datetime) || 0)); // Sort by most recent first
 
         historyTableBody.innerHTML = ''; // Clear existing rows
 
@@ -91,25 +112,83 @@ document.addEventListener('DOMContentLoaded', () => {
         noHistoryMessage.style.display = 'none';
         const fragment = document.createDocumentFragment();
 
-        serviceHistory.forEach(item => {
+        serviceHistory.forEach((item, index) => {
             const row = document.createElement('tr');
-            const itemDate = window.appData.parseCustomDate(item.datetime);
+            row.className = 'service-history-row';
+            row.dataset.index = index;
+            row.dataset.paymentStatus = item.paymentStatus || 'Unpaid';
+
+            const itemDate = parseDate(item.datetime);
             const formattedDate = itemDate ? itemDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
-            
-            const statusClass = (item.status || '').toLowerCase().replace(' ', '-');
+            const formattedTime = itemDate ? itemDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+            const dateTimeDisplay = `${formattedDate} ${formattedTime}`;
+
+            const statusClass = (item.status || '').toLowerCase().replace(/\s+/g, '-');
             const paymentStatus = item.paymentStatus || 'Unpaid';
             const paymentStatusClass = paymentStatus.toLowerCase();
 
+            // Format price if available
+            const price = (item.price !== undefined && item.price !== null)
+                ? `₱${parseFloat(item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : 'N/A';
+
+            // Paid indicator
+            const paidIndicator = paymentStatus === 'Paid' ? '<span class="material-symbols-outlined" style="font-size:18px;color:#4CAF50;margin-left:6px;">verified</span>' : '';
+
             row.innerHTML = `
-                <td class="text-center">${formattedDate}</td>
+                <td class="text-center">${dateTimeDisplay}</td>
                 <td>${item.service || item.serviceNames || 'N/A'}</td>
+                <td>${price}</td>
                 <td>${item.technician || 'N/A'}</td>
-                <td class="text-center"><span class="${statusClass}">${item.status}</span></td>
+                <td class="text-center"><span class="${statusClass}">${item.status || 'N/A'}</span></td>
                 <td class="text-center">
                     <span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span>
+                    ${paidIndicator}
                 </td>
             `;
+
+            // store original item for potential use
+            row.dataset.item = JSON.stringify(item);
             fragment.appendChild(row);
+
+            // If paid, add an expandable details row below
+            if (paymentStatus === 'Paid') {
+                const detailsRow = document.createElement('tr');
+                detailsRow.className = 'service-history-details-row';
+                detailsRow.style.display = 'none';
+                detailsRow.innerHTML = `
+                    <td colspan="6">
+                        <div class="payment-details-container">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <small class="text-muted">Transaction Status</small>
+                                    <p style="color:#4CAF50;font-weight:600;">✓ Payment Received</p>
+                                </div>
+                                <div class="detail-item">
+                                    <small class="text-muted">Total Amount Paid</small>
+                                    <p style="font-weight:600;font-size:16px;">${price}</p>
+                                </div>
+                                <div class="detail-item">
+                                    <small class="text-muted">Service Status</small>
+                                    <p>${item.status || 'N/A'}</p>
+                                </div>
+                                <div class="detail-item">
+                                    <small class="text-muted">Technician</small>
+                                    <p>${item.technician || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                fragment.appendChild(detailsRow);
+
+                // toggle details when clicking the row
+                row.addEventListener('click', () => {
+                    const visible = detailsRow.style.display === 'table-row';
+                    detailsRow.style.display = visible ? 'none' : 'table-row';
+                    row.classList.toggle('expanded', !visible);
+                });
+            }
         });
 
         historyTableBody.appendChild(fragment);

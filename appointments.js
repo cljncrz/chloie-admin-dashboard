@@ -195,7 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return null;
                     };
 
-                    const possibleDateFields = ['scheduleDate', 'dateTime', 'datetime', 'date', 'scheduledAt', 'appointmentDate', 'timestamp', 'bookingDate'];
+                    const possibleDateFields = ['time', 'scheduleDate', 'dateTime', 'datetime', 'date', 'scheduledAt', 'appointmentDate', 'timestamp', 'bookingDate', 'createdAt'];
                     let dateSource = null;
                     let selectedField = null;
 
@@ -221,9 +221,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const scheduleDateObj = parseFirestoreDate(dateSource);
 
-                    const formattedDateTime = scheduleDateObj
-                        ? scheduleDateObj.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ' -')
-                        : 'No Date';
+                    // Parse bookingTime if available
+                    if (scheduleDateObj && data.bookingTime) {
+                        const timeRange = data.bookingTime.split(' - ')[0]; // e.g., "1:20 PM"
+                        const timeMatch = timeRange.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                        if (timeMatch) {
+                            let hours = parseInt(timeMatch[1]);
+                            const minutes = parseInt(timeMatch[2]);
+                            const ampm = timeMatch[3].toUpperCase();
+                            if (ampm === 'PM' && hours !== 12) hours += 12;
+                            if (ampm === 'AM' && hours === 12) hours = 0;
+                            scheduleDateObj.setHours(hours, minutes, 0, 0);
+                        }
+                    }
+
+                    let formattedDateTime = 'No Date';
+                    if (scheduleDateObj) {
+                        const datePart = scheduleDateObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+                        const timePart = data.bookingTime || scheduleDateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                        formattedDateTime = `${datePart} - ${timePart}`;
+                    }
+
 
                     // Debug logging for documents that still don't resolve to a date
                     if (!scheduleDateObj) {
@@ -273,18 +291,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                             return null;
                         };
 
-                        const possibleDateFields = ['scheduleDate', 'dateTime', 'datetime', 'date', 'scheduledAt', 'appointmentDate', 'timestamp', 'bookingDate'];
+                        const possibleDateFields = ['time', 'scheduleDate', 'dateTime', 'datetime', 'date', 'scheduledAt', 'appointmentDate', 'timestamp', 'bookingDate', 'createdAt'];
                         let dateSource = null;
+                        let selectedField = null;
                         for (const f of possibleDateFields) {
                             if (data[f] !== undefined && data[f] !== null) {
                                 dateSource = data[f];
+                                selectedField = f;
                                 break;
                             }
                         }
                         if (!dateSource) {
                             for (const [k, v] of Object.entries(data)) {
                                 const maybe = parseFirestoreDate(v);
-                                if (maybe) {
+                                if (maybe instanceof Date) { // Ensure it's a valid Date object
                                     dateSource = v;
                                     break;
                                 }
@@ -292,9 +312,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
 
                         const scheduleDateObj = parseFirestoreDate(dateSource);
-                        const formattedDateTime = scheduleDateObj
-                            ? scheduleDateObj.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', ' -')
-                            : 'No Date';
+                        let formattedDateTime = 'No Date';
+                        if (scheduleDateObj ) {
+                            const datePart = scheduleDateObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+                            const timePart = scheduleDateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                            formattedDateTime = `${datePart} - ${timePart}`;
+                        }
 
                         return {
                             id: doc.id,
@@ -844,6 +867,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
 
                     if (appointment && appointment.paymentStatus === 'Unpaid') {
+                        const db = window.firebase.firestore();
+                        try {
+                            // Update payment status in Firestore
+                            await db.collection('bookings').doc(appointment.serviceId).update({
+                                paymentStatus: 'Paid',
+                                paidAt: window.firebase.firestore().FieldValue.serverTimestamp()
+                            });
+                        } catch (err) {
+                            console.error('Error updating payment status:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to mark as paid (database error).', 'error');
+                            else alert('Failed to mark as paid (database error).');
+                            return;
+                        }
+
+                        // Local/UI updates after successful DB update
                         appointment.paymentStatus = 'Paid';
                         row.dataset.paymentStatus = 'Paid';
 
@@ -1083,6 +1121,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const walkin = walkins.find(w => w.plate === row.dataset.plate && w.service === row.dataset.service);
 
                     if (walkin && walkin.paymentStatus === 'Unpaid') {
+                        const db = window.firebase.firestore();
+                        try {
+                            // Update payment status in Firestore
+                            await db.collection('walkins').doc(walkin.id).update({
+                                paymentStatus: 'Paid',
+                                paidAt: window.firebase.firestore().FieldValue.serverTimestamp()
+                            });
+                        } catch (err) {
+                            console.error('Error updating walk-in payment status:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to mark as paid (database error).', 'error');
+                            else alert('Failed to mark as paid (database error).');
+                            return;
+                        }
+
+                        // Local/UI updates after successful DB update
                         walkin.paymentStatus = 'Paid';
                         row.dataset.paymentStatus = 'Paid';
 

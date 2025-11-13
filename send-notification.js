@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ========== User Management ==========
   async function loadUsers() {
     try {
+      const db = window.firebase.firestore();
       const usersSnapshot = await db.collection('users').get();
       state.users = [];
 
@@ -285,6 +286,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function sendNotificationToFirestore() {
     try {
+      const db = window.firebase.firestore();
       elements.sendBtn.disabled = true;
       showStatus('Sending notification...', 'info');
 
@@ -409,6 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ========== Recent Notifications ==========
   async function loadRecentNotifications() {
     try {
+      const db = window.firebase.firestore();
       const currentUser = firebase.auth().currentUser;
       if (!currentUser) return;
 

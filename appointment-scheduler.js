@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const timeSlotsDate = document.getElementById('time-slots-date');
     const queueList = document.getElementById('queue-list');
     const bookNewAppointmentBtn = document.getElementById('book-new-appointment-btn');
+    if (bookNewAppointmentBtn) {
+        bookNewAppointmentBtn.style.display = 'none';
+    }
 
     // --- Modal Elements ---
     const modalOverlay = document.getElementById('modal-overlay');
@@ -336,7 +339,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 dayCell.classList.add('selected');
             }
 
-            // Check if there are appointments on this day
+           // Check if there are appointments on this day
             const appointmentsOnDay = appointments.filter(appt => {
                 const apptDate = window.appData.parseCustomDate(appt.datetime);
                 return apptDate &&
@@ -375,11 +378,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const timeSlots = generateTimeSlots();
         timeSlotsContainer.innerHTML = ''; // Clear previous slots
 
-        // Add a label for the lunch break
-        const lunchSlot = timeSlots.find(slot => slot.time === '12:00 PM');
-        if (lunchSlot && !lunchSlot.available) {
-            timeSlotsContainer.innerHTML += '<div class="time-slot lunch-break" title="Technicians are on their lunch break.">Lunch Break</div>';
-        }
         if (timeSlots.length === 0) {
             timeSlotsContainer.innerHTML = '<p class="text-muted">No available slots.</p>';
             return;
@@ -389,88 +387,91 @@ document.addEventListener('DOMContentLoaded', async () => {
             const slotEl = document.createElement('div');
             slotEl.classList.add('time-slot');
 
-            // Skip rendering the 12:00 PM slot if it's the lunch break
-            if (slot.time === '12:00 PM' && !slot.available) {
-                return;
-            }
-
-            slotEl.textContent = slot.time;
             if (!slot.available) {
                 slotEl.classList.add('booked');
-                slotEl.title = `Booked by ${slot.customer}`;
+                slotEl.innerHTML = `${slot.time}<br><small>(${slot.bookingCount} booking${slot.bookingCount > 1 ? 's' : ''})</small>`;
+                slotEl.title = `${slot.bookingCount} booking${slot.bookingCount > 1 ? 's' : ''} at this time`;
             } else {
-                // Add data attribute for booking
-                slotEl.dataset.time = slot.time;
+                slotEl.textContent = slot.time;
+                // Add data attribute for booking (use start time for selection)
+                slotEl.dataset.time = slot.startTime;
             }
             timeSlotsContainer.appendChild(slotEl);
         });
     };
 
     const generateTimeSlots = () => {
-        const slots = [];
-        const startHour = 8; // 8 AM
-        const endHour = 22; // 10 PM
-        const lunchHour = 12; // 12 PM is lunch break
+        const slotDefinitions = [
+            { start: '8:20 AM', end: '9:20 AM' },
+            { start: '9:20 AM', end: '10:20 AM' },
+            { start: '10:20 AM', end: '11:20 AM' },
+            { start: '11:20 AM', end: '12:10 PM' },
+            { start: '12:10 PM', end: '1:00 PM' },
+            { start: '1:20 PM', end: '2:20 PM' },
+            { start: '2:20 PM', end: '3:20 PM' },
+            { start: '3:50 PM', end: '4:50 PM' },
+            { start: '4:50 PM', end: '5:50 PM' },
+            { start: '5:50 PM', end: '6:50 PM' },
+            { start: '6:50 PM', end: '7:50 PM' },
+            { start: '7:50 PM', end: '8:50 PM' }
+        ];
 
+        const slots = [];
         const now = new Date();
         const isToday = selectedDate.toDateString() === now.toDateString();
         const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
 
-        for (let hour = startHour; hour <= endHour; hour++) {
-            // Only create slots on the hour
-            const minute = 0;
+        slotDefinitions.forEach(def => {
+            const slotTime = new Date(selectedDate);
+            const [time, period] = def.start.split(' ');
+            const [hourStr, minuteStr] = time.split(':');
+            let hour = parseInt(hourStr);
+            const minute = parseInt(minuteStr);
 
-            // Skip the lunch hour
-            if (hour === lunchHour) {
-                continue;
+            if (period === 'PM' && hour !== 12) hour += 12;
+            if (period === 'AM' && hour === 12) hour = 0;
+
+            slotTime.setHours(hour, minute, 0, 0);
+
+            let isAvailable = true;
+
+            // Rule 1: If it's today, the slot must be at least 1 hour in the future.
+            if (isToday && slotTime < oneHourFromNow) {
+                isAvailable = false;
             }
 
-                const slotTime = new Date(selectedDate);
-                slotTime.setHours(hour, minute, 0, 0);
+            // Rule 2: Count the number of non-cancelled appointments at this time slot.
+            const appointmentsAtSlot = appointments.filter(appt => {
+                const apptDate = window.appData.parseCustomDate(appt.datetime);
+                return (
+                    apptDate &&
+                    apptDate.getTime() === slotTime.getTime() &&
+                    appt.status !== 'Cancelled'
+                );
+            });
 
-                const formattedTime = slotTime.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                });
+            const bookingCount = appointmentsAtSlot.length;
 
-                let isAvailable = true;
-
-                // Rule 1: If it's today, the slot must be at least 1 hour in the future.
-                if (isToday && slotTime < oneHourFromNow) {
-                    isAvailable = false;
-                }
-
-                // Rule 2: The slot must not already be booked.
-                const existingAppointment = appointments.find(appt => {
-                    const apptDate = window.appData.parseCustomDate(appt.datetime);
-                    return (
-                        apptDate &&
-                        apptDate.getTime() === slotTime.getTime() &&
-                        appt.status !== 'Cancelled'
-                    );
-                });
-
-                if (existingAppointment) {
-                    isAvailable = false;
-                }
+            if (bookingCount > 0) {
+                isAvailable = false;
+            }
 
             slots.push({
-                time: formattedTime,
+                time: `${def.start} - ${def.end}`,
+                startTime: def.start,
                 available: isAvailable,
-                customer: existingAppointment
-                    ? existingAppointment.customer
-                    : null,
+                bookingCount: bookingCount,
             });
-        }
+        });
+
         return slots;
     };
 
     // --- Queue Logic ---
     const renderQueue = () => {
         // For this example, the queue shows 'Pending' appointments for the selected day
-        const pendingAppointments = appointments.filter(appt => {
-            const apptDate = window.appData.parseCustomDate(appt.datetime);
+        const pendingAppointments = (window.appData.appointments || []).filter(appt => {
+           const apptDate = window.appData.parseCustomDate(appt.datetime);
             return apptDate && appt.status === 'Pending' &&
                    apptDate.toDateString() === selectedDate.toDateString();
         });
@@ -985,7 +986,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             slotEl.classList.add('active');
 
             selectedTimeSlot = slotEl.dataset.time;
-            openBookingModal();
+            // Do not open modal on slot click
         }
     });
 

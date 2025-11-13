@@ -12,37 +12,19 @@ const sampleReviews = [
 
 const servicesAndPricing = [];
 
-const samplePromotions = [
-    {
-        promoId: "PROMO-001",
-        title: "Ultimate Shine Package",
-        description: "Get a complete exterior refresh with our most popular services bundled together.",
-        services: ["Carwash (wash + armor all)", "Meguiar's Carnauba Wax w/ FREE Carwash"],
-        originalPrice: 790, // 140 (small) + 650 (medium) - example
-        promoPrice: 650,
-        expiryDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), // Expires in 10 days
-        imageUrl: "https://images.pexels.com/photos/3729464/pexels-photo-3729464.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1", // Shiny red car exterior
-        status: "Active"
-    }
-];
+const samplePromotions = [];
 
 // --- Sample Media for Media Manager ---
-const sampleMedia = [
-    { id: "media-001", name: "shiny-red-car.jpeg", type: "image", url: "https://images.pexels.com/photos/3729464/pexels-photo-3729464.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1", size: "2.1 MB", dimensions: "1260x750" }
-];
+const sampleMedia = [];
 
 // --- Sample Notifications ---
 const sampleNotifications = [];
 
 // --- Sample Reschedule Requests from Mobile App ---
-const sampleRescheduleRequests = [
-    { requestId: "REQ-001", serviceId: "KC-231001", customer: "Angelo Reyes", service: "Ceramic Coating", originalDatetime: "Oct 28, 2025 - 2:00 PM", reason: "Unexpected work meeting." }
-];
+const sampleRescheduleRequests = [];
 
 // --- Sample Technicians ---
-const sampleTechnicians = [
-    { id: 'TCH-000', name: 'Unassigned', status: 'System', tasks: 0, rating: 0, role: 'System' }
-];
+const sampleTechnicians = [];
 
 // Expose data globally through the appData object for consistent access
 window.appData = window.appData || {}; // This line is already here, just for context
