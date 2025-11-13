@@ -171,10 +171,102 @@
 
         <!-- ========== Page Content ========== -->
         <section id="geofencing-page" class="page active editor-page-container">
+          <!-- Setup Info Alert -->
+          <div style="background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 1rem; margin-bottom: 2rem; border-radius: 4px;">
+            <p style="margin: 0; color: #0369a1; font-weight: 500;">
+              <span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 0.5rem;">info</span>
+              Geofencing System Active
+            </p>
+            <p style="margin: 0.5rem 0 0 0; color: #0c4a6e; font-size: 14px;">
+              ✅ Cloud Functions deployed • 📱 Customer app integrated • 🔔 Real-time notifications enabled
+            </p>
+            <p style="margin: 0.5rem 0 0 0; color: #0c4a6e; font-size: 14px;">
+              <a href="GEOFENCING_QUICKSTART.md" style="color: #0ea5e9; text-decoration: none; font-weight: 600;">📖 Quick Start Guide</a> • 
+              <a href="customer-dashboard.html" style="color: #0ea5e9; text-decoration: none; font-weight: 600;">👥 Test Customer Dashboard</a>
+            </p>
+          </div>
+
           <form id="geofencing-settings-form">
             <div class="profile-page-grid">
               <!-- Left Column -->
               <div class="profile-main-column">
+                <div class="editor-card">
+                  <div class="editor-card-header">
+                    <h3>Geofencing Locations</h3>
+                    <small
+                      >Add carwash locations. Nearby customers will receive notifications.</small
+                    >
+                  </div>
+                  <div class="editor-card-content">
+                    <div class="form-group">
+                      <label for="location-name">Location Name</label>
+                      <input
+                        type="text"
+                        id="location-name"
+                        placeholder="e.g., Downtown Branch"
+                        required
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="location-address">Address</label>
+                      <input
+                        type="text"
+                        id="location-address"
+                        placeholder="e.g., 123 Main St, City, State"
+                        required
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="location-latitude">Latitude</label>
+                      <input
+                        type="number"
+                        id="location-latitude"
+                        placeholder="e.g., 14.6091"
+                        step="0.0001"
+                        required
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="location-longitude">Longitude</label>
+                      <input
+                        type="number"
+                        id="location-longitude"
+                        placeholder="e.g., 121.0223"
+                        step="0.0001"
+                        required
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="location-radius">Geofence Radius (meters)</label>
+                      <input
+                        type="number"
+                        id="location-radius"
+                        placeholder="e.g., 500"
+                        value="500"
+                        min="100"
+                        max="10000"
+                        required
+                      />
+                    </div>
+                    <button type="button" id="add-location-btn" class="btn-primary">
+                      <span class="material-symbols-outlined">add_location</span>
+                      Add Location
+                    </button>
+                  </div>
+                </div>
+
+                <div class="editor-card">
+                  <div class="editor-card-header">
+                    <h3>Active Locations</h3>
+                    <small>Manage your geofencing locations</small>
+                  </div>
+                  <div class="editor-card-content">
+                    <div id="locations-list" class="locations-list">
+                      <!-- Location items will be populated by JS -->
+                    </div>
+                  </div>
+                </div>
+
                 <div class="editor-card">
                   <div class="editor-card-header">
                     <h3>Operating Hours</h3>
@@ -213,11 +305,48 @@
                     </div>
                   </div>
                 </div>
+
+                <div class="editor-card">
+                  <div class="editor-card-header">
+                    <h3>Notification Message</h3>
+                  </div>
+                  <div class="editor-card-content">
+                    <div class="form-group">
+                      <label for="notification-message">Custom Message</label>
+                      <textarea
+                        id="notification-message"
+                        rows="4"
+                        placeholder="e.g., Kingsley Carwash is nearby! Get 20% off your first visit. Visit us now!"
+                      ></textarea>
+                      <small class="text-muted">This message will be sent to customers near your locations.</small>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="editor-card">
+                  <div class="editor-card-header">
+                    <h3>Statistics</h3>
+                  </div>
+                  <div class="editor-card-content">
+                    <div class="stat-item">
+                      <span class="stat-label">Active Locations:</span>
+                      <span class="stat-value" id="active-locations-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                      <span class="stat-label">Geofencing Status:</span>
+                      <span class="stat-value" id="geofencing-status">Disabled</span>
+                    </div>
+                    <div class="stat-item">
+                      <span class="stat-label">Notifications Sent:</span>
+                      <span class="stat-value" id="notifications-sent-count">0</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div class="editor-form-footer">
-              <button type="submit" class="btn-primary">Save Settings</button>
+              <button type="submit" class="btn-primary">Save All Settings</button>
             </div>
           </form>
         </section>

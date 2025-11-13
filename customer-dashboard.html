@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Dashboard - Kingsley Carwash</title>
+
+  <!-- Google Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+  />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    .customer-dashboard {
+      padding: 2rem;
+    }
+
+    .geofence-status-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .status-item {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1rem;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .status-icon {
+      font-size: 2rem;
+    }
+
+    .status-text h4 {
+      margin: 0;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .status-text p {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .permission-required {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+
+    .permission-required button {
+      background: #ffc107;
+      color: #333;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-left: 1rem;
+    }
+
+    .permission-required button:hover {
+      background: #ffb300;
+    }
+
+    .nearby-locations {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .location-item {
+      padding: 1rem;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .location-item:last-child {
+      border-bottom: none;
+    }
+
+    .location-info h3 {
+      margin: 0 0 0.5rem 0;
+      color: #333;
+    }
+
+    .location-info p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .location-distance {
+      text-align: right;
+      font-size: 24px;
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .location-distance small {
+      display: block;
+      font-size: 12px;
+      color: #999;
+      font-weight: normal;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: #999;
+    }
+
+    .empty-state .material-symbols-outlined {
+      font-size: 48px;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="customer-dashboard">
+    <!-- Geofencing Status Card -->
+    <div class="geofence-status-card">
+      <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+        <span class="material-symbols-outlined" style="font-size: 2.5rem;">location_on</span>
+        <div>
+          <h2 style="margin: 0;">Geofencing Notifications</h2>
+          <p style="margin: 0; opacity: 0.9;">Get notified when you're near Kingsley Carwash</p>
+        </div>
+      </div>
+
+      <div class="status-grid">
+        <div class="status-item">
+          <span class="status-icon">📍</span>
+          <div class="status-text">
+            <h4>Tracking Status</h4>
+            <p id="tracking-status">Loading...</p>
+          </div>
+        </div>
+        <div class="status-item">
+          <span class="status-icon">🔔</span>
+          <div class="status-text">
+            <h4>Notifications</h4>
+            <p id="notification-status">Checking...</p>
+          </div>
+        </div>
+        <div class="status-item">
+          <span class="status-icon">🎯</span>
+          <div class="status-text">
+            <h4>Nearby Locations</h4>
+            <p id="nearby-count">0</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Permission Alert -->
+    <div id="permission-alert" class="permission-required" style="display: none;">
+      <span class="material-symbols-outlined" style="vertical-align: middle;">warning</span>
+      Location access is disabled. Enable notifications and location to receive alerts.
+      <button id="enable-permissions-btn">Enable Now</button>
+    </div>
+
+    <!-- Nearby Locations -->
+    <div class="nearby-locations">
+      <h3>
+        <span class="material-symbols-outlined" style="vertical-align: middle;">location_on</span>
+        Nearby Carwash Locations
+      </h3>
+      <div id="nearby-locations-list">
+        <div class="empty-state">
+          <span class="material-symbols-outlined">place</span>
+          <p>No nearby locations at the moment.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Initialize Firebase via module-based initializer -->
+  <script type="module" src="firebase-setup.js"></script>
+  <!-- Authentication Guard -->
+  <script src="auth-guard.js"></script>
+  <!-- Customer Geofencing Module -->
+  <script src="customer-geofencing.js"></script>
+
+  <script>
+    // Dashboard Controller
+    class CustomerDashboard {
+      constructor() {
+        this.geofencing = null;
+        this.nearbyLocations = [];
+        this.geofencingSettings = null;
+        this.checkInterval = null;
+        this.db = null;
+      }
+
+      async init() {
+        try {
+          console.log('🚀 Initializing Customer Dashboard...');
+
+          // Wait for Firebase and geofencing module
+          await window.firebaseInitPromise;
+          await new Promise((resolve) => {
+            const checkGeofencing = () => {
+              if (window.geofencing) {
+                resolve();
+              } else {
+                setTimeout(checkGeofencing, 100);
+              }
+            };
+            checkGeofencing();
+          });
+
+          this.db = window.firebase.firestore();
+          this.geofencing = window.geofencing;
+
+          console.log('✅ Dashboard initialized');
+
+          // Setup UI event listeners
+          this.setupEventListeners();
+
+          // Update UI immediately
+          this.updateUI();
+
+          // Update UI every 10 seconds
+          this.checkInterval = setInterval(() => this.updateUI(), 10000);
+        } catch (error) {
+          console.error('❌ Error initializing dashboard:', error);
+        }
+      }
+
+      setupEventListeners() {
+        const enableBtn = document.getElementById('enable-permissions-btn');
+        if (enableBtn) {
+          enableBtn.addEventListener('click', async () => {
+            console.log('🔄 Requesting permissions...');
+            await this.geofencing.requestLocationPermission();
+            await this.geofencing.requestNotificationPermission();
+            setTimeout(() => this.updateUI(), 1000);
+          });
+        }
+      }
+
+      updateUI() {
+        const status = this.geofencing.getStatus();
+
+        // Update tracking status
+        const trackingEl = document.getElementById('tracking-status');
+        if (trackingEl) {
+          trackingEl.textContent = status.isTracking ? '✅ Active' : '⏸️ Inactive';
+          trackingEl.style.color = status.isTracking ? '#4ade80' : '#fb923c';
+        }
+
+        // Update notification status
+        const notifEl = document.getElementById('notification-status');
+        if (notifEl) {
+          const notifStatus =
+            status.hasNotificationPermission && status.hasFCMToken
+              ? '✅ Ready'
+              : '❌ Not Enabled';
+          notifEl.textContent = notifStatus;
+          notifEl.style.color =
+            status.hasNotificationPermission && status.hasFCMToken
+              ? '#4ade80'
+              : '#fb923c';
+        }
+
+        // Show permission alert if needed
+        const permissionAlert = document.getElementById('permission-alert');
+        if (permissionAlert) {
+          const needsPermissions =
+            !status.isTracking ||
+            !status.hasNotificationPermission ||
+            !status.hasFCMToken;
+          permissionAlert.style.display = needsPermissions ? 'block' : 'none';
+        }
+
+        // Update nearby count
+        this.updateNearbyCount();
+      }
+
+      async updateNearbyCount() {
+        try {
+          const locationsSnapshot = await this.db
+            .collection('geofencing_locations')
+            .get();
+
+          let nearbyCount = 0;
+
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const { latitude, longitude } = position.coords;
+
+                locationsSnapshot.docs.forEach((doc) => {
+                  const location = doc.data();
+                  const distance = this.calculateDistance(
+                    latitude,
+                    longitude,
+                    location.latitude,
+                    location.longitude
+                  );
+
+                  if (distance < location.radius) {
+                    nearbyCount++;
+                  }
+                });
+
+                document.getElementById('nearby-count').textContent = nearbyCount;
+                this.renderNearbyLocations(locationsSnapshot, latitude, longitude);
+              },
+              () => {
+                document.getElementById('nearby-count').textContent = '?';
+              }
+            );
+          }
+        } catch (error) {
+          console.error('❌ Error updating nearby count:', error);
+        }
+      }
+
+      renderNearbyLocations(locationsSnapshot, userLat, userLng) {
+        const listEl = document.getElementById('nearby-locations-list');
+
+        if (locationsSnapshot.empty) {
+          listEl.innerHTML = `
+            <div class="empty-state">
+              <span class="material-symbols-outlined">place</span>
+              <p>No locations available.</p>
+            </div>
+          `;
+          return;
+        }
+
+        let locationsWithDistance = locationsSnapshot.docs.map((doc) => {
+          const location = doc.data();
+          const distance = this.calculateDistance(
+            userLat,
+            userLng,
+            location.latitude,
+            location.longitude
+          );
+          return {
+            ...location,
+            distance: distance,
+            inRadius: distance < location.radius
+          };
+        });
+
+        // Sort by distance
+        locationsWithDistance.sort((a, b) => a.distance - b.distance);
+
+        if (locationsWithDistance.length === 0) {
+          listEl.innerHTML = `
+            <div class="empty-state">
+              <span class="material-symbols-outlined">place</span>
+              <p>No locations available.</p>
+            </div>
+          `;
+          return;
+        }
+
+        listEl.innerHTML = locationsWithDistance
+          .map((location) => {
+            const distanceKm = (location.distance / 1000).toFixed(1);
+            const distanceM = location.distance.toFixed(0);
+            const displayDistance = location.distance > 1000 ? `${distanceKm} km` : `${distanceM} m`;
+
+            return `
+              <div class="location-item" style="background: ${location.inRadius ? '#f0fdf4' : 'transparent'};">
+                <div class="location-info">
+                  <h3>${location.name}</h3>
+                  <p>${location.address}</p>
+                </div>
+                <div class="location-distance">
+                  ${displayDistance}
+                  <small>${location.inRadius ? '🔔 Within Radius' : 'Outside radius'}</small>
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+      }
+
+      calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Earth's radius in meters
+        const dLat = (lat2 - lat1) * (Math.PI / 180);
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * (Math.PI / 180)) *
+          Math.cos(lat2 * (Math.PI / 180)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+    }
+
+    // Initialize dashboard when DOM is ready
+    document.addEventListener('DOMContentLoaded', async () => {
+      const dashboard = new CustomerDashboard();
+      await dashboard.init();
+      window.customerDashboard = dashboard; // For debugging
+    });
+  </script>
+</body>
+</html>

@@ -1,4 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to be initialized
+    await window.firebaseInitPromise;
+    
+    const db = window.firebase.firestore();
     const promotionsCarousel = document.getElementById('promotions-carousel');
     const promotionsTbody = document.getElementById('promotions-tbody');
     const successToast = document.getElementById('success-toast');
@@ -14,28 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const promotionsData = window.appData.promotions || [];
+    let promotionsData = window.appData.promotions || [];
 
-    // Check for a newly created promotion
-    const newPromoJSON = sessionStorage.getItem('newlyCreatedPromotion');
-    if (newPromoJSON) {
-        const newPromo = JSON.parse(newPromoJSON);
-        promotionsData.unshift(newPromo);
-        sessionStorage.removeItem('newlyCreatedPromotion');
-    }
-
-    // Check for an updated promotion
-    const updatedPromoJSON = sessionStorage.getItem('updatedPromotionData');
-    if (updatedPromoJSON) {
-        const updatedPromo = JSON.parse(updatedPromoJSON);
-        const index = promotionsData.findIndex(p => p.promoId === updatedPromo.promoId);
-        if (index !== -1) {
-            promotionsData[index] = updatedPromo; // Replace the old data
-        }
-        // Clean up sessionStorage
-        sessionStorage.removeItem('updatedPromotionData');
-    }
-
+    // --- Define helper functions FIRST (before they're called) ---
     const createPromotionCarouselCard = (promo) => {
         const card = document.createElement('div');
         card.classList.add('promotion-card');
@@ -138,7 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const promoPriceDisplay = getPriceRange(promo.promoPrices) || `₱${promo.promoPrice?.toLocaleString() || 'N/A'}`;
         const originalPriceDisplay = getPriceRange(promo.originalPrices) || (promo.originalPrice ? `₱${promo.originalPrice.toLocaleString()}` : '');
 
-        const includedServicesHTML = promo.services.map(s => `<li>${s}</li>`).join('');
+        const includedServicesHTML = (promo.services && Array.isArray(promo.services)) 
+            ? promo.services.map(s => `<li>${s}</li>`).join('') 
+            : '';
         const originalPriceHTML = originalPriceDisplay ? `<del>${originalPriceDisplay}</del>` : '';
 
         // --- Status Logic ---
@@ -202,14 +189,20 @@ document.addEventListener('DOMContentLoaded', () => {
         promotionsCarousel.innerHTML = '';
         promotionsTbody.innerHTML = '';
 
+        console.log('Rendering', promotionsData.length, 'promotions to table');
+
         promotionsData.forEach(promo => {
             // Add active promos to carousel
             if (promotionsCarousel && new Date() < new Date(promo.expiryDate) && promo.status !== 'Draft' && promo.status !== 'Expired') {
                 promotionsCarousel.appendChild(createPromotionCarouselCard(promo));
             }
             // Add all promos to table
-            promotionsTbody.appendChild(createPromotionTableRow(promo));
+            const row = createPromotionTableRow(promo);
+            promotionsTbody.appendChild(row);
+            console.log(`Added promotion to table: ${promo.title} (${promo.promoId})`);
         });
+        
+        console.log('✅ Finished rendering promotions. Table rows:', promotionsTbody.querySelectorAll('tr').length);
     };
 
     const showSuccessToast = (message) => {
@@ -276,11 +269,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const deletePromotion = (promoId) => {
+    const deletePromotion = async (promoId) => {
         const index = promotionsData.findIndex(p => p.promoId === promoId);
         if (index > -1) {
             const deletedPromoTitle = promotionsData[index].title;
             promotionsData.splice(index, 1); // Remove from data array
+            
+            // Delete from Firebase
+            try {
+                await db.collection('promotions').doc(promoId).delete();
+                console.log(`Promotion ${promoId} deleted from Firebase`);
+            } catch (error) {
+                console.error(`Error deleting promotion from Firebase:`, error);
+            }
+            
             renderPromotions(); // Re-render the UI
             showSuccessToast(`Promotion "${deletedPromoTitle}" deleted successfully.`);
         } else {
@@ -289,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
      // --- Status Dropdown Change Listener ---
-    promotionsTbody.addEventListener('change', (e) => {
+    promotionsTbody.addEventListener('change', async (e) => {
         const statusSelect = e.target.closest('.status-select-promo');
         if (statusSelect) {
             const promoId = statusSelect.dataset.promoId;
@@ -299,6 +301,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (promoToUpdate) {
                 // Update the status in our main data array
                 promoToUpdate.status = newStatus;
+
+                // Update status in Firebase
+                try {
+                    await db.collection('promotions').doc(promoId).update({ status: newStatus });
+                    console.log(`Promotion ${promoId} status updated to ${newStatus} in Firebase`);
+                } catch (error) {
+                    console.error(`Error updating promotion status in Firebase:`, error);
+                }
 
                 // Update the dropdown's class to change its color
                 statusSelect.classList.remove('active', 'draft', 'expired');
@@ -330,8 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const promoToEdit = promotionsData.find(p => p.promoId === promoId);
 
             if (promoToEdit) {
-                sessionStorage.setItem('promotionToEdit', JSON.stringify(promoToEdit));
-                window.location.href = 'edit-promotion.html';
+                sessionStorage.setItem('selectedPromotionData', JSON.stringify(promoToEdit));
+                window.location.href = 'promotion-profile.html';
             }
         }
 
@@ -343,4 +353,64 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    // --- Fetch Promotions from Firestore (MUST BE AFTER ALL FUNCTIONS ARE DEFINED) ---
+    const fetchPromotionsFromFirestore = async () => {
+        try {
+            const snapshot = await db.collection('promotions').get();
+            
+            if (snapshot.empty) {
+                console.log('No promotions found in Firestore.');
+                promotionsData = [];
+            } else {
+                promotionsData = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    const promotion = {
+                        promoId: doc.id,
+                        ...data,
+                        // Ensure dates are properly formatted
+                        publishDate: data.publishDate || new Date().toISOString(),
+                        expiryDate: data.expiryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                        // Ensure services is always an array
+                        services: Array.isArray(data.services) ? data.services : []
+                    };
+                    return promotion;
+                });
+                console.log(`✅ ${promotionsData.length} promotions loaded from Firestore:`, promotionsData);
+            }
+            
+            // After fetching from Firestore, check for newly created promotion from sessionStorage
+            const newPromoJSON = sessionStorage.getItem('newlyCreatedPromotion');
+            if (newPromoJSON) {
+                const newPromo = JSON.parse(newPromoJSON);
+                console.log('New promotion detected from sessionStorage:', newPromo);
+                promotionsData.unshift(newPromo);
+                sessionStorage.removeItem('newlyCreatedPromotion');
+            }
+
+            // Check for an updated promotion
+            const updatedPromoJSON = sessionStorage.getItem('updatedPromotionData');
+            if (updatedPromoJSON) {
+                const updatedPromo = JSON.parse(updatedPromoJSON);
+                console.log('Updated promotion detected from sessionStorage:', updatedPromo);
+                const index = promotionsData.findIndex(p => p.promoId === updatedPromo.promoId);
+                if (index !== -1) {
+                    promotionsData[index] = updatedPromo;
+                }
+                sessionStorage.removeItem('updatedPromotionData');
+            }
+
+            console.log('Total promotions to display:', promotionsData.length);
+            renderPromotions();
+        } catch (error) {
+            console.error('❌ Error fetching promotions from Firestore:', error);
+            // Fallback to window.appData.promotions if Firestore fetch fails
+            promotionsData = window.appData.promotions || [];
+            console.log('Fallback to appData promotions:', promotionsData);
+            renderPromotions();
+        }
+    };
+
+    // Fetch promotions on page load
+    await fetchPromotionsFromFirestore();
 });
