@@ -271,9 +271,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
 
-            // Note: Handlers for reviewBtn can be added here as well
-            // for better event delegation, but we'll leave them as is for now
-            // to stick to the user's request.
+            if (reviewBtn) {
+                // Open the reschedule modal to review the request
+                handleRescheduleClick(reviewBtn.dataset.requestId);
+                return;
+            }
         });
     }
 
@@ -291,6 +293,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         const date = new Date(dateTimeString.replace(' - ', ' '));
         return isNaN(date) ? null : date;
         
+    };
+
+    // Helper: look up Firestore user ID by fullName
+    const getCustomerIdFromName = async (customerName) => {
+        try {
+            if (!customerName || !window.firebase || !window.firebase.firestore) return null;
+            const db = window.firebase.firestore();
+            const usersSnapshot = await db.collection('users')
+                .where('fullName', '==', customerName.trim())
+                .limit(1)
+                .get();
+
+            if (usersSnapshot.empty) return null;
+            return usersSnapshot.docs[0].id;
+        } catch (error) {
+            console.error('❌ Error looking up customer ID:', error);
+            return null;
+        }
     };
 
     // --- Calendar Logic ---
@@ -850,22 +870,58 @@ document.addEventListener('DOMContentLoaded', async () => {
             removeRescheduleRequest(originalRequestId);
             renderCalendar(); // Re-render calendar to update dots and slots
 
-            // 3. Show success and close
+            // 3. Persist change and notify customer
+            try {
+                if (window.firebase && window.firebase.firestore) {
+                    const db = window.firebase.firestore();
+                    // Update the booking document if it exists
+                    if (reschedulingAppointment.serviceId) {
+                        await db.collection('bookings').doc(reschedulingAppointment.serviceId).update({
+                            datetime: reschedulingAppointment.datetime,
+                            updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+
+                    // Mark the reschedule request as approved
+                    if (originalRequestId) {
+                        await db.collection('rescheduleRequests').doc(originalRequestId).update({
+                            status: 'Approved',
+                            handledAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+
+                    // Send push notification to customer if possible
+                    const customerName = reschedulingAppointment.customer || reschedulingAppointment.customerName;
+                    const customerId = await getCustomerIdFromName(customerName);
+                    if (customerId && typeof NotificationService !== 'undefined') {
+                        try {
+                            if (typeof NotificationService.notifyAppointmentRescheduled === 'function') {
+                                await NotificationService.notifyAppointmentRescheduled(customerId, {
+                                    id: reschedulingAppointment.serviceId,
+                                    serviceName: reschedulingAppointment.service,
+                                    newDateTime: reschedulingAppointment.datetime
+                                });
+                            } else if (typeof NotificationService.notifyAppointmentStatusChange === 'function') {
+                                await NotificationService.notifyAppointmentStatusChange({
+                                    customerIds: [customerId],
+                                    status: 'rescheduled',
+                                    appointmentId: reschedulingAppointment.serviceId,
+                                    reason: 'Your reschedule request was approved',
+                                    serverUrl: window.serverUrl || 'http://localhost:5000'
+                                });
+                            }
+                        } catch (notifErr) {
+                            console.warn('Could not send reschedule notification:', notifErr);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not persist reschedule or send notification', err);
+            }
+
+            // 4. Show success and close
             closeBookingModal();
             if (typeof showSuccessToast === 'function') showSuccessToast(`Appointment for ${reschedulingAppointment.customer} rescheduled successfully!`);
-
-            // 4. Send a confirmation notification
-            // if (typeof window.addNewNotification === 'function') {
-            //     const newDateTime = new Date(reschedulingAppointment.datetime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-            //     const newNotification = {
-            //         id: `notif-resched-${Date.now()}`,
-            //         type: 'Service Completed', // Using an existing icon type
-            //         message: `Reschedule confirmed for <b>${reschedulingAppointment.customer}</b>. New time is ${newDateTime}.`,
-            //         timestamp: 'Just now',
-            //         isUnread: true,
-            //     };
-            //     window.addNewNotification(newNotification);
-            // }
             return;
         }
 
@@ -882,13 +938,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 alert('Please select a customer, a service, and a time slot to book an appointment.');
                 return;
             }
-        }
-
-        // This part of the logic was slightly misplaced. It should be inside the reschedule block.
-        // Moving it up to ensure it runs correctly.
-        if (reschedulingAppointment && !selectedTimeSlot) {
-            alert('Please select a new time slot to reschedule.');
-            return;
         }
 
         // Re-validating for new appointments after the reschedule check.
@@ -915,7 +964,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                 paymentStatus: 'Unpaid'
             };
 
-            // 3. Add the new appointment to the global and local data arrays
+            // 3. Persist booking to Firestore (if available), then add to local arrays
+            try {
+                if (window.firebase && window.firebase.firestore) {
+                    const db = window.firebase.firestore();
+                    const saveObj = {
+                        customer: newAppointment.customer,
+                        phone: newAppointment.phone,
+                        plate: newAppointment.plate,
+                        carName: newAppointment.carName,
+                        carType: newAppointment.carType,
+                        service: newAppointment.service,
+                        technician: newAppointment.technician,
+                        status: newAppointment.status,
+                        datetime: newAppointment.datetime,
+                        paymentStatus: newAppointment.paymentStatus,
+                        createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    const docRef = await db.collection('bookings').add(saveObj);
+                    newAppointment.serviceId = docRef.id;
+                }
+            } catch (saveErr) {
+                console.warn('Could not save new booking to Firestore:', saveErr);
+            }
+
+            // Add to the global and local data arrays
             window.appData.appointments.unshift(newAppointment);
             appointments.unshift(newAppointment);
 
@@ -928,17 +1001,42 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (typeof showSuccessToast === 'function') {
                 showSuccessToast(`Appointment for ${newAppointment.customer} booked successfully!`);
             }
-            // 6. Send a notification to the admin about the new booking
+
+            // 6. Send a notification to the customer (and admin note)
+            try {
+                const customerId = await getCustomerIdFromName(newAppointment.customer);
+                if (customerId && typeof NotificationService !== 'undefined') {
+                    if (typeof NotificationService.notifyNewAppointment === 'function') {
+                        await NotificationService.notifyNewAppointment({
+                            customerIds: [customerId],
+                            customerName: newAppointment.customer,
+                            serviceName: newAppointment.service,
+                            date: selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                            time: selectedTimeSlot,
+                            serverUrl: window.serverUrl || 'http://localhost:5000'
+                        });
+                    } else if (typeof NotificationService.notifyAppointmentConfirmed === 'function') {
+                        await NotificationService.notifyAppointmentConfirmed(customerId, {
+                            id: newAppointment.serviceId,
+                            serviceName: newAppointment.service,
+                            dateTime: newAppointment.datetime
+                        });
+                    }
+                }
+            } catch (notifErr) {
+                console.warn('Could not send booking notification to customer:', notifErr);
+            }
+
+            // Admin notification (persisted via addNewNotification)
             if (typeof window.addNewNotification === 'function') {
                 const notification = {
-                    id: `notif-new-booking-${Date.now()}`,
-                    type: 'New Booking',
+                    title: 'New Booking',
                     message: `<b>${newAppointment.customer}</b> has a new pending booking for <b>${newAppointment.service}</b>.`,
                     timestamp: 'Just now',
                     isUnread: true,
                     link: 'appointment.html'
                 };
-                window.addNewNotification(notification);
+                window.addNewNotification(notification, true);
             }
         } else {
             alert('Could not find selected customer data. Please try again.');
@@ -1117,6 +1215,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     initializeScheduler();
+
+    // --- 8. Admin notifications for pending items (bookings/reschedules/cancellations) ---
+    // NOTE: These notifications are now created server-side by Cloud Functions:
+    //   - onNewPendingBooking: triggers when a new booking with status='Pending' is created
+    //   - onNewRescheduleRequest: triggers when a new reschedule request with status='Pending' is created
+    //   - onBookingCancelled: triggers when a booking status changes to 'Cancelled'
+    // The notifications.js Firestore listener will automatically display these persisted notifications on the bell.
 }
 
 );

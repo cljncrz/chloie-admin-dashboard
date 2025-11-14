@@ -313,3 +313,165 @@ exports.healthCheck = onRequest((request, response) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// ============================================================
+// ADMIN NOTIFICATIONS FOR PENDING EVENTS
+// ============================================================
+
+/**
+ * Helper: Create admin notification if one doesn't already exist for this event
+ * Avoids duplicate notifications for the same booking/reschedule/cancellation
+ */
+async function createAdminNotificationIfMissing(action, itemId, title, message, link = 'appointment.html') {
+  try {
+    const db = admin.firestore();
+    
+    // Query for existing notification for this action+itemId
+    const existing = await db.collection('notifications')
+      .where('data.action', '==', action)
+      .where('data.itemId', '==', itemId)
+      .limit(1)
+      .get();
+
+    if (!existing.empty) {
+      logger.log(`📌 Admin notification already exists for ${action}:${itemId}`);
+      return; // already notified
+    }
+
+    // Create new admin notification
+    const notifRef = await db.collection('notifications').add({
+      title,
+      body: message,
+      link,
+      data: { action, itemId },
+      read: false,
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      type: 'admin'
+    });
+
+    logger.log(`✅ Created admin notification ${notifRef.id} for ${action}:${itemId}`);
+  } catch (err) {
+    logger.error(`❌ Error creating admin notification: ${err.message}`, err);
+  }
+}
+
+/**
+ * Cloud Function: Trigger when new pending booking is created
+ * Creates an admin notification for approval
+ */
+exports.onNewPendingBooking = onDocumentWritten(
+  "bookings/{bookingId}",
+  async (event) => {
+    try {
+      const bookingId = event.params.bookingId;
+      const newData = event.data.after.data();
+      const oldData = event.data.before.data();
+
+      // Only process new documents or status changes to 'Pending'
+      if (!newData || (!oldData && newData.status !== 'Pending') || (oldData && oldData.status !== 'Pending' && newData.status !== 'Pending')) {
+        return;
+      }
+
+      // Only trigger on new documents or status changes to Pending
+      if (oldData && oldData.status === 'Pending') {
+        return; // Status was already pending, skip
+      }
+
+      logger.log(`📅 New pending booking detected: ${bookingId}`);
+
+      const customer = newData.customer || newData.customerName || 'Customer';
+      const service = newData.service || newData.serviceNames || 'Service';
+      const title = 'Pending Approval';
+      const message = `${customer} has a new pending booking for ${service}.`;
+
+      await createAdminNotificationIfMissing(
+        'pending_booking',
+        bookingId,
+        title,
+        message,
+        'appointment.html'
+      );
+    } catch (error) {
+      logger.error(`❌ Error in onNewPendingBooking: ${error.message}`, error);
+    }
+  }
+);
+
+/**
+ * Cloud Function: Trigger when new reschedule request is created
+ * Creates an admin notification for reschedule request
+ */
+exports.onNewRescheduleRequest = onDocumentWritten(
+  "rescheduleRequests/{requestId}",
+  async (event) => {
+    try {
+      const requestId = event.params.requestId;
+      const newData = event.data.after.data();
+      const oldData = event.data.before.data();
+
+      // Only process new documents or status changes to 'Pending'
+      if (!newData || (!oldData && newData.status !== 'Pending') || (oldData && oldData.status !== 'Pending' && newData.status !== 'Pending')) {
+        return;
+      }
+
+      // Only trigger on new documents or status changes to Pending
+      if (oldData && oldData.status === 'Pending') {
+        return; // Status was already pending, skip
+      }
+
+      logger.log(`🔄 New reschedule request detected: ${requestId}`);
+
+      const customer = newData.customerName || newData.customer || 'Customer';
+      const service = newData.serviceName || newData.service || 'Service';
+      const title = 'Reschedule Request';
+      const message = `${customer} requested to reschedule ${service}.`;
+
+      await createAdminNotificationIfMissing(
+        'reschedule_request',
+        requestId,
+        title,
+        message,
+        'appointment.html'
+      );
+    } catch (error) {
+      logger.error(`❌ Error in onNewRescheduleRequest: ${error.message}`, error);
+    }
+  }
+);
+
+/**
+ * Cloud Function: Trigger when booking is cancelled
+ * Creates an admin notification for cancellation
+ */
+exports.onBookingCancelled = onDocumentWritten(
+  "bookings/{bookingId}",
+  async (event) => {
+    try {
+      const bookingId = event.params.bookingId;
+      const newData = event.data.after.data();
+      const oldData = event.data.before.data();
+
+      // Only process if status changed to 'Cancelled'
+      if (!newData || newData.status !== 'Cancelled' || (oldData && oldData.status === 'Cancelled')) {
+        return; // Not a new cancellation or already processed
+      }
+
+      logger.log(`❌ Booking cancelled detected: ${bookingId}`);
+
+      const customer = newData.customer || newData.customerName || 'Customer';
+      const service = newData.service || newData.serviceNames || 'Service';
+      const title = 'Appointment Cancelled';
+      const message = `${customer}'s appointment for ${service} was cancelled.`;
+
+      await createAdminNotificationIfMissing(
+        'appointment_cancelled',
+        bookingId,
+        title,
+        message,
+        'appointment.html'
+      );
+    } catch (error) {
+      logger.error(`❌ Error in onBookingCancelled: ${error.message}`, error);
+    }
+  }
+);
