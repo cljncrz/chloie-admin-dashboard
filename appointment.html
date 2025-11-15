@@ -263,6 +263,62 @@
 
             <div
               class="recent-appointments-container"
+              id="reschedule-requests-container"
+            >
+              <div class="recent-appointments reschedule-requests">
+                <div class="table-header">
+                  <h2>Reschedule Requests</h2>
+                </div>
+                <div class="table-responsive-wrapper">
+                  <div class="table-loader" style="display: none">
+                    <div class="spinner"></div>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Original Date</th>
+                        <th>Requested Date</th>
+                        <th>Reason</th>
+                        <th class="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="reschedule-requests-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="recent-appointments-container"
+              id="cancellation-requests-container"
+            >
+              <div class="recent-appointments cancellation-requests">
+                <div class="table-header">
+                  <h2>Cancellation Requests</h2>
+                </div>
+                <div class="table-responsive-wrapper">
+                  <div class="table-loader" style="display: none">
+                    <div class="spinner"></div>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Booking Date</th>
+                        <th>Service</th>
+                        <th>Reason</th>
+                        <th class="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="cancellation-requests-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="recent-appointments-container"
               id="main-appointments-table-container"
             >
               <div class="recent-appointments" id="main-appointments-table">
@@ -659,5 +715,6 @@
     <script src="./appointment-scheduler.js"></script>
     <script src="script.js"></script>
     <script src="notifications.js"></script>
+    <script src="resched.js"></script>
   </body>
 </html>

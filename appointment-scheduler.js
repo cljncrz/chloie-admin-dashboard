@@ -1100,8 +1100,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     const fetchRescheduleRequests = async () => {
         try {
             const db = window.firebase.firestore();
-            const snapshot = await db.collection('rescheduleRequests').where('status', '==', 'Pending').get();
-            window.appData.rescheduleRequests = snapshot.docs.map(doc => ({ requestId: doc.id, ...doc.data() }));
+            const allRequests = [];
+            
+            // Get all bookings
+            const bookingsSnapshot = await db.collection('bookings').get();
+            
+            if (!bookingsSnapshot.empty) {
+                // For each booking, get its rescheduleRequests subcollection
+                for (const bookingDoc of bookingsSnapshot.docs) {
+                    const rescheduleSnapshot = await db.collection('bookings').doc(bookingDoc.id).collection('rescheduleRequests').get();
+                    
+                    rescheduleSnapshot.docs.forEach((doc) => {
+                        const data = doc.data();
+                        // Only include pending requests
+                        if (data.status === 'Pending') {
+                            allRequests.push({
+                                requestId: doc.id,
+                                bookingId: bookingDoc.id,
+                                ...data
+                            });
+                        }
+                    });
+                }
+            }
+            
+            window.appData.rescheduleRequests = allRequests;
         } catch (error) {
             console.error("Error fetching reschedule requests:", error);
             window.appData.rescheduleRequests = []; // Ensure it's an empty array on error

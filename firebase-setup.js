@@ -34,7 +34,8 @@ import {
   Timestamp,
   increment,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 import {
   getStorage,
@@ -93,6 +94,15 @@ window.firebase = {
       async get() {
         const snap = await getDocs(query(collection(db, collectionName), ...queryConstraints));
         return buildQuerySnapshot(snap);
+      },
+      // Add the onSnapshot method to the wrapper
+      onSnapshot(observerOrNext, error, complete) {
+        const q = query(collection(db, collectionName), ...queryConstraints);
+        const observer = typeof observerOrNext === 'object' 
+          ? observerOrNext 
+          : { next: observerOrNext, error, complete };
+        
+        return onSnapshot(q, (snap) => observer.next(buildQuerySnapshot(snap)), observer.error, observer.complete);
       },
       async add(data) {
         // Add a new document with auto-generated ID
