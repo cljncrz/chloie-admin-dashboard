@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {string} - The HTML string for the notification item.
      */
     const generateItemHTML = (item) => {
-      const iconMap = {
+        const iconMap = {
         'New Booking': 'book_online',
         'Service Completed': 'check_circle',
         'New Review': 'reviews',
@@ -55,25 +55,30 @@ document.addEventListener('DOMContentLoaded', () => {
         'Cancellation': 'cancel',
         'default': 'notifications'
       };
-      const icon = iconMap[item.type] || iconMap['default'];
+        const iconKey = item.type || item.title || 'default';
+        const icon = iconMap[iconKey] || iconMap['default'];
 
-      return `
+        // Prefer title + message when available
+        const titleHTML = item.title ? `<strong>${item.title}</strong>` : '';
+        const messageHTML = item.message || item.body || '';
+
+        return `
         <div class="notification-item ${item.isUnread ? 'unread' : ''}" data-id="${item.id}" data-link="${item.link || '#'}">
-            <div class="notification-icon">
-                <span class="material-symbols-outlined">${icon}</span>
-            </div>
-            <div class="notification-details">
-                <p>${item.message}</p>
-                <small class="text-muted">${item.timestamp}</small>
-            </div>
-            <div class="notification-item-actions">
-                ${item.isUnread ? 
-                `<button class="action-icon-btn mark-as-read-btn" title="Mark as read">
-                    <span class="material-symbols-outlined">drafts</span>
-                </button>` : ''}
-            </div>
+          <div class="notification-icon">
+            <span class="material-symbols-outlined">${icon}</span>
+          </div>
+          <div class="notification-details">
+            <p>${titleHTML} ${messageHTML}</p>
+            <small class="text-muted">${item.timestamp}</small>
+          </div>
+          <div class="notification-item-actions">
+            ${item.isUnread ? 
+            `<button class="action-icon-btn mark-as-read-btn" title="Mark as read">
+              <span class="material-symbols-outlined">drafts</span>
+            </button>` : ''}
+          </div>
         </div>
-      `;
+        `;
     };
 
     /**
@@ -106,24 +111,49 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Adds a new notification, triggers animation, and re-renders.
+     * Adds a new notification, optionally persists to Firestore, triggers animation, and re-renders.
      * @param {object} newNotification - The new notification object to add.
+     * @param {boolean} persist - Whether to persist in Firestore (if available). Defaults to true.
      */
-    const addNewNotification = (newNotification) => {
-        // Add to the beginning of the array
-        state.notifications.unshift(newNotification);
-        
-        // Re-render all components
-        render();
+    const addNewNotification = async (newNotification, persist = true) => {
+      try {
+        if (persist && window.firebase && window.firebase.firestore) {
+          const db = window.firebase.firestore();
+          const docRef = await db.collection('notifications').add({
+            title: newNotification.title || newNotification.type || 'Notification',
+            body: newNotification.message || newNotification.body || '',
+            data: newNotification.data || {},
+            link: newNotification.link || null,
+            read: false,
+            sentAt: window.firebase.firestore.FieldValue.serverTimestamp()
+          });
 
-        // Trigger animation on the bell
-        if (dom.notificationBell) {
-            dom.notificationBell.classList.add('new-notification-animation');
-            // Remove the class after the animation completes to allow re-triggering
-            dom.notificationBell.addEventListener('animationend', () => {
-                dom.notificationBell.classList.remove('new-notification-animation');
-            }, { once: true }); // The listener will be removed after it runs once
+          // Optimistically add it locally so the UI updates immediately
+          state.notifications.unshift({
+            id: docRef.id,
+            title: newNotification.title || newNotification.type || 'Notification',
+            message: newNotification.message || newNotification.body || '',
+            timestamp: 'Just now',
+            isUnread: true,
+            link: newNotification.link || '#'
+          });
+        } else {
+          state.notifications.unshift(newNotification);
         }
+      } catch (err) {
+        console.warn('Could not persist notification to Firestore:', err);
+        state.notifications.unshift(newNotification);
+      }
+
+      render();
+
+      // Trigger animation on the bell
+      if (dom.notificationBell) {
+        dom.notificationBell.classList.add('new-notification-animation');
+        dom.notificationBell.addEventListener('animationend', () => {
+          dom.notificationBell.classList.remove('new-notification-animation');
+        }, { once: true });
+      }
     };
 
     // Expose the function globally so other scripts can add notifications
@@ -138,8 +168,23 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleMarkAllRead = () => {
+      // Mark locally
       state.notifications.forEach(n => n.isUnread = false);
       render(); // Re-render to reflect changes
+
+      // Persist to Firestore if available: mark all unread notifications as read
+      try {
+        if (window.firebase && window.firebase.firestore) {
+          const db = window.firebase.firestore();
+          state.notifications.forEach(n => {
+            if (n.id) {
+              db.collection('notifications').doc(n.id).update({ read: true }).catch(() => {});
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Could not persist mark-all-read to Firestore', err);
+      }
     };
 
     const handleClearAll = () => {
@@ -187,8 +232,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const notificationId = notificationItem.dataset.id;
             const notification = state.notifications.find(n => n.id === notificationId);
             if (notification) {
-                notification.isUnread = false;
-                render(); // Re-render to reflect the change
+          notification.isUnread = false;
+          // Persist change to Firestore if available
+          if (window.firebase && window.firebase.firestore) {
+            try {
+              const db = window.firebase.firestore();
+              db.collection('notifications').doc(notificationId).update({ read: true }).catch(() => {});
+            } catch (err) {
+              console.warn('Could not mark notification read in Firestore', err);
+            }
+          }
+
+          render(); // Re-render to reflect the change
             }
         }
     };
@@ -202,8 +257,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Mark as read if it's currently unread
             if (notification && notification.isUnread) {
-                notification.isUnread = false;
-                render(); // Re-render to reflect the change immediately
+          notification.isUnread = false;
+          // Persist change to Firestore if available
+          if (window.firebase && window.firebase.firestore) {
+            try {
+              const db = window.firebase.firestore();
+              db.collection('notifications').doc(notificationId).update({ read: true }).catch(() => {});
+            } catch (err) {
+              console.warn('Could not mark notification read in Firestore', err);
+            }
+          }
+
+          render(); // Re-render to reflect the change immediately
             }
 
             const link = item.dataset.link;
@@ -278,8 +343,45 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global listener to close dropdowns when clicking outside
     window.addEventListener('click', handleCloseDropdowns);
 
-    // --- 6. Initialization ---
-    render();
+    // --- 6. Firestore-backed Initialization ---
+    const tryInitFirestoreListener = () => {
+      try {
+        if (window.firebase && window.firebase.firestore) {
+          const db = window.firebase.firestore();
+
+          db.collection('notifications')
+            .orderBy('sentAt', 'desc')
+            .limit(50)
+            .onSnapshot(snapshot => {
+              const docs = snapshot.docs.map(doc => {
+                const d = doc.data() || {};
+                return {
+                  id: doc.id,
+                  title: d.title || d.type || 'Notification',
+                  message: d.body || d.message || '',
+                  timestamp: d.sentAt && d.sentAt.toDate ? d.sentAt.toDate().toLocaleString() : (d.sentAt || 'Just now'),
+                  isUnread: d.read === false || d.read === undefined,
+                  link: d.data && d.data.action === 'view_appointment' ? 'appointment.html' : (d.link || '#')
+                };
+              });
+
+              state.notifications = docs;
+              render();
+            }, err => {
+              console.warn('Could not establish notifications listener:', err);
+              render();
+            });
+
+          return true;
+        }
+      } catch (e) {
+        console.warn('Firestore listener initialization failed', e);
+      }
+      return false;
+    };
+
+    const firestoreAvailable = tryInitFirestoreListener();
+    if (!firestoreAvailable) render();
 
     // --- 7. Demo: Simulate a new notification after 5 seconds ---
     setTimeout(() => {

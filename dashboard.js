@@ -217,12 +217,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             // The customer's profile picture is hardcoded for this example.
             // In a real app, this would come from the customer's data.
             const customerProfilePic = './images/redicon.png';
+            
+            // Get creation timestamp - show when the appointment was created
+            let createdTime = 'N/A';
+            if (appt.createdAt) {
+                const createdDate = appt.createdAt instanceof Date ? appt.createdAt : (typeof appt.createdAt.toDate === 'function' ? appt.createdAt.toDate() : new Date(appt.createdAt));
+                createdTime = new Date(createdDate).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            } else if (appt.datetimeRaw) {
+                // Fallback to appointment datetime if createdAt not available
+                createdTime = new Date(appt.datetimeRaw).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            }
+            
             row.innerHTML = `
                 <td class="customer-cell">
                     <span>${appt.customer}</span>
                 </td>
                 <td>${appt.plateNumber}</td>
                 <td>${appt.serviceNames}</td>
+                <td><small>${createdTime}</small></td>
                 <td class="text-center"><span class="${statusClass}">${appt.status}</span></td>
             `;
             fragment.appendChild(row);
@@ -502,6 +514,52 @@ document.addEventListener('DOMContentLoaded', async () => {
         await fetchDashboardData(); // Fetch data first
         populateServiceReviews();
         setupRowClickNavigation(); // Set up the click listener
+        setupRealtimeUpdates(); // Set up real-time listeners
+    };
+
+    // --- Real-Time Updates for Dashboard Cards ---
+    const setupRealtimeUpdates = () => {
+        try {
+            if (!window.firebase || !window.firebase.firestore) {
+                console.warn('Firebase Firestore not available for real-time updates');
+                return;
+            }
+
+            const db = window.firebase.firestore();
+
+            // Helper function to show update animation on cards
+            const showUpdateAnimation = (cardClass) => {
+                const card = document.querySelector(`.insights > .card.${cardClass}`);
+                if (card) {
+                    card.classList.add('updating');
+                    // Remove animation class after animation completes
+                    setTimeout(() => card.classList.remove('updating'), 1200);
+                }
+            };
+
+            // Listen for real-time changes in bookings collection
+            db.collection('bookings').onSnapshot(snapshot => {
+                console.log('📊 Real-time update: Bookings collection changed');
+                showUpdateAnimation('bookings');
+                updateDashboardInsights();
+                populateAppointmentsTable();
+            }, error => {
+                console.warn('Error listening to bookings:', error);
+            });
+
+            // Listen for real-time changes in walkins collection
+            db.collection('walkins').onSnapshot(snapshot => {
+                console.log('📊 Real-time update: Walk-ins collection changed');
+                showUpdateAnimation('completed');
+                updateDashboardInsights();
+                populateWalkinsTable();
+            }, error => {
+                console.warn('Error listening to walkins:', error);
+            });
+
+        } catch (error) {
+            console.warn('Could not set up real-time updates:', error);
+        }
     };
 
     initializeDashboard();

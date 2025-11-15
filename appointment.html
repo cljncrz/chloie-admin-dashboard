@@ -380,6 +380,65 @@
               </div>
             </div>
 
+            <!-- Pending Reschedule Requests Table -->
+            <div
+              class="recent-appointments-container"
+              id="pending-reschedule-table-container"
+            >
+              <div
+                class="recent-appointments pending-reschedule-appointments"
+                id="pending-reschedule-table"
+              >
+                <div class="table-header">
+                  <h2>Pending Reschedule Requests</h2>
+                  <span class="pending-reschedule-badge" id="pending-reschedule-count" style="background: #ff9800; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem;">0</span>
+                </div>
+                <div class="table-controls">
+                  <div class="table-search-container">
+                    <input
+                      type="search"
+                      id="reschedule-search"
+                      placeholder="Search reschedule requests..."
+                    />
+                  </div>
+                </div>
+                <div class="table-responsive-wrapper">
+                  <div class="table-loader">
+                    <div class="spinner"></div>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr class="sortable-header">
+                        <th>Request ID</th>
+                        <th>Customer</th>
+                        <th>Service</th>
+                        <th>Current Date & Time</th>
+                        <th>Requested New Date & Time</th>
+                        <th>Reason</th>
+                        <th class="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="no-results-row">
+                        <td colspan="7" class="text-center text-muted">
+                          No pending reschedule requests.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="table-pagination">
+                  <button class="pagination-btn" data-action="prev">
+                    &laquo; Previous
+                  </button>
+                  <span class="page-info"></span>
+                  <button class="pagination-btn" data-action="next">
+                    Next &raquo;
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div
               class="recent-appointments-container"
               id="walk-in-appointments-table-container"

@@ -1506,4 +1506,212 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error('❌ Error sending appointment cancelled notification:', error.message);
         }
     };
+
+    // --- Pending Reschedule Requests Table Management ---
+    const rescheduleContainer = document.getElementById('pending-reschedule-table');
+    const rescheduleTable = rescheduleContainer?.querySelector('table tbody');
+    let rescheduleCurrentPage = 1;
+    const rescheduleRowsPerPage = 10;
+    let rescheduleSearchTerm = '';
+
+    const renderRescheduleTable = () => {
+        if (!rescheduleTable) return;
+
+        let rescheduleRequests = (window.appData.rescheduleRequests || []).filter(req => req.status === 'Pending');
+
+        // Apply search filter
+        if (rescheduleSearchTerm) {
+            rescheduleRequests = rescheduleRequests.filter(req => 
+                (req.customer || '').toLowerCase().includes(rescheduleSearchTerm.toLowerCase()) ||
+                (req.service || '').toLowerCase().includes(rescheduleSearchTerm.toLowerCase()) ||
+                (req.requestId || '').toLowerCase().includes(rescheduleSearchTerm.toLowerCase())
+            );
+        }
+
+        // Update badge count
+        const badge = document.getElementById('pending-reschedule-count');
+        if (badge) {
+            badge.textContent = rescheduleRequests.length;
+        }
+
+        // Calculate pagination
+        const totalPages = Math.ceil(rescheduleRequests.length / rescheduleRowsPerPage);
+        const startIdx = (rescheduleCurrentPage - 1) * rescheduleRowsPerPage;
+        const endIdx = startIdx + rescheduleRowsPerPage;
+        const paginatedRequests = rescheduleRequests.slice(startIdx, endIdx);
+
+        // Clear table
+        rescheduleTable.innerHTML = '';
+
+        if (paginatedRequests.length === 0) {
+            rescheduleTable.innerHTML = `
+                <tr class="no-results-row">
+                    <td colspan="7" class="text-center text-muted">
+                        ${rescheduleRequests.length === 0 ? 'No pending reschedule requests.' : 'No results found.'}
+                    </td>
+                </tr>
+            `;
+        } else {
+            paginatedRequests.forEach(req => {
+                const row = document.createElement('tr');
+                const currentDateTime = new Date(req.currentDateTime || req.dateTime).toLocaleString();
+                const requestedDateTime = new Date(req.requestedDateTime || req.newDateTime).toLocaleString();
+
+                row.innerHTML = `
+                    <td>${req.requestId || 'N/A'}</td>
+                    <td>${req.customer || 'N/A'}</td>
+                    <td>${req.service || 'N/A'}</td>
+                    <td>${currentDateTime}</td>
+                    <td>${requestedDateTime}</td>
+                    <td>${req.reason || 'No reason provided'}</td>
+                    <td class="text-center">
+                        <button class="btn-primary-small approve-reschedule-btn" data-request-id="${req.requestId}" data-service-id="${req.serviceId}" title="Approve Reschedule">
+                            <span class="material-symbols-outlined" style="font-size: 1.2rem;">check_circle</span>
+                        </button>
+                        <button class="btn-danger-small deny-reschedule-btn" data-request-id="${req.requestId}" data-service-id="${req.serviceId}" title="Deny Reschedule">
+                            <span class="material-symbols-outlined" style="font-size: 1.2rem;">cancel</span>
+                        </button>
+                    </td>
+                `;
+                rescheduleTable.appendChild(row);
+            });
+        }
+
+        // Update pagination
+        const paginationInfo = rescheduleContainer?.querySelector('.page-info');
+        if (paginationInfo) {
+            paginationInfo.textContent = `Page ${rescheduleCurrentPage} of ${totalPages || 1}`;
+        }
+
+        // Attach event listeners to buttons
+        const approveButtons = rescheduleContainer?.querySelectorAll('.approve-reschedule-btn');
+        const denyButtons = rescheduleContainer?.querySelectorAll('.deny-reschedule-btn');
+
+        approveButtons?.forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const requestId = btn.dataset.requestId;
+                const serviceId = btn.dataset.serviceId;
+                
+                if (confirm('Approve this reschedule request?')) {
+                    try {
+                        const db = window.firebase.firestore();
+                        const req = rescheduleRequests.find(r => r.requestId === requestId);
+                        
+                        if (!req) return;
+
+                        // Update reschedule request status
+                        await db.collection('rescheduleRequests').doc(requestId).update({
+                            status: 'Approved',
+                            approvedBy: currentUserFullName,
+                            approvedAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        // Update the original appointment with new datetime
+                        if (req.serviceId) {
+                            await db.collection('bookings').doc(req.serviceId).update({
+                                datetime: req.requestedDateTime || req.newDateTime,
+                                lastModified: window.firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
+
+                        // Create admin notification
+                        if (typeof window.addNewNotification === 'function') {
+                            await window.addNewNotification({
+                                title: 'Reschedule Approved',
+                                message: `Approved reschedule request for ${req.customer}`,
+                                link: 'appointment.html',
+                                data: { action: 'reschedule_approved', itemId: requestId }
+                            }, true);
+                        }
+
+                        // Refresh table
+                        window.appData.rescheduleRequests = (window.appData.rescheduleRequests || []).map(r => 
+                            r.requestId === requestId ? { ...r, status: 'Approved' } : r
+                        );
+                        renderRescheduleTable();
+                        updateAppointmentPageStats();
+
+                        alert('Reschedule request approved!');
+                    } catch (error) {
+                        console.error('Error approving reschedule:', error);
+                        alert('Error approving reschedule request');
+                    }
+                }
+            });
+        });
+
+        denyButtons?.forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const requestId = btn.dataset.requestId;
+                
+                if (confirm('Deny this reschedule request? The appointment will remain cancelled.')) {
+                    try {
+                        const db = window.firebase.firestore();
+                        
+                        // Update reschedule request status
+                        await db.collection('rescheduleRequests').doc(requestId).update({
+                            status: 'Denied',
+                            deniedBy: currentUserFullName,
+                            deniedAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        // Create admin notification
+                        if (typeof window.addNewNotification === 'function') {
+                            const req = rescheduleRequests.find(r => r.requestId === requestId);
+                            await window.addNewNotification({
+                                title: 'Reschedule Denied',
+                                message: `Denied reschedule request for ${req?.customer || 'customer'}`,
+                                link: 'appointment.html',
+                                data: { action: 'reschedule_denied', itemId: requestId }
+                            }, true);
+                        }
+
+                        // Refresh table
+                        window.appData.rescheduleRequests = (window.appData.rescheduleRequests || []).map(r => 
+                            r.requestId === requestId ? { ...r, status: 'Denied' } : r
+                        );
+                        renderRescheduleTable();
+                        updateAppointmentPageStats();
+
+                        alert('Reschedule request denied!');
+                    } catch (error) {
+                        console.error('Error denying reschedule:', error);
+                        alert('Error denying reschedule request');
+                    }
+                }
+            });
+        });
+    };
+
+    // Search functionality for reschedule requests
+    const rescheduleSearchInput = document.getElementById('reschedule-search');
+    if (rescheduleSearchInput) {
+        rescheduleSearchInput.addEventListener('input', (e) => {
+            rescheduleSearchTerm = e.target.value;
+            rescheduleCurrentPage = 1;
+            renderRescheduleTable();
+        });
+    }
+
+    // Pagination for reschedule requests
+    const reschedulePaginationBtns = rescheduleContainer?.querySelectorAll('.pagination-btn');
+    reschedulePaginationBtns?.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            const totalPages = Math.ceil(((window.appData.rescheduleRequests || []).filter(r => r.status === 'Pending').length) / rescheduleRowsPerPage);
+            
+            if (action === 'prev' && rescheduleCurrentPage > 1) {
+                rescheduleCurrentPage--;
+            } else if (action === 'next' && rescheduleCurrentPage < totalPages) {
+                rescheduleCurrentPage++;
+            }
+            
+            renderRescheduleTable();
+        });
+    });
+
+    // Initial render of reschedule table
+    renderRescheduleTable();
 });
