@@ -5,9 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // The single source of truth for notification data
     const state = {
       notifications: window.appData.notifications || [],
-      lastClearedNotifications: [], // For the "Undo" functionality
     };
-    let undoTimeout = null; // To manage the undo toast timeout
 
     // --- 2. DOM Element References ---
     // Query all necessary elements once and store them for efficiency.
@@ -19,14 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
       countBadge: document.querySelector('.notification-bell .message-count'),
       markAllReadBtn: document.getElementById('mark-all-read-btn'),
       clearAllBtn: document.getElementById('clear-all-btn'),
-      // Confirmation Modal Elements
-      clearAllConfirmOverlay: document.getElementById('clear-all-confirm-overlay'),
-      clearAllConfirmBtn: document.getElementById('clear-all-confirm-btn'),
-      clearAllCancelBtn: document.getElementById('clear-all-cancel-btn'),
-      clearAllConfirmCloseBtn: document.getElementById('clear-all-confirm-close-btn'),
-      // Undo Toast Elements
-      undoToast: document.getElementById('undo-toast'),
-      undoClearBtn: document.getElementById('undo-clear-btn'),
       viewAllLink: document.querySelector('.notification-footer'),
       mainHeaderTitle: document.querySelector('.main-header h1'),
       pages: document.querySelectorAll('.page'),
@@ -125,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data: newNotification.data || {},
             link: newNotification.link || null,
             read: false,
-            sentAt: window.firebase.firestore.FieldValue.serverTimestamp()
+            sentAt: db.FieldValue.serverTimestamp()
           });
 
           // Optimistically add it locally so the UI updates immediately
@@ -187,42 +177,32 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    const handleClearAll = () => {
-      // Open the confirmation modal instead of clearing directly
-      if (dom.clearAllConfirmOverlay) {
-        dom.clearAllConfirmOverlay.classList.add('show');
-        document.body.classList.add('modal-open');
+    const handleClearAll = async () => {
+      // Clear all notifications from Firestore and local state
+      try {
+        if (window.firebase && window.firebase.firestore) {
+          const db = window.firebase.firestore();
+          const batch = db.batch();
+
+          // Get all notification documents
+          const snapshot = await db.collection('notifications').get();
+
+          // Add delete operations to batch
+          snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+          });
+
+          // Commit the batch delete
+          await batch.commit();
+          console.log(`Deleted ${snapshot.docs.length} notifications from Firestore`);
+        }
+      } catch (err) {
+        console.warn('Could not delete notifications from Firestore:', err);
       }
-    };
 
-    const closeClearAllModal = () => {
-      if (dom.clearAllConfirmOverlay) {
-        dom.clearAllConfirmOverlay.classList.remove('show');
-        document.body.classList.remove('modal-open');
-      }
-    };
-
-    const showUndoToast = () => {
-      if (!dom.undoToast) return;
-
-      // Clear any existing timeout to prevent premature clearing of data
-      if (undoTimeout) clearTimeout(undoTimeout);
-
-      dom.undoToast.classList.add('show');
-
-      // After 5 seconds, hide the toast and permanently clear the backup
-      undoTimeout = setTimeout(() => {
-        hideUndoToast();
-        state.lastClearedNotifications = []; // Final clear
-      }, 5000);
-    };
-
-    const hideUndoToast = () => {
-      if (dom.undoToast) dom.undoToast.classList.remove('show');
-      if (undoTimeout) {
-        clearTimeout(undoTimeout);
-        undoTimeout = null;
-      }
+      // Clear local state
+      state.notifications = [];
+      render();
     };
 
     const handleMarkOneRead = (e) => {
@@ -304,35 +284,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dom.markAllReadBtn) dom.markAllReadBtn.addEventListener('click', handleMarkAllRead);
     if (dom.clearAllBtn) {
       dom.clearAllBtn.addEventListener('click', handleClearAll);
-
-      // Add listeners for the new confirmation modal
-      dom.clearAllConfirmBtn.addEventListener('click', () => {
-        // 1. Back up the current notifications
-        state.lastClearedNotifications = [...state.notifications];
-        // 2. Clear the main notifications array
-        state.notifications = [];
-        // 3. Re-render the empty state
-        render();
-        // 4. Close the modal and show the undo toast
-        closeClearAllModal();
-        showUndoToast();
-      });
-      dom.clearAllCancelBtn.addEventListener('click', closeClearAllModal);
-      dom.clearAllConfirmCloseBtn.addEventListener('click', closeClearAllModal);
-      dom.clearAllConfirmOverlay.addEventListener('click', (e) => {
-        if (e.target === dom.clearAllConfirmOverlay) closeClearAllModal();
-      });
-    }
-
-    // Add listener for the "Undo" button
-    if (dom.undoClearBtn) {
-      dom.undoClearBtn.addEventListener('click', () => {
-        // Restore notifications from the backup
-        state.notifications = [...state.lastClearedNotifications];
-        state.lastClearedNotifications = [];
-        render(); // Re-render with the restored notifications
-        hideUndoToast(); // Hide the toast immediately
-      });
     }
     // Use event delegation for dynamically created "mark as read" buttons
     // and for the notification item clicks.
@@ -382,21 +333,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const firestoreAvailable = tryInitFirestoreListener();
     if (!firestoreAvailable) render();
-
-    // --- 7. Demo: Simulate a new notification after 5 seconds ---
-    setTimeout(() => {
-        const newDemoNotification = {
-            id: `notif-${Date.now()}`,
-            type: 'New Booking',
-            message: '<b>Juan Dela Cruz</b> just booked a <b>Full Package Detailing</b>.',
-            timestamp: 'Just now',
-            isUnread: true,
-            link: 'appointment.html'
-        };
-        // This function can be called from anywhere (e.g., a Firebase listener)
-        // to add a new notification in real-time.
-        addNewNotification(newDemoNotification);
-    }, 5000); // 5-second delay
 
 
   })(); // End of IIFE

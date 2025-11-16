@@ -128,67 +128,219 @@ document.addEventListener('DOMContentLoaded', () => {
  
     createStatusTracker(profileData.status);
     
-    // --- Populate Service History ---
-    const populateServiceHistory = (profile) => {
+    // --- Populate Service History from Firestore ---
+    const populateServiceHistory = async (profile) => {
         const historyTableBody = document.querySelector('#service-history-table tbody');
         const noHistoryMessage = document.querySelector('.profile-history .no-history');
         if (!historyTableBody || !noHistoryMessage) return;
 
-        // A customer identifier (ID or plate) is required to find history.
-        if (!profile.customerId && !profile.plate) {
+        try {
+            // Get customer userId from profileData
+            let userId = profile.customerId || null;
+
+            // If no customerId, try to get userId from Firestore by matching fullName
+            if (!userId && profile.fullName) {
+                const db = window.firebase.firestore();
+                try {
+                    const userSnapshot = await db.collection('users')
+                        .where('fullName', '==', profile.fullName)
+                        .limit(1)
+                        .get();
+                    
+                    if (!userSnapshot.empty) {
+                        userId = userSnapshot.docs[0].id;
+                    }
+                } catch (err) {
+                    console.warn('Could not fetch userId from Firestore:', err);
+                }
+            }
+
+            // A customer userId is required to find history.
+            if (!userId) {
+                noHistoryMessage.style.display = 'block';
+                historyTableBody.innerHTML = '';
+                return;
+            }
+
+            // Fetch completed bookings from Firestore for this userId
+            const db = window.firebase.firestore();
+            const bookingsSnapshot = await db.collection('bookings')
+                .where('userId', '==', userId)
+                .where('status', '==', 'Completed')
+                .get();
+
+            let customerHistory = [];
+            
+            if (!bookingsSnapshot.empty) {
+                customerHistory = bookingsSnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    
+                    // Helper function to parse Firestore dates
+                    const parseFirestoreDate = (val) => {
+                        if (!val) return null;
+                        try {
+                            // Firestore Timestamp with toDate() method
+                            if (val && typeof val.toDate === 'function') return val.toDate();
+                            
+                            // Firestore-like object: { seconds, nanoseconds }
+                            if (val && typeof val.seconds === 'number') {
+                                return new Date(val.seconds * 1000);
+                            }
+                            
+                            // String date
+                            if (typeof val === 'string' && val.trim() !== '') {
+                                const parsed = new Date(val);
+                                if (!isNaN(parsed.getTime())) return parsed;
+                            }
+                            
+                            // Number timestamp
+                            if (typeof val === 'number') {
+                                return new Date(val);
+                            }
+                            
+                            // Native Date
+                            if (val instanceof Date) {
+                                return val;
+                            }
+                        } catch (e) {
+                            // Silently fail and return null
+                        }
+                        return null;
+                    };
+                    
+                    // Parse Firestore date - try multiple field names
+                    let dateObj = null;
+                    const possibleDateFields = ['time', 'scheduleDate', 'dateTime', 'datetime', 'date', 'scheduledAt', 'appointmentDate', 'timestamp', 'bookingDate', 'createdAt', 'scheduledDate'];
+                    
+                    for (let field of possibleDateFields) {
+                        const dateValue = data[field];
+                        dateObj = parseFirestoreDate(dateValue);
+                        if (dateObj) {
+                            break;
+                        }
+                    }
+                    
+                    // If still no date, try scanning all object values
+                    if (!dateObj) {
+                        for (const [key, value] of Object.entries(data)) {
+                            dateObj = parseFirestoreDate(value);
+                            if (dateObj) {
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Parse bookingTime if available (format: "1:20 PM - 2:20 PM" or similar)
+                    let timeStr = '';
+                    if (dateObj && data.bookingTime) {
+                        const timeRange = data.bookingTime.split(' - ')[0]; // e.g., "1:20 PM"
+                        const timeMatch = timeRange.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                        if (timeMatch) {
+                            let hours = parseInt(timeMatch[1]);
+                            const minutes = parseInt(timeMatch[2]);
+                            const ampm = timeMatch[3].toUpperCase();
+                            if (ampm === 'PM' && hours !== 12) hours += 12;
+                            if (ampm === 'AM' && hours === 12) hours = 0;
+                            dateObj.setHours(hours, minutes, 0, 0);
+                            timeStr = data.bookingTime;
+                        }
+                    }
+
+                    console.log('Booking doc:', data, 'Parsed date:', dateObj, 'Time string:', timeStr);
+
+                    return {
+                        service: data.serviceNames || data.service || 'Unknown Service',
+                        technician: data.technician || 'N/A',
+                        status: data.status || 'N/A',
+                        paymentStatus: data.paymentStatus || 'N/A',
+                        datetime: dateObj,
+                        bookingTime: data.bookingTime || '',
+                        datetimeString: dateObj ? dateObj.toISOString() : 'N/A'
+                    };
+                });
+            }
+
+            // Also include local walk-in history for the current profile (if applicable)
+            if (profile.plate) {
+                const localWalkins = (window.appData.walkins || []).filter(
+                    walkin => walkin.plate === profile.plate && walkin.status === 'Completed'
+                );
+                customerHistory = [...customerHistory, ...localWalkins];
+            }
+
+            // Sort by most recent first
+            customerHistory.sort((a, b) => {
+                const dateA = a.datetime ? new Date(a.datetime) : null;
+                const dateB = b.datetime ? new Date(b.datetime) : null;
+                if (!dateA || !dateB) return 0;
+                return dateB - dateA;
+            });
+
+            historyTableBody.innerHTML = ''; // Clear previous history before populating
+            if (customerHistory.length === 0) {
+                noHistoryMessage.style.display = 'block';
+                return;
+            }
+
+            noHistoryMessage.style.display = 'none';
+
+            // After sorting, the first item is the most recent.
+            // Let's update the "Last Service Availed" field in the profile card.
+            const lastServiceEl = document.getElementById('profile-service');
+            if (lastServiceEl && customerHistory.length > 0) {
+                lastServiceEl.textContent = customerHistory[0].service;
+            } else if (lastServiceEl) {
+                lastServiceEl.textContent = 'N/A';
+            }
+
+            const fragment = document.createDocumentFragment();
+            customerHistory.forEach(item => {
+                const row = document.createElement('tr');
+                const statusClass = (item.status || '').toLowerCase().replace(/\s+/g, '-');
+                
+                // Format date and time
+                let datePart = 'N/A';
+                let timePart = 'N/A';
+                
+                if (item.datetime) {
+                    try {
+                        const itemDate = item.datetime instanceof Date ? item.datetime : new Date(item.datetime);
+                        if (!isNaN(itemDate.getTime())) {
+                            datePart = itemDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                            
+                            // Use bookingTime if available (full time range), otherwise use the datetime from the booking
+                            if (item.bookingTime) {
+                                timePart = item.bookingTime; // Use full booking time range
+                            } else {
+                                timePart = itemDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Error formatting date:', item.datetime, e);
+                    }
+                }
+
+                // Create a styled badge for the payment status
+                const paymentStatus = item.paymentStatus || 'N/A';
+                const paymentStatusClass = paymentStatus.toLowerCase();
+                const paymentBadge = `<span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span>`;
+
+                row.innerHTML = `
+                    <td>${datePart}</td>
+                    <td class="text-center">${timePart}</td>
+                    <td>${item.service}</td>
+                    <td>${item.technician}</td>
+                    <td class="text-center"><span class="${statusClass}">${item.status}</span></td>
+                    <td class="text-center">${paymentBadge}</td>
+                `;
+                fragment.appendChild(row);
+            });
+            historyTableBody.appendChild(fragment);
+        } catch (error) {
+            console.error('Error populating service history from Firestore:', error);
             noHistoryMessage.style.display = 'block';
             historyTableBody.innerHTML = '';
-            return;
         }
-
-        // Find history based on the type of profile we are viewing.
-        const customerHistory = [
-            ...(window.appData.appointments || []).filter(appt => appt.customer === customerName),
-            // Only include walk-in history if the current profile is a walk-in (has no serviceId)
-            // and has a plate number to match against. This logic is being updated.
-            ...(window.appData.walkins || []).filter(walkin => walkin.plate === profile.plate)
-        ];
-
-        customerHistory.sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
-        historyTableBody.innerHTML = ''; // Clear previous history before populating
-        if (customerHistory.length === 0) {
-            noHistoryMessage.style.display = 'block';
-            return;
-        }
-
-        // After sorting, the first item is the most recent.
-        // Let's update the "Last Service Availed" field in the profile card.
-        const lastServiceEl = document.getElementById('profile-service');
-        if (lastServiceEl && customerHistory.length > 0) {
-            lastServiceEl.textContent = customerHistory[0].service;
-        } else if (lastServiceEl) {
-            lastServiceEl.textContent = 'N/A';
-        }
-
-        const fragment = document.createDocumentFragment();
-        customerHistory.forEach(item => {
-            const row = document.createElement('tr');
-            const statusClass = (item.status || '').toLowerCase().replace(/\s+/g, '-');
-            const itemDate = item.datetime ? new Date(item.datetime.replace(' - ', ' ')) : null;
-            const datePart = itemDate ? itemDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
-            const timePart = itemDate ? itemDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'N/A';
-
-            // Create a styled badge for the payment status
-            const paymentStatus = item.paymentStatus || 'N/A';
-            const paymentStatusClass = paymentStatus.toLowerCase();
-            const paymentBadge = `<span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span>`;
-
-            row.innerHTML = `
-                <td>${datePart}</td>
-                <td class="text-center">${timePart}</td>
-                <td>${item.service}</td>
-                <td>${item.technician}</td>
-                <td class="text-center"><span class="${statusClass}">${item.status}</span></td>
-                <td class="text-center">${paymentBadge}</td>
-            `;
-            fragment.appendChild(row);
-        });
-        historyTableBody.appendChild(fragment);
     };
 
     populateServiceHistory(profileData);

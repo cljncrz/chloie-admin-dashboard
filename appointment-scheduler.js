@@ -395,28 +395,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         );
 
-        const timeSlots = generateTimeSlots();
-        timeSlotsContainer.innerHTML = ''; // Clear previous slots
+        // Filter appointments for the selected date
+        const bookedAppointments = appointments.filter(appt => {
+            const apptDate = window.appData.parseCustomDate(appt.datetime);
+            return apptDate &&
+                   apptDate.getFullYear() === selectedDate.getFullYear() &&
+                   apptDate.getMonth() === selectedDate.getMonth() &&
+                   apptDate.getDate() === selectedDate.getDate() &&
+                   appt.status !== 'Cancelled';
+        });
 
-        if (timeSlots.length === 0) {
-            timeSlotsContainer.innerHTML = '<p class="text-muted">No available slots.</p>';
+        timeSlotsContainer.innerHTML = ''; // Clear previous content
+
+        if (bookedAppointments.length === 0) {
+            timeSlotsContainer.innerHTML = '<p class="text-muted">No bookings on this date.</p>';
             return;
         }
 
-        timeSlots.forEach(slot => {
-            const slotEl = document.createElement('div');
-            slotEl.classList.add('time-slot');
+        const uniqueTimes = new Set();
+        bookedAppointments.forEach(appt => {
+            const apptDate = window.appData.parseCustomDate(appt.datetime);
+            const timeString = apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            uniqueTimes.add(timeString);
+        });
 
-            if (!slot.available) {
-                slotEl.classList.add('booked');
-                slotEl.innerHTML = `${slot.time}<br><small>(${slot.bookingCount} booking${slot.bookingCount > 1 ? 's' : ''})</small>`;
-                slotEl.title = `${slot.bookingCount} booking${slot.bookingCount > 1 ? 's' : ''} at this time`;
-            } else {
-                slotEl.textContent = slot.time;
-                // Add data attribute for booking (use start time for selection)
-                slotEl.dataset.time = slot.startTime;
-            }
-            timeSlotsContainer.appendChild(slotEl);
+        uniqueTimes.forEach(timeString => {
+            const apptEl = document.createElement('div');
+            apptEl.classList.add('time-slot', 'booked');
+            apptEl.innerHTML = `${timeString}`;
+            apptEl.title = `Booked at ${timeString}`;
+            timeSlotsContainer.appendChild(apptEl);
         });
     };
 
@@ -844,7 +852,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderRescheduleRequests();
     };
 
-    const handleBookingSubmit = (e) => { 
+    const handleBookingSubmit = async (e) => { 
         e.preventDefault();
         const selectedCustomerName = bookingCustomerSelect.value;
         const selectedServiceName = bookingServiceSelect.value;
@@ -1237,7 +1245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updatePendingApprovalsCount(); // Update the badge with the correct count
     };
 
-    initializeScheduler();
+    await initializeScheduler();
 
     // --- 8. Admin notifications for pending items (bookings/reschedules/cancellations) ---
     // NOTE: These notifications are now created server-side by Cloud Functions:

@@ -866,7 +866,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const appointments = window.appData.appointments || [];
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
 
-                    if (appointment && appointment.paymentStatus === 'Unpaid') {
+                    // Normalize current payment status (treat undefined/null as 'Unpaid')
+                    const currentPaymentStatus = (appointment && appointment.paymentStatus) ? String(appointment.paymentStatus) : 'Unpaid';
+
+                    if (appointment && currentPaymentStatus.toLowerCase() === 'unpaid') {
                         const db = window.firebase.firestore();
                         try {
                             // Update payment status in Firestore
@@ -886,7 +889,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         row.dataset.paymentStatus = 'Paid';
 
                         const paymentCell = row.querySelector('td:nth-last-child(2)');
-                        paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+                        if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
 
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Appointment ${appointment.serviceId} marked as paid.`);
                         
@@ -1120,7 +1123,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const walkins = window.appData.walkins || [];
                     const walkin = walkins.find(w => w.plate === row.dataset.plate && w.service === row.dataset.service);
 
-                    if (walkin && walkin.paymentStatus === 'Unpaid') {
+                    // Normalize current payment status (treat undefined/null as 'Unpaid')
+                    const currentPaymentStatus = (walkin && walkin.paymentStatus) ? String(walkin.paymentStatus) : 'Unpaid';
+
+                    if (walkin && currentPaymentStatus.toLowerCase() === 'unpaid') {
                         const db = window.firebase.firestore();
                         try {
                             // Update payment status in Firestore
@@ -1140,7 +1146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         row.dataset.paymentStatus = 'Paid';
 
                         const paymentCell = row.querySelector('td:nth-last-child(2)');
-                        paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+                        if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
 
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Walk-in for ${walkin.plate} marked as paid.`);
                         
