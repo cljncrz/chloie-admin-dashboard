@@ -143,7 +143,7 @@
                 <small>Admin Portal</small>
               </div>
               <div class="profile-photo">
-                <img src="./images/profile-1.jpg" alt="Admin Profile" />
+                <img src="./images/adam.jpg" alt="Admin Profile" />
               </div>
             </div>
           </div>
@@ -359,11 +359,22 @@
       </div>
     </div>
 
-    <!-- Initialize Firebase -->
-    <script type="module" src="firebase-setup.js"></script>
-    <!-- Authentication Guard -->
-    <script src="auth-guard.js"></script>
-    <!-- Send Notification Script -->
-    <script src="send-notification.js"></script>
+    <!-- Initialize Firebase (must load first as ES module) -->
+    <script type="module">
+      import('./firebase-setup.js').then(() => {
+        // Firebase is now ready, load auth guard
+        const script = document.createElement('script');
+        script.src = 'auth-guard.js';
+        document.body.appendChild(script);
+        
+        // Load notification script after auth guard
+        const notifScript = document.createElement('script');
+        notifScript.src = 'send-notification.js';
+        notifScript.onload = () => console.log('Send notification script loaded');
+        document.body.appendChild(notifScript);
+      }).catch(err => {
+        console.error('Failed to initialize Firebase:', err);
+      });
+    </script>
   </body>
 </html>

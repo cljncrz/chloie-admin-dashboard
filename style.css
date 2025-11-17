@@ -3246,6 +3246,52 @@ main .insights::-webkit-scrollbar-thumb {
     gap: 2rem;
 }
 
+.review-details-right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.customer-media-card {
+    padding: 2rem;
+}
+
+.customer-media-card h3 {
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.media-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 250px;
+    background: var(--color-light);
+    border-radius: var(--card-border-radius);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.media-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    text-align: center;
+    padding: 2rem;
+}
+
+.media-placeholder .material-symbols-outlined {
+    font-size: 3rem;
+    opacity: 0.5;
+}
+
+.media-placeholder p {
+    color: var(--color-dark);
+    opacity: 0.7;
+}
+
 .review-info-card .review-comment {
     font-size: 1.1rem; /* Make the comment text larger on this page */
     font-style: normal;

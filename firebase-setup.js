@@ -17,6 +17,7 @@ import {
 import {
   getFirestore,
   collection,
+  collectionGroup,
   doc as fsDoc,
   getDoc,
   getDocs,
@@ -132,8 +133,34 @@ window.firebase = {
       }
     });
 
+    // Helper: create a queryable collectionGroup reference
+    const createCollectionGroupRef = (collectionName, queryConstraints = []) => ({
+      async get() {
+        const snap = await getDocs(query(collectionGroup(db, collectionName), ...queryConstraints));
+        return buildQuerySnapshot(snap);
+      },
+      onSnapshot(observerOrNext, error, complete) {
+        const q = query(collectionGroup(db, collectionName), ...queryConstraints);
+        const observer = typeof observerOrNext === 'object' 
+          ? observerOrNext 
+          : { next: observerOrNext, error, complete };
+        
+        return onSnapshot(q, (snap) => observer.next(buildQuerySnapshot(snap)), observer.error, observer.complete);
+      },
+      where: (field, operator, value) => {
+        return createCollectionGroupRef(collectionName, [...queryConstraints, where(field, operator, value)]);
+      },
+      orderBy: (field, direction = 'asc') => {
+        return createCollectionGroupRef(collectionName, [...queryConstraints, orderBy(field, direction)]);
+      },
+      limit: (n) => {
+        return createCollectionGroupRef(collectionName, [...queryConstraints, limit(n)]);
+      }
+    });
+
     return {
       collection: (name) => createCollectionRef(name),
+      collectionGroup: (name) => createCollectionGroupRef(name),
       // helpers
       FieldValue: {
         serverTimestamp: () => serverTimestamp(),
