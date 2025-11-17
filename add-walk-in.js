@@ -158,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dateTime, // Store as a Firestore timestamp
                 status: 'Pending',
                 paymentStatus: 'Unpaid',
+                paymentMethod: null, // Will be set when payment is processed
                 technician: 'Unassigned', // Default technician
                 isWalkin: true
             };

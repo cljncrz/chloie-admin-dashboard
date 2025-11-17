@@ -395,53 +395,70 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         );
 
-        // Filter appointments for the selected date
-        const bookedAppointments = appointments.filter(appt => {
-            const apptDate = window.appData.parseCustomDate(appt.datetime);
-            return apptDate &&
-                   apptDate.getFullYear() === selectedDate.getFullYear() &&
-                   apptDate.getMonth() === selectedDate.getMonth() &&
-                   apptDate.getDate() === selectedDate.getDate() &&
-                   appt.status !== 'Cancelled';
-        });
+        const slots = generateTimeSlots();
 
         timeSlotsContainer.innerHTML = ''; // Clear previous content
 
-        if (bookedAppointments.length === 0) {
-            timeSlotsContainer.innerHTML = '<p class="text-muted">No bookings on this date.</p>';
-            return;
-        }
+        slots.forEach(slot => {
+            const slotEl = document.createElement('div');
+            slotEl.classList.add('time-slot');
+            slotEl.dataset.time = slot.startTime; // Use startTime for selection
 
-        const uniqueTimes = new Set();
-        bookedAppointments.forEach(appt => {
-            const apptDate = window.appData.parseCustomDate(appt.datetime);
-            const timeString = apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-            uniqueTimes.add(timeString);
-        });
+            if (slot.available) {
+                slotEl.classList.add('available');
+                slotEl.innerHTML = `
+                    <span class="time">${slot.time}</span>
+                    <span class="status">Available</span>
+                `;
+                slotEl.title = `Click to select ${slot.time}`;
+            } else {
+                slotEl.classList.add('booked');
+                // Find the appointment(s) at this slot
+                const appointmentsAtSlot = appointments.filter(appt => {
+                    const apptDate = window.appData.parseCustomDate(appt.datetime);
+                    return apptDate &&
+                           apptDate.getFullYear() === selectedDate.getFullYear() &&
+                           apptDate.getMonth() === selectedDate.getMonth() &&
+                           apptDate.getDate() === selectedDate.getDate() &&
+                           appt.status !== 'Cancelled' &&
+                           apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) === slot.startTime;
+                });
 
-        uniqueTimes.forEach(timeString => {
-            const apptEl = document.createElement('div');
-            apptEl.classList.add('time-slot', 'booked');
-            apptEl.innerHTML = `${timeString}`;
-            apptEl.title = `Booked at ${timeString}`;
-            timeSlotsContainer.appendChild(apptEl);
+                if (appointmentsAtSlot.length > 0) {
+                    const appt = appointmentsAtSlot[0]; // Assuming one per slot, but handle multiple if needed
+                    slotEl.innerHTML = `
+                        <span class="time">${slot.time}</span>
+                        <span class="customer-name">${appt.customer}</span>
+                        <span class="service-name text-muted">${appt.service}</span>
+                    `;
+                    slotEl.title = `${appt.customer} - ${appt.service} at ${slot.time}`;
+                } else {
+                    // If not available but no appointment found, still mark as booked
+                    slotEl.innerHTML = `
+                        <span class="time">${slot.time}</span>
+                        <span class="status">Booked</span>
+                    `;
+                }
+            }
+
+            timeSlotsContainer.appendChild(slotEl);
         });
     };
 
     const generateTimeSlots = () => {
         const slotDefinitions = [
-            { start: '8:20 AM', end: '9:20 AM' },
-            { start: '9:20 AM', end: '10:20 AM' },
-            { start: '10:20 AM', end: '11:20 AM' },
-            { start: '11:20 AM', end: '12:10 PM' },
-            { start: '12:10 PM', end: '1:00 PM' },
-            { start: '1:20 PM', end: '2:20 PM' },
-            { start: '2:20 PM', end: '3:20 PM' },
-            { start: '3:50 PM', end: '4:50 PM' },
-            { start: '4:50 PM', end: '5:50 PM' },
-            { start: '5:50 PM', end: '6:50 PM' },
-            { start: '6:50 PM', end: '7:50 PM' },
-            { start: '7:50 PM', end: '8:50 PM' }
+            { start: "8:20 AM", end: "9:20 AM" },
+            { start: "9:20 AM", end: "10:20 AM" },
+            { start: "10:20 AM", end: "11:20 AM" },
+            { start: "11:20 AM", end: "12:10 PM" },
+            { start: "12:10 PM", end: "1:00 PM" },
+            { start: "1:20 PM", end: "2:20 PM" },
+            { start: "2:20 PM", end: "3:20 PM" },
+            { start: "3:50 PM", end: "4:50 PM" },
+            { start: "4:50 PM", end: "5:50 PM" },
+            { start: "5:50 PM", end: "6:50 PM" },
+            { start: "6:50 PM", end: "7:50 PM" },
+            { start: "7:50 PM", end: "8:50 PM" },
         ];
 
         const slots = [];
@@ -956,7 +973,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const customerData = window.appData.customers.find(c => c.name === selectedCustomerName);
         if (customerData) {
-            // 2. Construct the new appointment object
+            // 2. Helper function to calculate price for service
+            const getPriceForService = (serviceName, carType) => {
+                const serviceData = (window.appData.services || []).find(s => s.service === serviceName);
+                if (!serviceData) return 250; // Fallback default price
+                
+                const carTypeLower = carType.toLowerCase();
+                let priceCategory = 'medium';
+                if (['sedan', 'hatchback'].includes(carTypeLower)) priceCategory = 'small';
+                if (['suv', 'pickup'].includes(carTypeLower)) priceCategory = 'large';
+                if (['van', 'truck'].includes(carTypeLower)) priceCategory = 'xLarge';
+                
+                return serviceData[priceCategory] || serviceData.medium || serviceData.small || serviceData.large || serviceData.xLarge || 250;
+            };
+
+            // 3. Construct the new appointment object
+            const calculatedPrice = getPriceForService(selectedServiceName, "N/A");
             const newAppointment = {
                 serviceId: `KC-${Date.now().toString().slice(-6)}`,
                 customer: customerData.name,
@@ -969,10 +1001,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 status: 'Pending',
                 // Format date to match "Oct 28, 2025 - 2:00 PM"
                 datetime: `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${selectedTimeSlot}`,
-                paymentStatus: 'Unpaid'
+                paymentStatus: 'Unpaid',
+                price: calculatedPrice,
+                paymentMethod: null // Will be set when payment is processed
             };
 
-            // 3. Persist booking to Firestore (if available), then add to local arrays
+            // 4. Persist booking to Firestore (if available), then add to local arrays
             try {
                 if (window.firebase && window.firebase.firestore) {
                     const db = window.firebase.firestore();
@@ -987,6 +1021,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         status: newAppointment.status,
                         datetime: newAppointment.datetime,
                         paymentStatus: newAppointment.paymentStatus,
+                        price: newAppointment.price,
+                        paymentMethod: newAppointment.paymentMethod,
                         createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
                     };
                     const docRef = await db.collection('bookings').add(saveObj);
@@ -1000,17 +1036,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.appData.appointments.unshift(newAppointment);
             appointments.unshift(newAppointment);
 
-            // 4. Update the UI in real-time
+            // 5. Update the UI in real-time
             addAppointmentToMainTable(newAppointment); // Add to the main appointments table
             renderCalendar(); // This will re-render the calendar, time slots, and queue
 
-            // 5. Close modal and show success message
+            // 6. Close modal and show success message
             closeBookingModal();
             if (typeof showSuccessToast === 'function') {
                 showSuccessToast(`Appointment for ${newAppointment.customer} booked successfully!`);
             }
 
-            // 6. Send a notification to the customer (and admin note)
+            // 7. Send a notification to the customer (and admin note)
             try {
                 const customerId = await getCustomerIdFromName(newAppointment.customer);
                 if (customerId && typeof NotificationService !== 'undefined') {
@@ -1202,5 +1238,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             closeBookingModal();
         }
     });
+
+    // --- Initial Page Render ---
+    // This was missing, causing the calendar not to show on load.
+    renderCalendar();
 
 });

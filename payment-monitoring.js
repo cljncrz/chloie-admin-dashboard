@@ -30,73 +30,163 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSortDir = 'desc';
 
     // --- Data Preparation ---
-    // **FIXED**: The data source is now aligned with the 'sales.js' page for complete accuracy.
-    // It combines all paid appointments and walk-ins.
-    const getCombinedSalesData = () => {
-        // Helper to get price from the services list, similar to sales.js
-        const getPriceForService = (serviceName, carType) => {
-            const serviceData = (window.appData.services || []).find(s => s.service === serviceName);
-            if (!serviceData) return 250 + Math.floor(Math.random() * 1000); // Fallback
-
-            const carTypeLower = carType.toLowerCase();
-            let priceCategory = 'medium';
-            if (['sedan', 'hatchback'].includes(carTypeLower)) priceCategory = 'small';
-            if (['suv', 'pickup'].includes(carTypeLower)) priceCategory = 'large';
-            if (['van', 'truck'].includes(carTypeLower)) priceCategory = 'xLarge';
-
-            return serviceData[priceCategory] || serviceData.medium || serviceData.small || serviceData.large || serviceData.xLarge || 250;
-        };
-
-        // Helper to get payment method. Prioritize review data, otherwise simulate.
-        const getPaymentMethod = (transactionId) => {
-            const review = (window.appData.reviews || []).find(r => r.transactionId === transactionId);
-            if (review && review.paymentMethod) {
-                return review.paymentMethod;
-            }
-            // Simulate if not found in reviews
-            return ['GCash', 'Cash', 'PayMaya'][Math.floor(Math.random() * 3)];
-        };
-
-        const paidAppointments = (window.appData.appointments || [])
-            .filter(appt => appt.paymentStatus === 'Paid')
-            .map(appt => ({
-                transactionId: appt.serviceId,
-                date: new Date(appt.datetime.split(' - ')[0]),
-                customer: appt.customer,
-                service: appt.service,
-                amount: getPriceForService(appt.service, appt.carType),
-                paymentMethod: getPaymentMethod(appt.serviceId),
-                // Include other relevant data for potential future use
-                technician: appt.technician,
-                carType: appt.carType,
-            }));
-
-        const paidWalkins = (window.appData.walkins || [])
-            .filter(walkin => walkin.paymentStatus === 'Paid')
-            .map((walkin, index) => {
-                const transactionId = `WLK-${1001 + index}`; // Create a consistent ID
-                return {
-                    transactionId: transactionId,
-                    // Simulate recent dates for walk-ins for realistic data
-                    date: new Date(Date.now() - index * 24 * 3600 * 1000),
-                    customer: 'Walk-in Customer',
-                    service: walkin.service,
-                    amount: getPriceForService(walkin.service, walkin.carType),
-                    paymentMethod: getPaymentMethod(transactionId), // Use a dummy ID
-                    technician: walkin.technician,
-                    carType: walkin.carType,
+    // **FIXED**: The data source is now aligned with Firestore collections.
+    // It combines all paid appointments from 'bookings' and walk-ins from 'walkins' with customer details.
+    const getCombinedSalesData = async () => {
+        try {
+            // Get Firestore instance using the compat wrapper which has .collection()
+            const db = firebase.firestore();
+            
+            // Fetch customers from Firestore
+            const customersSnapshot = await db.collection('users').get();
+            const customersMap = {};
+            customersSnapshot.docs.forEach(doc => {
+                const customerData = doc.data();
+                customersMap[doc.id] = {
+                    name: customerData.name || 'Unknown',
+                    email: customerData.email || '',
+                    phone: customerData.phone || '',
+                    plateNumber: customerData.plateNumber || '',
+                    carType: customerData.carType || '',
                 };
             });
 
-        // Combine all sources into one master list
-        const allPayments = [...paidAppointments, ...paidWalkins];
+            // Fetch paid bookings from Firestore
+            const bookingsSnapshot = await db.collection('bookings').where('paymentStatus', '==', 'Paid').get();
+            const paidAppointments = bookingsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                const scheduleDate = data.scheduleDate?.toDate ? data.scheduleDate.toDate() : (data.scheduleDate ? new Date(data.scheduleDate) : new Date());
+                const customerData = customersMap[data.userId] || { name: 'Unknown', email: '', phone: '', plateNumber: '', carType: data.carType || '' };
 
-        return allPayments.sort((a, b) => b.date - a.date);
+                // Compute amount: prefer stored amount; otherwise derive from serviceNames and carType
+                const bookingCarType = (data.carType || customerData.carType || '').toString();
+                const extractServiceName = (svc) => {
+                    if (!svc && svc !== 0) return '';
+                    if (typeof svc === 'string') return svc;
+                    if (typeof svc === 'object') return svc.service || svc.name || svc.title || svc.label || svc.serviceName || svc.id || svc.serviceId || '';
+                    return String(svc);
+                };
+
+                let bookingAmount = (typeof data.amount === 'number' && !isNaN(data.amount)) ? data.amount : 0;
+                if (!bookingAmount) {
+                    if (Array.isArray(data.serviceNames) && data.serviceNames.length > 0) {
+                        bookingAmount = data.serviceNames.reduce((sum, svc) => {
+                            const svcName = extractServiceName(svc);
+                            if (!svcName) return sum;
+                            try {
+                                return sum + (getPriceForService(svcName, bookingCarType) || 0);
+                            } catch (e) {
+                                return sum;
+                            }
+                        }, 0);
+                    } else if (data.serviceNames) {
+                        const svcName = extractServiceName(data.serviceNames);
+                        bookingAmount = getPriceForService(svcName, bookingCarType) || 0;
+                    }
+                }
+
+                return {
+                    transactionId: doc.id,
+                    date: scheduleDate,
+                    customer: customerData.name,
+                    email: customerData.email,
+                    plateNumber: customerData.plateNumber,
+                    service: Array.isArray(data.serviceNames) ? data.serviceNames.join(', ') : (data.serviceNames || 'Unknown'),
+                    paymentMethod: data.paymentMethod || 'Unknown',
+                    amount: bookingAmount,
+                    technician: data.technician || '',
+                    carType: data.carType || customerData.carType,
+                    userId: data.userId,
+                    isBooking: true,
+                };
+            });
+
+            // Fetch paid walk-ins from Firestore
+            const walkinsSnapshot = await db.collection('walkins').where('paymentStatus', '==', 'Paid').get();
+            const paidWalkins = walkinsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                const scheduleDate = data.dateTime?.toDate ? data.dateTime.toDate() : (data.dateTime ? new Date(data.dateTime) : new Date());
+                const customerData = customersMap[data.customerId] || { name: data.customerName || 'Walk-in Customer', email: data.email || '', phone: data.phone || '', plateNumber: data.plateNumber || '', carType: data.carType || '' };
+
+                // Compute amount: prefer stored amount; otherwise derive from service and carType
+                const walkinCarType = (data.carType || customerData.carType || '').toString();
+                const extractServiceNameWalkin = (svc) => {
+                    if (!svc && svc !== 0) return '';
+                    if (typeof svc === 'string') return svc;
+                    if (typeof svc === 'object') return svc.service || svc.name || svc.title || svc.label || svc.serviceName || svc.id || svc.serviceId || '';
+                    return String(svc);
+                };
+
+                let walkinAmount = (typeof data.amount === 'number' && !isNaN(data.amount)) ? data.amount : 0;
+                if (!walkinAmount) {
+                    if (Array.isArray(data.service) && data.service.length > 0) {
+                        walkinAmount = data.service.reduce((sum, svc) => {
+                            const svcName = extractServiceNameWalkin(svc);
+                            if (!svcName) return sum;
+                            return sum + (getPriceForService(svcName, walkinCarType) || 0);
+                        }, 0);
+                    } else if (data.service) {
+                        const svcName = extractServiceNameWalkin(data.service);
+                        walkinAmount = getPriceForService(svcName, walkinCarType) || 0;
+                    }
+                }
+
+                return {
+                    transactionId: doc.id,
+                    date: scheduleDate,
+                    customer: customerData.name,
+                    email: customerData.email,
+                    phone: customerData.phone,
+                    plateNumber: customerData.plateNumber,
+                    service: data.service || 'Unknown',
+                    amount: walkinAmount,
+                    paymentMethod: data.paymentMethod || 'Unknown',
+                    technician: data.technician || '',
+                    carType: data.carType || customerData.carType,
+                    customerId: data.customerId,
+                    isWalkin: true,
+                };
+            });
+
+            // Combine all sources into one master list
+            const allPayments = [...paidAppointments, ...paidWalkins];
+
+            return allPayments.sort((a, b) => b.date - a.date);
+        } catch (error) {
+            console.error('Error fetching combined sales data from Firestore:', error);
+            return [];
+        }
     };
-    const paymentData = getCombinedSalesData();
+
+    let paymentData = [];
 
     const formatCurrency = (amount) => {
         return `₱${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    // --- Get Price for Service ---
+    const getPriceForService = (serviceName, carType) => {
+        const serviceData = (window.appData?.services || []).find(
+            (s) => s.service === serviceName
+        );
+        if (!serviceData) return 250 + Math.floor(Math.random() * 1000); // Fallback random price
+
+        // Map car types to price categories
+        const carTypeLower = (carType || '').toLowerCase();
+        let priceCategory = 'medium'; // Default
+        if (['sedan', 'hatchback'].includes(carTypeLower)) priceCategory = 'small';
+        if (['suv', 'pickup'].includes(carTypeLower)) priceCategory = 'large';
+        if (['van', 'truck'].includes(carTypeLower)) priceCategory = 'xLarge';
+
+        // Find the most relevant price
+        return (
+            serviceData[priceCategory] ||
+            serviceData.medium ||
+            serviceData.small ||
+            serviceData.large ||
+            serviceData.xLarge ||
+            250 + Math.floor(Math.random() * 1000)
+        ); // Final fallback
     };
 
     // --- Reusable Data Calculation ---
@@ -107,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 acc.gcash += payment.amount;
             } else if (payment.paymentMethod === 'PayMaya') {
                 acc.maya += payment.amount;
-            } else if (payment.paymentMethod === 'Cash') {
+            } else if (payment.paymentMethod === 'Cash on Hand') {
                 acc.cash += payment.amount;
             }
             return acc;
@@ -132,12 +222,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const totals = getPaymentTotals();
 
-        const chartLabels = ['GCash', 'Maya', 'Cash'];
+        const chartLabels = ['GCash', 'Maya', 'Cash on Hand'];
         const chartData = [totals.gcash, totals.maya, totals.cash];
 
         const colorPalette = [
             '#007BFF', // A distinct blue for GCash
             '#00C6AE', // A teal/green for Maya
+            '#7F1618', // A distinct orange for Cash on Hand
             getCssVar('--color-success-variant'), // Use existing theme color for Cash
         ];
 
@@ -269,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const filteredPayments = paymentData.filter(payment => {
                 const matchesMethod = selectedMethod === 'all' || payment.paymentMethod === selectedMethod;
-                const paymentText = `${payment.customer} ${payment.service} ${payment.transactionId}`.toLowerCase();
+                const paymentText = `${payment.customer} ${payment.email} ${payment.phone} ${payment.plateNumber} ${payment.service} ${payment.transactionId}`.toLowerCase();
                 const matchesSearch = paymentText.includes(searchTerm);
                 return matchesMethod && matchesSearch;
             });
@@ -291,11 +382,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     const row = document.createElement('tr');
                     row.classList.add('clickable-row');
                     row.innerHTML = /*html*/`
-                        <td>${payment.transactionId}</td>
                         <td>${payment.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                        <td>${payment.customer}</td>
-                        <td>${payment.service}</td>
-                        <td>${formatCurrency(payment.amount)}</td>
+                        <td>
+                            <div>${payment.customer}</div>
+                            <small style="color: var(--color-text-secondary);">${payment.email || 'N/A'}</small>
+                        </td>
+                        <td>
+                            <div>${payment.plateNumber || 'N/A'}</div>
+                        </td>
+                        <td>
+                            <div>${payment.service}</div>
+                        </td>
+                        <td>
+                            <div>${formatCurrency(payment.amount)}</div>
+                        </td>
                         <td>${payment.paymentMethod}</td>
                         <td class="text-center actions-cell">
                             <button class="action-icon-btn view-btn" title="View Full Details">
@@ -320,11 +420,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const exportToCSV = () => {
-        const headers = ['Transaction ID', 'Date', 'Customer', 'Service', 'Amount', 'Payment Method'];
+        const headers = [ 'Date', 'Customer Name', 'Email', 'Phone', 'Plate Number', 'Service', 'Amount', 'Payment Method'];
         const rows = paymentData.map(p => [
             p.transactionId,
             p.date.toISOString().split('T')[0],
-            `"${p.customer.replace(/"/g, '""')}"`, // Escape quotes
+            `"${p.customer.replace(/"/g, '""')}"`,
+            `"${(p.email || '').replace(/"/g, '""')}"`,
+            `"${(p.phone || '').replace(/"/g, '""')}"`,
+            `"${(p.plateNumber || '').replace(/"/g, '""')}"`,
             `"${p.service.replace(/"/g, '""')}"`,
             p.amount,
             p.paymentMethod
@@ -420,11 +523,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Initial Load ---
-    const initialSortHeader = paymentsTable.querySelector('th[data-sort-by="date"]');
-    if (initialSortHeader) initialSortHeader.classList.add('sorted-desc');
+    const initializeData = async () => {
+        if (loader) loader.classList.add('loading');
+        try {
+            paymentData = await getCombinedSalesData();
+            
+            const initialSortHeader = paymentsTable.querySelector('th[data-sort-by="date"]');
+            if (initialSortHeader) initialSortHeader.classList.add('sorted-desc');
 
-    calculateAndDisplayStats();
-    renderPaymentDistributionChart();
-    renderRevenueByServiceChart();
-    renderTablePage();
+            calculateAndDisplayStats();
+            renderPaymentDistributionChart();
+            renderRevenueByServiceChart();
+            renderTablePage();
+        } catch (error) {
+            console.error('Error initializing payment monitoring data:', error);
+            if (loader) loader.classList.remove('loading');
+        }
+    };
+
+    initializeData();
 });

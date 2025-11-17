@@ -870,34 +870,49 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const currentPaymentStatus = (appointment && appointment.paymentStatus) ? String(appointment.paymentStatus) : 'Unpaid';
 
                     if (appointment && currentPaymentStatus.toLowerCase() === 'unpaid') {
-                        const db = window.firebase.firestore();
-                        try {
-                            // Update payment status in Firestore
-                            await db.collection('bookings').doc(appointment.serviceId).update({
-                                paymentStatus: 'Paid',
-                                paidAt: window.firebase.firestore().FieldValue.serverTimestamp()
-                            });
-                        } catch (err) {
-                            console.error('Error updating payment status:', err);
-                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to mark as paid (database error).', 'error');
-                            else alert('Failed to mark as paid (database error).');
-                            return;
+                        // Show payment modal
+                        const modalOverlay = document.getElementById('modal-overlay');
+                        const modalTitle = document.getElementById('modal-title');
+                        const modalBody = document.getElementById('modal-body');
+                        const paymentModalContent = document.getElementById('payment-modal-content');
+                        const paymentAmountInput = document.getElementById('payment-amount');
+                        const paymentMethodSelect = document.getElementById('payment-method');
+                        const paymentForm = document.getElementById('payment-form');
+                        const paymentCancelBtn = document.getElementById('payment-cancel-btn');
+
+                        // Show payment modal and hide other content
+                        document.querySelectorAll('.modal-content').forEach(content => {
+                            content.style.display = 'none';
+                        });
+
+                        if (paymentModalContent) {
+                            paymentModalContent.style.display = 'block';
                         }
 
-                        // Local/UI updates after successful DB update
-                        appointment.paymentStatus = 'Paid';
-                        row.dataset.paymentStatus = 'Paid';
+                        // Set the amount field
+                        const amount = appointment.price || 0;
+                        if (paymentAmountInput) {
+                            paymentAmountInput.value = amount.toFixed(2);
+                        }
 
-                        const paymentCell = row.querySelector('td:nth-last-child(2)');
-                        if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+                        // Reset payment method
+                        if (paymentMethodSelect) {
+                            paymentMethodSelect.value = '';
+                        }
 
-                        if (typeof showSuccessToast === 'function') showSuccessToast(`Appointment ${appointment.serviceId} marked as paid.`);
-                        
-                        // --- Send notification to mobile app user ---
-                        sendPaymentReceivedNotification(appointment);
+                        // Update modal title
+                        if (modalTitle) {
+                            modalTitle.textContent = `Process Payment for ${appointment.customer}`;
+                        }
 
-                        // Remove the button after it's clicked
-                        markPaidButton.remove();
+                        // Show the modal overlay
+                        if (modalOverlay) {
+                            modalOverlay.style.display = 'flex';
+                        }
+
+                        // Store the appointment for later use in the form submission
+                        window.pendingPaymentAppointment = appointment;
+                        window.pendingPaymentRow = row;
                     }
                     return;
                 }
@@ -1720,4 +1735,113 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initial render of reschedule table
     renderRescheduleTable();
+
+    // --- Payment Form Handler ---
+    const paymentForm = document.getElementById('payment-form');
+    const paymentCancelBtn = document.getElementById('payment-cancel-btn');
+    const modalOverlay = document.getElementById('modal-overlay');
+
+    if (paymentForm) {
+        paymentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const paymentMethodSelect = document.getElementById('payment-method');
+            const paymentAmountInput = document.getElementById('payment-amount');
+            const paymentMethod = paymentMethodSelect?.value;
+            const amount = parseFloat(paymentAmountInput?.value || 0);
+
+            if (!paymentMethod) {
+                alert('Please select a payment method.');
+                return;
+            }
+
+            const appointment = window.pendingPaymentAppointment;
+            const row = window.pendingPaymentRow;
+
+            if (!appointment || !row) {
+                alert('Error: Could not find appointment data.');
+                return;
+            }
+
+            const db = window.firebase.firestore();
+            try {
+                // Update payment status in Firestore with paymentMethod and price
+                await db.collection('bookings').doc(appointment.serviceId).update({
+                    paymentStatus: 'Paid',
+                    paymentMethod: paymentMethod,
+                    price: amount,
+                    paidAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Local/UI updates after successful DB update
+                appointment.paymentStatus = 'Paid';
+                appointment.paymentMethod = paymentMethod;
+                appointment.price = amount;
+                row.dataset.paymentStatus = 'Paid';
+
+                const paymentCell = row.querySelector('td:nth-last-child(2)');
+                if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+
+                if (typeof showSuccessToast === 'function') {
+                    showSuccessToast(`Appointment ${appointment.serviceId} marked as paid with ${paymentMethod}.`);
+                }
+
+                // Remove the mark paid button
+                const markPaidBtn = row.querySelector('.mark-paid-btn');
+                if (markPaidBtn) markPaidBtn.remove();
+
+                // Send notification to mobile app user
+                if (typeof sendPaymentReceivedNotification === 'function') {
+                    sendPaymentReceivedNotification(appointment);
+                }
+
+                // Close the modal
+                if (modalOverlay) {
+                    modalOverlay.style.display = 'none';
+                }
+
+                // Reset form
+                paymentForm.reset();
+                window.pendingPaymentAppointment = null;
+                window.pendingPaymentRow = null;
+
+            } catch (err) {
+                console.error('Error updating payment status:', err);
+                if (typeof showSuccessToast === 'function') {
+                    showSuccessToast('Failed to process payment (database error).', 'error');
+                } else {
+                    alert('Failed to process payment (database error).');
+                }
+            }
+        });
+    }
+
+    if (paymentCancelBtn) {
+        paymentCancelBtn.addEventListener('click', () => {
+            if (modalOverlay) {
+                modalOverlay.style.display = 'none';
+            }
+            const paymentForm = document.getElementById('payment-form');
+            if (paymentForm) {
+                paymentForm.reset();
+            }
+            window.pendingPaymentAppointment = null;
+            window.pendingPaymentRow = null;
+        });
+    }
+
+    // Close modal when clicking outside of it
+    if (modalOverlay) {
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                modalOverlay.style.display = 'none';
+                const paymentForm = document.getElementById('payment-form');
+                if (paymentForm) {
+                    paymentForm.reset();
+                }
+                window.pendingPaymentAppointment = null;
+                window.pendingPaymentRow = null;
+            }
+        });
+    }
 });

@@ -208,7 +208,7 @@
               <div class="widget-card stat-card">
                 <span class="material-symbols-outlined">payments</span>
                 <div class="stat-info">
-                  <h3>Cash</h3>
+                  <h3>Cash on Hand</h3>
                   <h1 id="cash-total-stat">₱0.00</h1>
                 </div>
               </div>
@@ -237,7 +237,7 @@
                       <option value="all">All Payment Methods</option>
                       <option value="GCash">GCash</option>
                       <option value="PayMaya">Maya</option>
-                      <option value="Cash">Cash</option>
+                      <option value="Cash">Cash on Hand</option>
                     </select>
                   </div>
                   <div class="table-action-buttons">
@@ -257,15 +257,15 @@
                   <table id="payments-table">
                     <thead>
                       <tr>
-                        <th data-sortable="true" data-sort-by="transactionId">
-                          Transaction ID
-                        </th>
                         <th data-sortable="true" data-sort-by="date">Date</th>
                         <th data-sortable="true" data-sort-by="customer">
-                          Customer
+                          Customer Name
+                        </th>
+                        <th data-sortable="true" data-sort-by="plateNumber">
+                          Plate Number
                         </th>
                         <th data-sortable="true" data-sort-by="service">
-                          Service
+                          Service Name
                         </th>
                         <th data-sortable="true" data-sort-by="amount">
                           Amount
@@ -279,7 +279,7 @@
                     <tbody>
                       <!-- Payment data will be injected here by JavaScript -->
                       <tr class="no-results-row" style="display: none">
-                        <td colspan="7" class="text-center text-muted">
+                        <td colspan="8" class="text-center text-muted">
                           No payment records found.
                         </td>
                       </tr>

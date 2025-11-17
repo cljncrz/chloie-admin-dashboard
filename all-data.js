@@ -6,9 +6,7 @@ const sampleTodos = [
 
 const sampleWalkins = [];
 
-const sampleReviews = [
-    { reviewId: "REV-001", transactionId: "TRN-231001", customer: "Angelo Reyes", service: "Ceramic Coating", rating: 5, comment: "Fantastic job! My car looks brand new. The attention to detail was impeccable.", date: "Oct 28, 2025", mediaUrl: "https://images.pexels.com/photos/2127740/pexels-photo-2127740.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1", mediaType: "image", reply: "Thank you, Angelo! We're thrilled you're happy with the ceramic coating. We look forward to seeing you again!", amount: 18000, paymentMethod: "GCash" }
-];
+const sampleReviews = [];
 
 const servicesAndPricing = [];
 

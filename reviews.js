@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const reviewsTable = document.getElementById('reviews-table');
 
     // Only run if the main table element exists
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSortBy = 'date';
     let currentSortDir = 'desc';
 
-    const reviewsData = window.appData.reviews || [];
+    let reviewsData = [];
 
     const createStarRating = (rating) => {
         let stars = '';
@@ -85,6 +85,102 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         topServiceStatEl.textContent = topService;
+    };
+
+    // Fetch reviews from Firestore feedbacks collection
+    const fetchReviews = async () => {
+        try {
+            if (loader) loader.classList.add('loading');
+            
+            const feedbacksRef = firebase.firestore().collection('feedbacks');
+            const snapshot = await feedbacksRef.get();
+            
+            console.log('Total feedbacks found:', snapshot.docs.length);
+            
+            reviewsData = await Promise.all(snapshot.docs.map(async (doc) => {
+                const data = doc.data();
+                let customerName = 'Unknown';
+                let serviceNames = 'N/A';
+                let paymentMethod = 'N/A';
+                let amount = 0;
+                let transactionId = 'N/A';
+                
+                // Get userID - try multiple field names
+                const userId = data.userId || data.userID || data.users || data.customerId || data.customerID;
+                
+                // Get bookingID - try multiple field names
+                const bookingId = data.bookingId || data.bookingID || data.bookings || data.appointmentId || data.appointmentID;
+                
+                console.log('Processing feedback:', {
+                    id: doc.id,
+                    userId,
+                    bookingId,
+                    feedback: data.feedback
+                });
+                
+                // Fetch customer name from users collection using userID
+                if (userId) {
+                    try {
+                        const userDoc = await firebase.firestore().collection('users').doc(userId).get();
+                        console.log('User doc exists:', userDoc.exists, 'for userID:', userId);
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            console.log('User data:', userData);
+                            customerName = userData.name || userData.firstName || userData.fullName || userData.email || 'Unknown';
+                        }
+                    } catch (err) {
+                        console.error('Error fetching user data for userID:', userId, err);
+                    }
+                }
+                
+                // Fetch service name, payment method, and price from bookings collection using bookingID
+                if (bookingId) {
+                    try {
+                        const bookingDoc = await firebase.firestore().collection('bookings').doc(bookingId).get();
+                        console.log('Booking doc exists:', bookingDoc.exists, 'for bookingID:', bookingId);
+                        if (bookingDoc.exists) {
+                            const bookingData = bookingDoc.data();
+                            console.log('Booking data:', bookingData);
+                            serviceNames = bookingData.service || bookingData.serviceNames || bookingData.serviceType || 'N/A';
+                            paymentMethod = bookingData.paymentMethod || 'N/A';
+                            amount = bookingData.price || 0;
+                        }
+                    } catch (err) {
+                        console.error('Error fetching booking data for bookingID:', bookingId, err);
+                    }
+                }
+                
+                console.log('Final review object:', {
+                    customer: customerName,
+                    service: serviceNames,
+                    paymentMethod: paymentMethod,
+                    amount: amount
+                });
+                
+                return {
+                    reviewId: doc.id,
+                    customer: customerName,
+                    service: serviceNames,
+                    comment: data.feedback || data.comment || '',
+                    rating: parseFloat(data.rating) || 0,
+                    date: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : new Date().toLocaleDateString(),
+                    paymentMethod: paymentMethod,
+                    amount: amount
+                };
+            }));
+
+            console.log('Final reviews data:', reviewsData);
+            window.appData.reviews = reviewsData;
+            calculateAndDisplayStats();
+            renderTablePage();
+        } catch (error) {
+            console.error('Error fetching reviews from Firestore:', error);
+            if (typeof showErrorToast === 'function') {
+                showErrorToast('Failed to load reviews from database');
+            }
+        } finally {
+            if (loader) loader.classList.remove('loading');
+        }
     };
 
     const renderTablePage = () => {
@@ -172,7 +268,10 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteSelectedBtn.disabled = checkedBoxes.length === 0;
     };
 
-    const deleteSelectedReviews = () => {
+    // Fetch reviews on load
+    await fetchReviews();
+
+    const deleteSelectedReviews = async () => {
         const checkedBoxes = tableBody.querySelectorAll('.review-checkbox:checked');
         const count = checkedBoxes.length;
 
@@ -184,18 +283,32 @@ document.addEventListener('DOMContentLoaded', () => {
             idsToDelete.push(row.dataset.reviewId);
         });
 
-        // In a real app, you'd send `idsToDelete` to a server.
-        // Here, we filter the client-side array.
-        const initialCount = reviewsData.length;
-        reviewsData.splice(0, reviewsData.length, ...reviewsData.filter(r => !idsToDelete.includes(r.reviewId)));
+        try {
+            // Delete from Firestore
+            const batch = firebase.firestore().batch();
+            idsToDelete.forEach(id => {
+                const docRef = firebase.firestore().collection('feedbacks').doc(id);
+                batch.delete(docRef);
+            });
+            await batch.commit();
 
-        calculateAndDisplayStats(); // Update stats after deletion
-        renderTablePage(); // Re-render the table with the updated data
+            // Update client-side array
+            const initialCount = reviewsData.length;
+            reviewsData.splice(0, reviewsData.length, ...reviewsData.filter(r => !idsToDelete.includes(r.reviewId)));
 
-        if (typeof showSuccessToast === 'function') {
-            const deletedCount = initialCount - reviewsData.length;
-            if (deletedCount > 0) {
-                showSuccessToast(`${deletedCount} review(s) successfully deleted.`);
+            calculateAndDisplayStats(); // Update stats after deletion
+            renderTablePage(); // Re-render the table with the updated data
+
+            if (typeof showSuccessToast === 'function') {
+                const deletedCount = initialCount - reviewsData.length;
+                if (deletedCount > 0) {
+                    showSuccessToast(`${deletedCount} review(s) successfully deleted.`);
+                }
+            }
+        } catch (error) {
+            console.error('Error deleting reviews:', error);
+            if (typeof showErrorToast === 'function') {
+                showErrorToast('Failed to delete reviews');
             }
         }
     };

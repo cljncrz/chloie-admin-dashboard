@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Populate Assigned Tasks ---
     const populateAssignedTasks = async (technicianName) => {
-        const tasksTableBody = document.querySelector('#assigned-tasks-table tbody');
+        const tasksTableBody = document.querySelector('#assigned-tasks-body');
         const tasksCountEl = document.getElementById('assigned-tasks-count');
         if (!tasksTableBody) return;
 
@@ -171,29 +171,77 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Fetch from 'bookings' collection
             const bookingsSnapshot = await db.collection('bookings').where('technician', '==', technicianName).get();
-            bookingsSnapshot.forEach(doc => {
+
+            // Map docs to task objects, resolving customer name when it's stored as a userId (string or object)
+            const bookingTasksPromises = bookingsSnapshot.docs.map(async (doc) => {
                 const data = doc.data();
-                assignedTasks.push({
+
+                // Try common direct name fields first
+                let customerName = data.customerName || data.customer || data.fullName || null;
+
+                // If not found, try resolving from userId which may be a string (doc id) or an object containing name/email
+                if (!customerName && data.userId) {
+                    try {
+                        if (typeof data.userId === 'string') {
+                            const userDoc = await db.collection('users').doc(data.userId).get();
+                            if (userDoc.exists) {
+                                const u = userDoc.data();
+                                customerName = u.fullName || u.name || u.displayName || u.email || null;
+                            }
+                        } else if (typeof data.userId === 'object') {
+                            customerName = data.userId.fullName || data.userId.name || data.userId.displayName || data.userId.email || null;
+                        }
+                    } catch (err) {
+                        console.warn('Could not resolve userId for booking', doc.id, err);
+                    }
+                }
+
+                return {
                     id: doc.id,
-                    plate: data.plateNumber || 'N/A',
-                    customer: data.customerName || 'N/A',
+                    plate: data.plateNumber || data.plate || 'N/A',
+                    customer: customerName || 'N/A',
                     service: data.serviceNames || data.service || 'N/A',
-                    status: data.status || 'N/A'
-                });
+                    status: data.status || 'N/A',
+                };
             });
 
-            // Fetch from 'walkins' collection
+            const bookingTasks = await Promise.all(bookingTasksPromises);
+            assignedTasks.push(...bookingTasks);
+            
+
+            // Fetch from 'walkins' collection (resolve userId if present)
             const walkinsSnapshot = await db.collection('walkins').where('technician', '==', technicianName).get();
-            walkinsSnapshot.forEach(doc => {
+            const walkinTasksPromises = walkinsSnapshot.docs.map(async (doc) => {
                 const data = doc.data();
-                assignedTasks.push({
+
+                let customerName = data.customerName || data.fullName || null;
+                if (!customerName && data.userId) {
+                    try {
+                        if (typeof data.userId === 'string') {
+                            const userDoc = await db.collection('users').doc(data.userId).get();
+                            if (userDoc.exists) {
+                                const u = userDoc.data();
+                                customerName = u.fullName || u.name || u.displayName || u.email || null;
+                            }
+                        } else if (typeof data.userId === 'object') {
+                            customerName = data.userId.fullName || data.userId.name || data.userId.displayName || data.userId.email || null;
+                        }
+                    } catch (err) {
+                        console.warn('Could not resolve userId for walkin', doc.id, err);
+                    }
+                }
+
+                return {
                     id: doc.id,
-                    plate: data.plate || 'N/A',
-                    customer: 'Walk-in',
-                    service: data.service || 'N/A',
-                    status: data.status || 'N/A'
-                });
+                    plate: data.plate || data.plateNumber || 'N/A',
+                    customer: customerName || data.customer || 'N/A',
+                    service: data.service || data.serviceName || 'N/A',
+                    status: data.status || 'N/A',
+                };
             });
+
+            const walkinTasks = await Promise.all(walkinTasksPromises);
+            assignedTasks.push(...walkinTasks);
 
             // Update the total tasks count in the card header
             const completedTasks = assignedTasks.filter(task => task.status === 'Completed').length;
@@ -242,21 +290,6 @@ document.addEventListener('DOMContentLoaded', () => {
             feedbackContainer.innerHTML = '<p class="text-muted" style="text-align: center; padding: 2rem;">Could not load review data.</p>';
             return;
         }
-
-        // --- Image mapping for different car types ---
-        const carImageMap = {
-            'sedan': 'https://images.pexels.com/photos/112460/pexels-photo-112460.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-            'suv': 'https://images.pexels.com/photos/3764984/pexels-photo-3764984.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-            'pickup': 'https://images.pexels.com/photos/1637859/pexels-photo-1637859.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-            'crossover': 'https://images.pexels.com/photos/1638459/pexels-photo-1638459.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-            'mpv': 'https://images.pexels.com/photos/3807378/pexels-photo-3807378.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-            'hatchback': 'https://images.pexels.com/photos/10394782/pexels-photo-10394782.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-            'default': 'https://images.pexels.com/photos/3156482/pexels-photo-3156482.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
-        };
-
-        const getCarImage = (carType) => {
-            return carImageMap[carType?.toLowerCase()] || carImageMap['default'];
-        };
 
         // Find reviews linked to this technician's completed services
         const technicianReviews = window.appData.reviews.filter(review => {
