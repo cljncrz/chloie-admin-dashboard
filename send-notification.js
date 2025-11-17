@@ -417,8 +417,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Load recent notifications sent by this admin
       const snapshot = await db
-        .collectionGroup('notifications')
-        .where('sentBy', '==', currentUser.email)
+        .collectionGroup('notifications') // This now returns a queryable object
+        .where('sentBy', '==', currentUser.email) // These methods are chained
         .orderBy('timestamp', 'desc')
         .limit(10)
         .get();

@@ -27,6 +27,7 @@ import {
   serverTimestamp,
   Timestamp,
   increment,
+  collectionGroup,
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 import {
   ref,
@@ -142,11 +143,17 @@ class Query {
   }
 
   where(field, operator, value) {
-    // Note: can't add more where clauses easily, return the snapshot
+    this._query = query(this._query, where(field, operator, value));
     return this;
   }
 
   orderBy(field, direction = 'asc') {
+    this._query = query(this._query, orderBy(field, direction));
+    return this;
+  }
+
+  limit(n) {
+    this._query = query(this._query, limit(n));
     return this;
   }
 }
@@ -172,7 +179,8 @@ window.firebase = {
   // Firestore methods
   firestore: () => ({
     collection: (name) => new CollectionReference(name),
-    
+    collectionGroup: (collectionId) => new Query(collectionGroup(db, collectionId)),
+
     // Timestamp support
     FieldValue: {
       serverTimestamp: () => serverTimestamp(),

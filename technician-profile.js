@@ -157,42 +157,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Populate Assigned Tasks ---
-    const populateAssignedTasks = (technicianName) => {
-        const tasksTableBody = document.getElementById('assigned-tasks-body');
+    const populateAssignedTasks = async (technicianName) => {
+        const tasksTableBody = document.querySelector('#assigned-tasks-table tbody');
+        const tasksCountEl = document.getElementById('assigned-tasks-count');
+        if (!tasksTableBody) return;
+
         const noHistoryRow = tasksTableBody.querySelector('.no-history');
+        if (!noHistoryRow) return;
 
-        if (!tasksTableBody || !noHistoryRow) return;
+        try {
+            const db = window.firebase.firestore();
+            const assignedTasks = [];
 
-        // Check if global appointment data is available
-        if (typeof window.appData?.appointments === 'undefined' || typeof window.appData?.walkins === 'undefined') {
+            // Fetch from 'bookings' collection
+            const bookingsSnapshot = await db.collection('bookings').where('technician', '==', technicianName).get();
+            bookingsSnapshot.forEach(doc => {
+                const data = doc.data();
+                assignedTasks.push({
+                    id: doc.id,
+                    plate: data.plateNumber || 'N/A',
+                    customer: data.customerName || 'N/A',
+                    service: data.serviceNames || data.service || 'N/A',
+                    status: data.status || 'N/A'
+                });
+            });
+
+            // Fetch from 'walkins' collection
+            const walkinsSnapshot = await db.collection('walkins').where('technician', '==', technicianName).get();
+            walkinsSnapshot.forEach(doc => {
+                const data = doc.data();
+                assignedTasks.push({
+                    id: doc.id,
+                    plate: data.plate || 'N/A',
+                    customer: 'Walk-in',
+                    service: data.service || 'N/A',
+                    status: data.status || 'N/A'
+                });
+            });
+
+            // Update the total tasks count in the card header
+            const completedTasks = assignedTasks.filter(task => task.status === 'Completed').length;
+            if (tasksCountEl) {
+                tasksCountEl.textContent = `${completedTasks} Completed`;
+            }
+
+            if (assignedTasks.length === 0) {
+                noHistoryRow.style.display = 'table-row';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            assignedTasks.forEach(task => {
+                const row = document.createElement('tr');
+                const statusClass = (task.status || '').toLowerCase().replace(/\s+/g, '-');
+                row.innerHTML = `
+                    <td>${task.id}</td>
+                    <td>${task.plate}</td>
+                    <td>${task.customer}</td>
+                    <td>${task.service}</td>
+                    <td class="text-center"><span class="${statusClass}">${task.status}</span></td>
+                `;
+                fragment.appendChild(row);
+            });
+            noHistoryRow.style.display = 'none'; // Hide the no history row
+            tasksTableBody.innerHTML = ''; // Clear previous content
+            tasksTableBody.appendChild(fragment);
+
+        } catch (error) {
+            console.error("Error fetching assigned tasks:", error);
             noHistoryRow.style.display = 'table-row';
-            noHistoryRow.querySelector('td').textContent = 'Could not load appointment data.';
-            return;
+            noHistoryRow.querySelector('td').textContent = 'Error loading tasks.';
         }
-
-        const assignedTasks = [
-            ...window.appData.appointments.filter(appt => appt.technician === technicianName),
-            ...window.appData.walkins.filter(walkin => walkin.technician === technicianName)
-        ];
-
-        if (assignedTasks.length === 0) {
-            noHistoryRow.style.display = 'table-row';
-            return;
-        }
-
-        const fragment = document.createDocumentFragment();
-        assignedTasks.forEach(task => {
-            const row = document.createElement('tr');
-            const statusClass = task.status.toLowerCase().replace(' ', '-');
-            row.innerHTML = `
-                <td>${task.serviceId || task.plate}</td>
-                <td>${task.customer || 'Walk-in'}</td>
-                <td>${task.service}</td>
-                <td class="${statusClass} text-center">${task.status}</td>
-            `;
-            fragment.appendChild(row);
-        });
-        tasksTableBody.appendChild(fragment);
     };
 
     populateAssignedTasks(techData.name);

@@ -117,7 +117,8 @@ window.firebase = {
         },
         set: (data) => setDoc(fsDoc(db, collectionName, id), data),
         update: (data) => updateDoc(fsDoc(db, collectionName, id), data),
-        delete: () => deleteDoc(fsDoc(db, collectionName, id))
+        delete: () => deleteDoc(fsDoc(db, collectionName, id)),
+        collection: (subCollectionName) => createCollectionRef(`${collectionName}/${id}/${subCollectionName}`)
       }),
       where: (field, operator, value) => {
         // Return a new queryable object with the where constraint added
