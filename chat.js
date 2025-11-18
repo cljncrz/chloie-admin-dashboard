@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const userData = doc.data();
                 usersData[doc.id] = {
                     uid: doc.id,
-                    name: userData.name || userData.customerName || 'Unknown User',
+                    name: userData.fullName || userData.name || userData.customerName || 'Unknown User',
                     email: userData.email || '',
                     phone: userData.phone || '',
                     profilePic: userData.profilePic || userData.customerProfilePic || './images/redicon.png',
@@ -432,8 +432,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             .then(() => {
                 // After sending, update the parent chat document for the list view
                 return chatRef.update({
-                    lastMessage: `You: ${text}`,
-                    timestamp: serverTimestamp(),
+                    lastMessage: text.startsWith('You:') ? text : `You: ${text}`,
+                    timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
                     isUnreadForCustomer: true, // Mark as unread for the customer
                     isUnreadForAdmin: false // Admin just sent it, so it's read for them
                 });

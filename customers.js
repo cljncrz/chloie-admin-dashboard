@@ -18,6 +18,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
 
+        // --- Fetch Booking Counts from Firestore ---
+        const fetchBookingCounts = async (userIds) => {
+            const counts = {};
+            
+            try {
+                // Fetch all completed bookings for the given user IDs
+                const bookingsSnapshot = await db.collection('bookings')
+                    .where('userId', 'in', userIds.slice(0, 10)) // Firestore 'in' query limit is 10
+                    .where('status', '==', 'Completed')
+                    .get();
+
+                // Count bookings per user
+                bookingsSnapshot.docs.forEach(doc => {
+                    const userId = doc.data().userId;
+                    counts[userId] = (counts[userId] || 0) + 1;
+                });
+
+                // If there are more than 10 users, fetch in batches
+                if (userIds.length > 10) {
+                    for (let i = 10; i < userIds.length; i += 10) {
+                        const batch = userIds.slice(i, i + 10);
+                        const batchSnapshot = await db.collection('bookings')
+                            .where('userId', 'in', batch)
+                            .where('status', '==', 'Completed')
+                            .get();
+
+                        batchSnapshot.docs.forEach(doc => {
+                            const userId = doc.data().userId;
+                            counts[userId] = (counts[userId] || 0) + 1;
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching booking counts:", error);
+            }
+
+            return counts;
+        };
+
         // --- Fetch and Populate Table from Firestore ---
         const fetchAndPopulateCustomers = async () => {
             if (loader) loader.classList.add('loading');
@@ -34,6 +73,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 mobileCustomers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // Fetch booking counts for each customer
+                const bookingCounts = await fetchBookingCounts(mobileCustomers.map(c => c.id));
+                
+                // Add booking count to each customer
+                mobileCustomers = mobileCustomers.map(customer => ({
+                    ...customer,
+                    bookings: bookingCounts[customer.id] || 0
+                }));
 
                 // Sort by registration date, newest first
                 mobileCustomers.sort((a, b) => {
@@ -73,7 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td>${customer.phoneNumber || 'N/A'}</td>
                     <td>${customer.email || 'N-A'}</td>
                     <td class="text-center">${verificationBadge}</td>
-                    <td class="text-center">${customer.orders || 0}</td>
+                    <td class="text-center">${customer.bookings || 0}</td>
                     <td>${customer.createdAt ? new Date(customer.createdAt.seconds * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
                     <td class="text-center actions-cell">
                         <button type="button" class="action-icon-btn view-btn" title="View Details">

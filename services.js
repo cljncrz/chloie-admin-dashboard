@@ -171,15 +171,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const priceContent = getPriceRange(service);
         const hasSpecificPrices = !priceContent.includes('text-muted');
-
-
-        // --- Create Featured Toggle Switch ---
-        const featuredToggle = `
-            <label class="table-toggle-switch">
-                <input type="checkbox" class="featured-toggle-checkbox" ${service.featured ? 'checked' : ''}>
-                <span class="slider"></span>
-            </label>
-        `;
         
         const statusDropdown = `
             <select class="technician-select status-select ${service.availability.toLowerCase()}">
@@ -211,7 +202,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             </td>
             <td>${service.category}</td>
             <td class="text-center">${availedCounts[service.service] || 0}</td>
-            <td class="text-center">${featuredToggle}</td>
             <td>${statusDropdown}</td>
             <td class="text-center">
                 <button type="button" class="action-icon-btn view-service-btn" title="View Service Profile"><span class="material-symbols-outlined">visibility</span></button>
@@ -276,7 +266,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!row) return;
 
         const viewBtn = e.target.closest('.view-service-btn');
-        const featuredToggleInput = e.target.closest('.featured-toggle-checkbox');
         const statusSelect = e.target.closest('.status-select');
 
         // Handle checkbox clicks for enabling/disabling the delete button
@@ -294,53 +283,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.location.href = 'service-profile.html';
             }
             return;
-        }
-
-        if (featuredToggleInput) {
-            // Prevent the default toggle action until confirmed
-            e.preventDefault();
-
-            const serviceId = row.dataset.serviceId;
-            const service = servicesData.find(s => s.serviceId === serviceId);
-            const isCurrentlyFeatured = service.featured;
-            const willBeFeatured = !isCurrentlyFeatured;
-
-            if (service) {
-                const action = willBeFeatured ? 'feature' : 'unfeature';
-                const title = willBeFeatured ? 'Feature Service' : 'Unfeature Service';
-                const message = `Are you sure you want to ${action} the service "${service.service}"?`;
-
-                openGenericConfirmModal(title, message, async () => {
-                    // --- This runs only on confirmation ---
-                    // 1. Visually update the toggle
-                    featuredToggleInput.checked = willBeFeatured;
-
-                    // 2. Update the data model
-                    service.featured = willBeFeatured;
-
-                    // 3. Save to Firestore
-                    try {
-                        await db.collection('services').doc(serviceId).update({
-                            featured: willBeFeatured
-                        });
-                        console.log(`Service ${serviceId} featured status updated in Firestore`);
-                    } catch (error) {
-                        console.error('Error updating featured status in Firestore:', error);
-                        alert('Error updating service. Please try again.');
-                    }
-
-                    // 4. Show a success message
-                    const successMessage = willBeFeatured
-                        ? `"${service.service}" is now featured.`
-                        : `"${service.service}" is no longer featured.`;
-                    showSuccessToast(successMessage);
-                });
-            }
-        }
-
-        // Close generic modal if cancel/close is clicked
-        if (e.target === genericCancelBtn || e.target === genericCloseModalBtn || e.target === genericConfirmOverlay) {
-            closeGenericConfirmModal();
         }
     });
 
@@ -377,12 +319,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    deleteSelectedBtn.addEventListener('click', () => {
+    deleteSelectedBtn.addEventListener('click', async () => {
         const checkedBoxes = servicesTbody.querySelectorAll('.service-checkbox:checked');
         const count = checkedBoxes.length;
         if (count > 0) {
             const idsToDelete = Array.from(checkedBoxes).map(cb => cb.closest('tr').dataset.serviceId);
-            deleteServices(idsToDelete);
+            
+            // Delete directly without confirmation
+            try {
+                // Delete from Firestore
+                const deletePromises = idsToDelete.map(id => 
+                    db.collection('services').doc(id).delete()
+                );
+                await Promise.all(deletePromises);
+                
+                // Remove from local data
+                servicesData = servicesData.filter(s => !idsToDelete.includes(s.serviceId));
+                
+                // Re-render the table
+                renderTable();
+                
+                // Uncheck "Select All" checkbox
+                const selectAllCheckbox = document.getElementById('select-all-services');
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = false;
+                }
+                
+                // Update delete button state
+                updateDeleteButtonState();
+                
+                // Show success message
+                const message = count === 1 
+                    ? 'Service deleted successfully.' 
+                    : `${count} services deleted successfully.`;
+                showSuccessToast(message);
+                
+                console.log(`Deleted ${count} service(s) from Firestore`);
+            } catch (error) {
+                console.error('Error deleting services:', error);
+                alert('Error deleting services. Please try again.');
+            }
         }
     });
 

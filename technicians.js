@@ -18,6 +18,55 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Helper Functions ---
 
+    // Helper function to count all assigned tasks for a technician
+    const countAssignedTasks = async (technicianName) => {
+        if (!technicianName || technicianName === 'Unassigned') return 0;
+
+        try {
+            let assignedTaskCount = 0;
+            let bookingsCount = 0;
+            let walkinsCount = 0;
+
+            // Count from bookings collection - all tasks (including all statuses for debugging)
+            const bookingsSnapshot = await db.collection('bookings')
+                .where('technician', '==', technicianName)
+                .get();
+
+            console.log(`[${technicianName}] Found ${bookingsSnapshot.size} total bookings`);
+
+            bookingsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const status = (data.status || '').toLowerCase();
+                console.log(`  - Booking ${doc.id}: status = ${status}`);
+                // Count all tasks regardless of status
+                bookingsCount++;
+                assignedTaskCount++;
+            });
+
+            // Count from walkins collection - all tasks
+            const walkinsSnapshot = await db.collection('walkins')
+                .where('technician', '==', technicianName)
+                .get();
+
+            console.log(`[${technicianName}] Found ${walkinsSnapshot.size} total walkins`);
+
+            walkinsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const status = (data.status || '').toLowerCase();
+                console.log(`  - Walkin ${doc.id}: status = ${status}`);
+                // Count all tasks regardless of status
+                walkinsCount++;
+                assignedTaskCount++;
+            });
+
+            console.log(`[${technicianName}] Total: ${assignedTaskCount} tasks (${bookingsCount} bookings + ${walkinsCount} walkins)`);
+            return assignedTaskCount;
+        } catch (error) {
+            console.error(`Error counting assigned tasks for ${technicianName}:`, error);
+            return 0;
+        }
+    };
+
         const createStarRating = (rating) => {
             let stars = '';
             const fullStars = Math.floor(rating);
@@ -55,7 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         ${stars}
                                     </div>
                                     <div>
-                                        <div class="label">Tasks Today</div>
+                                        <div class="label">Tasks</div>
                                         <div class="value">${tech.tasks ?? 0}</div>
                                     </div>
                                 </div>
@@ -87,14 +136,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Map Firestore documents to local technician objects
             technicians = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            window.appData.technicians = technicians; // Update the global data source
 
             // Filter out "Unassigned" for the main list view (if it exists in Firestore)
             // The "Unassigned" technician is a system entry and should not be displayed in the main list.
             const displayableTechnicians = technicians.filter(tech => tech && tech.name !== 'Unassigned');
 
+            // Count all assigned tasks for each technician and update their data
+            const techniciansWithTaskCounts = await Promise.all(
+                displayableTechnicians.map(async (tech) => {
+                    const assignedTaskCount = await countAssignedTasks(tech.name);
+                    return { ...tech, tasks: assignedTaskCount };
+                })
+            );
+
+            // Update the global technicians array with the new task counts
+            technicians = technicians.map(tech => {
+                if (tech.name === 'Unassigned') return tech;
+                const updatedTech = techniciansWithTaskCounts.find(t => t.id === tech.id);
+                return updatedTech || tech;
+            });
+            window.appData.technicians = technicians; // Update the global data source
+
             const fragment = document.createDocumentFragment();
-                displayableTechnicians.forEach(tech => {
+            techniciansWithTaskCounts.forEach(tech => {
                 if (tech && tech.name) {
                     const card = createTechnicianCard(tech);
                     fragment.appendChild(card);
@@ -102,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             if (cardsContainer) cardsContainer.appendChild(fragment);
 
-            if (noResultsEl) noResultsEl.style.display = displayableTechnicians.length === 0 ? 'block' : 'none';
+            if (noResultsEl) noResultsEl.style.display = techniciansWithTaskCounts.length === 0 ? 'block' : 'none';
 
         } catch (error) {
             console.error("Error fetching technicians from Firestore:", error);
