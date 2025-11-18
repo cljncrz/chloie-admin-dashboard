@@ -2,8 +2,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Wait for Firebase to initialize
     await window.firebaseInitPromise;
 
-    const db = window.firebase.firestore();
-    const auth = window.firebase.auth();
+    const firebase = window.firebase;
+    const db = firebase.firestore();
+    const auth = firebase.auth();
 
     // Tab Navigation
     const tabButtons = document.querySelectorAll('.tab-btn');
