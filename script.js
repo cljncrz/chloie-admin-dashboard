@@ -44,6 +44,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Create and append the sidebar overlay
     const createSidebarOverlay = () => {
+        // Check if overlay already exists to prevent duplicates
+        if (document.querySelector('.sidebar-overlay')) {
+            sidebarOverlay = document.querySelector('.sidebar-overlay');
+            return;
+        }
+        
         sidebarOverlay = document.createElement('div');
         sidebarOverlay.classList.add('sidebar-overlay');
         document.body.appendChild(sidebarOverlay);
@@ -52,18 +58,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const openSidebar = () => {
         sideMenu.classList.add('show');
-        sidebarOverlay.style.display = 'block';
+        if (sidebarOverlay) {
+            sidebarOverlay.style.display = 'block';
+            setTimeout(() => sidebarOverlay.classList.add('active'), 10);
+        }
     };
 
     const closeSidebar = () => {
         sideMenu.classList.remove('show');
-        sidebarOverlay.style.display = 'none';
+        if (sidebarOverlay) {
+            sidebarOverlay.classList.remove('active');
+            setTimeout(() => sidebarOverlay.style.display = 'none', 300);
+        }
     };
 
     // --- Sidebar Toggle ---
-    if (menuBtn) {
-        menuBtn.addEventListener('click', openSidebar);
-        closeBtn.addEventListener('click', closeSidebar);
+    if (menuBtn && closeBtn) {
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openSidebar();
+        });
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeSidebar();
+        });
+    }
+
+    // Close sidebar when clicking on sidebar navigation links (mobile)
+    if (navLinks) {
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 1200 && sideMenu.classList.contains('show')) {
+                    closeSidebar();
+                }
+            });
+        });
     }
 
     // --- Theme Management ---

@@ -277,6 +277,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Add real-time toggle listener to update status immediately
+    if (enabledToggle) {
+        enabledToggle.addEventListener('change', () => {
+            geofencingSettings.isEnabled = enabledToggle.checked;
+            updateStats();
+            console.log(`🔄 Geofencing ${enabledToggle.checked ? 'enabled' : 'disabled'} (not saved yet)`);
+        });
+    }
+
     // --- Initialization ---
     await loadSettings();
 });

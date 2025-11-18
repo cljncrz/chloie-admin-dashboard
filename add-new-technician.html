@@ -18,7 +18,17 @@
     />
 
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css" />  
+  <!-- Prevent dark mode flash -->
+  <script>
+    (function() {
+      const theme = localStorage.getItem('theme');
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark-theme-variables');
+        document.body.classList.add('dark-theme-variables');
+      }
+    })();
+  </script>
     <style>
       .page-content {
         padding: 2rem;
