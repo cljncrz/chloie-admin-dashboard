@@ -5738,6 +5738,37 @@ input[type="checkbox"]:checked::after {
     padding: 1.5rem;
 }
 
+/* Notification Settings Sections */
+.notification-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--color-light);
+}
+
+.notification-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.notification-section h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-dark);
+    margin-bottom: 1rem;
+}
+
+.notification-section h4 .material-symbols-outlined {
+    font-size: 1.3rem;
+    color: var(--color-primary);
+}
+
+.dark-theme-variables .notification-section {
+    border-bottom-color: var(--color-dark-variant);
+}
+
 /* Specific grid for pricing inputs */
 .pricing-grid {
     display: grid;
