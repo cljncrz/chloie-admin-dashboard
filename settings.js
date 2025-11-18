@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Save to Firestore
             await db.collection('adminSettings').doc(user.uid).set({
                 notificationPreferences: preferences,
-                updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
 
             // Show success message
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Save to Firestore
                 await db.collection('adminSettings').doc(user.uid).set({
                     generalSettings: generalSettings,
-                    updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
 
                 // Show success message
