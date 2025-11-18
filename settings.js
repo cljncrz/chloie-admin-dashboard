@@ -38,13 +38,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         'notify-system-updates': 'systemUpdates'
     };
 
-    // Load notification settings from Firestore or localStorage
+    // Load notification settings from Firestore
     const loadNotificationSettings = async () => {
         try {
             const user = auth.currentUser;
-            if (!user) return;
+            if (!user) {
+                console.log('User not logged in, cannot load settings');
+                return;
+            }
 
-            // Try to load from Firestore first
             const settingsDoc = await db.collection('adminSettings').doc(user.uid).get();
             
             if (settingsDoc.exists) {
@@ -59,23 +61,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         toggle.checked = settings[settingKey];
                     }
                 });
-            } else {
-                // Fall back to localStorage
-                const localSettings = localStorage.getItem('notificationSettings');
-                if (localSettings) {
-                    const settings = JSON.parse(localSettings);
-                    Object.keys(notificationToggles).forEach(toggleId => {
-                        const toggle = document.getElementById(toggleId);
-                        const settingKey = notificationToggles[toggleId];
-                        
-                        if (toggle && settings.hasOwnProperty(settingKey)) {
-                            toggle.checked = settings[settingKey];
-                        }
-                    });
-                }
             }
         } catch (error) {
             console.error('Error loading notification settings:', error);
+            alert('Failed to load notification settings. Please refresh the page.');
         }
     };
 
@@ -104,9 +93,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 notificationPreferences: preferences,
                 updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
-
-            // Also save to localStorage as backup
-            localStorage.setItem('notificationSettings', JSON.stringify(preferences));
 
             // Show success message
             const successToast = document.getElementById('success-toast');
@@ -155,14 +141,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const shopPhone = document.getElementById('shop-phone').value;
                 const shopEmail = document.getElementById('shop-email').value;
 
+                const generalSettings = {
+                    shopName,
+                    shopAddress,
+                    shopPhone,
+                    shopEmail
+                };
+
                 // Save to Firestore
                 await db.collection('adminSettings').doc(user.uid).set({
-                    generalSettings: {
-                        shopName,
-                        shopAddress,
-                        shopPhone,
-                        shopEmail
-                    },
+                    generalSettings: generalSettings,
                     updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
 
