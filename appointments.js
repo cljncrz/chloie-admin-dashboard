@@ -84,11 +84,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const counts = allAppointments.reduce((acc, appt) => {
                 acc.total++;
-                const status = appt.status.toLowerCase();
-                if (status === 'pending') acc.pending++;
-                else if (status === 'in progress') acc.inProgress++;
-                else if (status === 'completed') acc.completed++;
-                else if (status === 'cancelled') acc.cancelled++;
+                const status = appt.status; // Keep original case
+                if (status === 'Pending') acc.pending++;
+                else if (status === 'In Progress') acc.inProgress++;
+                else if (status === 'Completed') acc.completed++;
+                else if (status === 'Cancelled') acc.cancelled++;
                 return acc;
              }, { total: 0, pending: 0, inProgress: 0, completed: 0, cancelled: 0 });
 
