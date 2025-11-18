@@ -1,7 +1,6 @@
 // damage-reviews.js
-// Renders sample damage reports into the damage reviews table and
-// provides a simple arrow action that stores the selected item
-// in sessionStorage (for a details page).
+// Fetches damage reports from Firestore and renders them into the damage reviews table
+// Provides a view action that stores the selected item in sessionStorage (for a details page).
 (function () {
   console.log('damage-reviews.js loaded');
 
@@ -19,6 +18,28 @@
   function hideLoader() {
     const loader = document.querySelector('#damage-reviews-table-container .table-loader');
     if (loader) loader.style.display = 'none';
+  }
+
+  // Show error message
+  function showErrorMessage(message) {
+    const table = $('#damage-reviews-table');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    // Clear existing rows
+    tbody.querySelectorAll('tr').forEach(tr => tr.remove());
+
+    // Add error row
+    const errorRow = document.createElement('tr');
+    errorRow.className = 'no-results-row';
+    errorRow.innerHTML = `
+      <td colspan="6" class="text-center" style="padding: 2rem; color: #e74c3c;">
+        <span class="material-symbols-outlined" style="font-size: 3rem; display: block; margin-bottom: 1rem;">error</span>
+        <strong>${message}</strong>
+      </td>
+    `;
+    tbody.appendChild(errorRow);
   }
 
   // Ensure each row has an Actions cell with an arrow button
@@ -64,18 +85,17 @@
       if (!row) return;
       const reportId = row.dataset.reportId || row.dataset.reviewId || null;
 
-      // Try to gather row data (best-effort)
-      const cells = Array.from(row.querySelectorAll('td'));
-      const customer = cells[1] ? cells[1].textContent.trim() : '';
-      const service = cells[2] ? cells[2].textContent.trim() : '';
-      const reportText = cells[3] ? cells[3].textContent.trim() : '';
-      const date = cells[4] ? cells[4].textContent.trim() : '';
-
-      const payload = { reportId, customer, service, reportText, date };
-      try {
-        sessionStorage.setItem('selectedDamageReport', JSON.stringify(payload));
-      } catch (err) {
-        console.warn('Could not save selected damage report to sessionStorage', err);
+      // Find the full report data from the damageReports array
+      const reportData = damageReports.find(rep => rep.reportId === reportId);
+      
+      if (reportData) {
+        try {
+          sessionStorage.setItem('selectedDamageReport', JSON.stringify(reportData));
+        } catch (err) {
+          console.warn('Could not save selected damage report to sessionStorage', err);
+        }
+      } else {
+        console.warn('Report data not found for reportId:', reportId);
       }
 
       // Navigate to a details page if available
@@ -100,32 +120,115 @@
     mo.observe(tbody, { childList: true, subtree: true });
   }
 
-  // --- Sample data and renderer (for development/demo) ---
-  const sampleReports = [
-    {
-      reportId: 'dr_001',
-      customer: 'TestingUser01',
-      service: 'Underwash (7-seater)',
-      reportText: 'Minor scratch on rear bumper',
-      date: '11/17/2025'
-    },
-    {
-      reportId: 'dr_002',
-      customer: 'TestingUser01',
-      service: 'Seat Cover (7-seater)',
-      reportText: 'Stain on seat cover after wash',
-      date: '11/17/2025'
-    },
-    {
-      reportId: 'dr_003',
-      customer: 'TestingUser01',
-      service: 'Motorcycle (400cc above)',
-      reportText: 'Left-side mirror loosened',
-      date: '11/17/2025'
-    }
-  ];
+  // --- Fetch damage reports from Firestore ---
+  let damageReports = [];
 
-  function renderSampleData() {
+  async function fetchDamageReports() {
+    try {
+      console.log('Starting damage reports fetch...');
+      
+      // Wait for Firebase to be initialized
+      await window.firebaseInitPromise;
+      console.log('Firebase initialized successfully');
+      
+      const db = window.firebase.firestore();
+      const auth = window.firebase.auth();
+      
+      // Wait for auth state to be determined
+      const user = await new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          unsubscribe();
+          resolve(user);
+        });
+      });
+      
+      console.log('User authentication state:', user ? 'Authenticated' : 'Not authenticated');
+      
+      // Check if user is authenticated
+      if (!user) {
+        console.warn('User not authenticated. Cannot fetch damage reports.');
+        damageReports = [];
+        showErrorMessage('Please log in to view damage reports.');
+        return;
+      }
+      
+      // Verify user has admin role (required by Firestore rules)
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const userRole = userDoc.exists ? userDoc.data().role : null;
+      
+      console.log('User role:', userRole);
+      
+      if (userRole !== 'admin') {
+        console.warn('User does not have admin privileges. Current role:', userRole);
+        damageReports = [];
+        showErrorMessage('Access Denied: Admin privileges required to view damage reports.');
+        return;
+      }
+      
+      console.log('Fetching damage reports from Firestore collection: damage_reports');
+      // Try fetching from 'damage_reports' collection
+      const snapshot = await db.collection('damage_reports').get();
+      
+      console.log('Firestore query completed. Documents found:', snapshot.size);
+      
+      if (snapshot.empty) {
+        console.log('No damage reports found in Firestore.');
+        damageReports = [];
+        showErrorMessage('No damage reports found. The collection is empty.');
+        hideLoader();
+      } else {
+        damageReports = snapshot.docs.map(doc => {
+          const data = doc.data();
+          
+          // Format timestamp to readable date if it exists
+          let formattedDate = 'N/A';
+          if (data.timestamp) {
+            try {
+              // Handle Firestore Timestamp
+              const date = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+              formattedDate = date.toLocaleDateString('en-US', { 
+                month: '2-digit', 
+                day: '2-digit', 
+                year: 'numeric' 
+              });
+            } catch (e) {
+              console.warn('Error formatting date:', e);
+              formattedDate = data.date || 'N/A';
+            }
+          } else if (data.date) {
+            formattedDate = data.date;
+          }
+
+          return {
+            reportId: doc.id,
+            customer: data.customerName || data.customer || 'Unknown',
+            service: data.service || data.serviceName || 'N/A',
+            reportText: data.damageReport || data.reportText || data.description || 'No description',
+            date: formattedDate,
+            // Keep original data for details page
+            ...data
+          };
+        });
+        console.log('Damage reports loaded from Firestore. Total count:', damageReports.length);
+        console.log('Sample report data:', damageReports[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching damage reports from Firestore:', error);
+      
+      // Provide more detailed error information
+      if (error.code === 'permission-denied') {
+        console.error('Permission denied. Please check Firestore security rules for the damage_reports collection.');
+        const errorMsg = 'Access Denied: Firestore security rules need to be updated to allow reading damage reports.';
+        showErrorMessage(errorMsg);
+      } else {
+        showErrorMessage('Error loading damage reports. Please try again later.');
+      }
+      
+      damageReports = [];
+    }
+  }
+
+  function renderDamageReports() {
     const table = $('#damage-reviews-table');
     if (!table) return;
     const tbody = table.querySelector('tbody');
@@ -136,14 +239,36 @@
       if (!tr.classList.contains('no-results-row')) tr.remove();
     });
 
-    sampleReports.forEach((rep) => {
+    if (damageReports.length === 0) {
+      // Show no results row if it exists
+      const noResultsRow = tbody.querySelector('.no-results-row');
+      if (noResultsRow) {
+        noResultsRow.style.display = '';
+      }
+      updateTotals(0);
+      return;
+    }
+
+    // Hide no results row
+    const noResultsRow = tbody.querySelector('.no-results-row');
+    if (noResultsRow) {
+      noResultsRow.style.display = 'none';
+    }
+
+    damageReports.forEach((rep) => {
       const row = document.createElement('tr');
       row.dataset.reportId = rep.reportId;
+      
+      // Truncate long text for display
+      const displayText = rep.reportText.length > 50 
+        ? rep.reportText.substring(0, 50) + '...' 
+        : rep.reportText;
+      
       row.innerHTML = `
         <td><input type="checkbox" class="damage-review-checkbox"></td>
         <td>${rep.customer}</td>
         <td>${rep.service}</td>
-        <td class="damage-comment" title="${rep.reportText}">${rep.reportText}</td>
+        <td class="damage-comment" title="${rep.reportText}">${displayText}</td>
         <td>${rep.date}</td>
         <td class="text-center actions-cell">
           <button type="button" class="action-icon-btn view-btn" title="View Full Details">
@@ -155,22 +280,25 @@
     });
 
     // update totals
-    updateTotals(sampleReports.length);
+    updateTotals(damageReports.length);
   }
 
-  window.addEventListener('DOMContentLoaded', () => {
-    // Hide loader, render sample data, and wire handlers
-    hideLoader();
-    renderSampleData();
-    ensureArrowButtons();
-    setupArrowHandler();
-    observeTableMutations();
-
-    // Update totals based on current rows
-    const tbody = document.querySelector('#damage-reviews-table tbody');
-    if (tbody) {
-      const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.classList.contains('no-results-row'));
-      updateTotals(rows.length);
+  // Initialize when DOM is ready
+  window.addEventListener('DOMContentLoaded', async () => {
+    try {
+      // Fetch data from Firestore
+      await fetchDamageReports();
+      
+      // Hide loader and render data
+      hideLoader();
+      renderDamageReports();
+      ensureArrowButtons();
+      setupArrowHandler();
+      observeTableMutations();
+    } catch (error) {
+      console.error('Error initializing damage reviews:', error);
+      hideLoader();
+      updateTotals(0);
     }
   });
 })();

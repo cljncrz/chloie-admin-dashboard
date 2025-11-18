@@ -173,6 +173,9 @@
                   <input type="search" id="chat-search" placeholder="Search conversations..." />
                 </div>
                 <div class="chat-list-actions">
+                  <button class="action-icon-btn" id="new-conversation-btn" title="Start new conversation">
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
                   <button class="action-icon-btn" id="chat-list-menu-btn" title="List options">
                     <span class="material-symbols-outlined">more_vert</span>
                   </button>
@@ -266,6 +269,32 @@
         </footer>
       </main>
       <!-- ========== End of Main Content ========== -->
+    </div>
+
+    <!-- New Conversation Modal -->
+    <div id="new-conversation-modal" class="modal" style="display: none;">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h2>Start New Conversation</h2>
+          <button class="close-btn" id="close-new-conversation-modal">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <input 
+              type="search" 
+              id="user-search-input" 
+              placeholder="Search users by name, email, or phone..." 
+              class="form-control"
+              style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-info-light); border-radius: 8px;"
+            />
+          </div>
+          <div id="user-list-container" class="user-list-container">
+            <!-- User items will be injected here by JS -->
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="all-data.js"></script>

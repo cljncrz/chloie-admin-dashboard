@@ -4547,6 +4547,89 @@ input[type="checkbox"]:checked::after {
     display: block;
 }
 
+/* ================== USER LIST MODAL ================== */
+.user-list-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid var(--color-info-light);
+    border-radius: var(--border-radius-2);
+    background: var(--color-white);
+}
+
+.user-list-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--color-light);
+    transition: background 0.3s ease;
+    cursor: pointer;
+}
+
+.user-list-item:hover {
+    background: var(--color-light);
+}
+
+.user-list-item:last-child {
+    border-bottom: none;
+}
+
+.user-list-item .profile-photo {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.user-list-item .profile-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-list-item .user-details {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.user-list-item .user-details strong {
+    display: block;
+    font-size: 1rem;
+    color: var(--color-dark);
+    margin-bottom: 0.25rem;
+}
+
+.user-list-item .status-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--border-radius-1);
+    font-size: 0.75rem;
+}
+
+.user-list-item .start-chat-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border: none;
+    background: var(--color-primary);
+    color: white;
+    border-radius: var(--border-radius-2);
+    cursor: pointer;
+    transition: background 0.3s ease;
+    flex-shrink: 0;
+}
+
+.user-list-item .start-chat-btn:hover {
+    background: var(--color-primary-variant);
+}
+
+.user-list-item .start-chat-btn .material-symbols-outlined {
+    font-size: 1.2rem;
+}
+
 /* ================== MEDIA QUERIES (TABLETS) ================== */
 @media screen and (max-width: 1200px) {
     aside .logo {

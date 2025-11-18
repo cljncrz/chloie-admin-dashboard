@@ -5,6 +5,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const db = window.firebase.firestore();
     const auth = window.firebase.auth();
     
+    /**
+     * CHAT SYSTEM - MOBILE-INITIATED ONLY
+     * ====================================
+     * Mobile app users initiate all conversations.
+     * 
+     * HOW IT WORKS:
+     * 1. Customer opens chat in mobile app and sends first message
+     * 2. Chat document is created in Firestore: chats/{customerId}
+     * 3. Admin dashboard automatically shows the new conversation
+     * 4. Admin can respond to customer messages
+     * 
+     * This approach ensures:
+     * - Customers reach out when they need help
+     * - Better privacy (no unsolicited messages)
+     * - Cleaner chat list (only active support requests)
+     */
+    
     const chatPageContainer = document.querySelector('.chat-page-container');
     if (!chatPageContainer) return;
     const chatListColumn = document.querySelector('.chat-page-list-column');
@@ -34,74 +51,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     let activeDropdownOriginalParent = null; // Stores the original parent of the activeDropdown
     let unsubscribeMessages = null; // To stop listening to old message streams
     let isSelectionModeActive = false;
-    let usersData = {}; // Store user data fetched from Firebase for quick lookup
 
     // --- Functions ---
-
-    /**
-     * Fetches all users who signed up in the mobile app from Firestore.
-     * This ensures we have access to customer data for chat initialization.
-     */
-    const fetchMobileAppUsers = async () => {
-        try {
-            const usersSnapshot = await db.collection('users').get();
-            usersData = {}; // Reset user data storage
-            
-            usersSnapshot.forEach(doc => {
-                const userData = doc.data();
-                usersData[doc.id] = {
-                    uid: doc.id,
-                    name: userData.fullName || userData.name || userData.customerName || 'Unknown User',
-                    email: userData.email || '',
-                    phone: userData.phone || '',
-                    profilePic: userData.profilePic || userData.customerProfilePic || './images/redicon.png',
-                    isVerified: userData.isVerified || false,
-                    createdAt: userData.createdAt || userData.registrationDate || null,
-                };
-            });
-            
-            console.log(`Fetched ${Object.keys(usersData).length} users from Firebase`, usersData);
-            return usersData;
-        } catch (error) {
-            console.error("Error fetching mobile app users:", error);
-            return {};
-        }
-    };
 
     /**
      * Listens for real-time updates to the conversations list from Firestore.
      */
     const listenForConversations = () => {
-        // Order by the timestamp of the last message to show recent chats first
+        // Get the chats collection
         const chatsRef = db.collection('chats');
-        const q = chatsRef.orderBy('timestamp', 'desc');
         
-        q.onSnapshot(snapshot => {
-            const newChats = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                // Get user info from the usersData cache, fallback to chat document data
-                const userInfo = usersData[doc.id] || {};
-                
-                newChats.push({
-                    id: doc.id, // The document ID is the chatId (e.g., customer's UID)
-                    customerName: userInfo.name || data.customerName || 'Unknown Customer',
-                    profilePic: userInfo.profilePic || data.customerProfilePic || './images/redicon.png', // Fallback avatar
-                    lastMessage: data.lastMessage || '...',
-                    // Convert Firestore timestamp to a readable string
-                    timestamp: data.timestamp ? formatTimestamp(data.timestamp) : '',
-                    isUnread: data.isUnreadForAdmin || false,
-                    isVerified: userInfo.isVerified || data.isVerified || false,
-                    phone: userInfo.phone || data.phone || '',
-                    // Messages will be fetched separately
+        // Set up real-time listener with error handling
+        try {
+            const unsubscribe = chatsRef.onSnapshot(snapshot => {
+                const newChats = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    
+                    newChats.push({
+                        id: doc.id, // The document ID is the chatId (e.g., customer's UID)
+                        customerName: data.customerName || 'Unknown Customer',
+                        profilePic: data.customerProfilePic || './images/redicon.png',
+                        lastMessage: data.lastMessage || '...',
+                        // Convert Firestore timestamp to a readable string
+                        timestamp: data.timestamp ? formatTimestamp(data.timestamp) : '',
+                        timestampValue: data.timestamp || null, // Store raw timestamp for sorting
+                        isUnread: data.isUnreadForAdmin || false,
+                        isVerified: data.isVerified || false,
+                        phone: data.phone || '',
+                        email: data.email || '',
+                        // Messages will be fetched separately
+                    });
                 });
+                
+                // Sort by timestamp in JavaScript (most recent first)
+                newChats.sort((a, b) => {
+                    if (!a.timestampValue) return 1;
+                    if (!b.timestampValue) return -1;
+                    return b.timestampValue.toMillis() - a.timestampValue.toMillis();
+                });
+                
+                chats = newChats;
+                renderConversationList(searchInput.value);
+            }, error => {
+                console.error("Error accessing chats collection:", error);
+                conversationListEl.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">Unable to access chats. Please check Firestore permissions and ensure you are logged in as an admin.</p>';
             });
-            chats = newChats;
-            renderConversationList(searchInput.value);
-        }, error => {
-            console.error("Error listening for conversations:", error);
-            conversationListEl.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">Error loading chats.</p>';
-        });
+        } catch (error) {
+            console.error("Error setting up chat listener:", error);
+            conversationListEl.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">Error initializing chat system. Please refresh the page.</p>';
+        }
     };
 
     const formatTimestamp = (firestoreTimestamp) => {
@@ -212,12 +211,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             // The UI will update automatically due to the `listenForConversations` snapshot listener.
         }
 
-        // Get full customer data from the usersData cache
-        const customerData = usersData[conversationId];
+        // Get customer verification status from chat data
         let verificationBadgeHTML = '';
-        if (customerData && customerData.isVerified) {
+        if (chat.isVerified) {
             verificationBadgeHTML = `<span class="status-badge verified small">Verified App User</span>`;
-        } else if (customerData) {
+        } else {
             verificationBadgeHTML = `<span class="status-badge not-verified small">Not Verified</span>`;
         }
 
@@ -336,13 +334,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const chat = chats.find(c => c.id === currentConversationId);
             if (chat) {
-                // Get customer data from usersData cache (already loaded from Firebase)
-                const customerData = usersData[currentConversationId];
-                if (customerData) {
-                    sessionStorage.setItem('selectedProfileData', JSON.stringify(customerData));
-                    sessionStorage.setItem('previousPage', window.location.href);
-                    window.location.href = 'customer-profile.html';
-                }
+                // Fetch customer data from users collection
+                db.collection('users').doc(currentConversationId).get()
+                    .then(doc => {
+                        if (doc.exists) {
+                            const customerData = {
+                                uid: doc.id,
+                                name: doc.data().fullName || doc.data().name || chat.customerName,
+                                email: doc.data().email || chat.email || '',
+                                phone: doc.data().phone || chat.phone || '',
+                                profilePic: doc.data().profilePic || chat.profilePic,
+                                isVerified: doc.data().isVerified || chat.isVerified,
+                            };
+                            sessionStorage.setItem('selectedProfileData', JSON.stringify(customerData));
+                            sessionStorage.setItem('previousPage', window.location.href);
+                            window.location.href = 'customer-profile.html';
+                        } else {
+                            alert('Customer profile not found.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching customer profile:', error);
+                        alert('Failed to load customer profile.');
+                    });
             }
             return;
         }
@@ -740,10 +754,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentAdminData = await fetchAdminData();
             console.log('Current Admin:', currentAdminData);
             
-            // Fetch all mobile app users
-            await fetchMobileAppUsers();
-            
-            // Then listen for conversations with user data populated
+            // Listen for conversations initiated by mobile app users
             listenForConversations();
         } catch (error) {
             console.error("Error initializing chat:", error);

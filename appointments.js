@@ -1765,9 +1765,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td>${a.customer || 'N/A'}</td>
                 <td>${a.service || 'N/A'}</td>
                 <td>${a.datetime || 'N/A'}</td>
-                <td>${cancelledAt}</td>
                 <td>${a.cancellationReason || 'N/A'}</td>
-                <td>${a.cancellationNotes || ''}</td>
                 <td class="text-center">
                     <button class="action-icon-btn view-cancel-btn" data-id="${a.serviceId}" title="View"><span class="material-symbols-outlined">visibility</span></button>
                     <button class="action-icon-btn reinstate-btn" data-id="${a.serviceId}" title="Reinstate"><span class="material-symbols-outlined">restore</span></button>
