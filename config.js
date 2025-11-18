@@ -38,7 +38,34 @@ function getFirebaseConfig() {
   }
 }
 
+/**
+ * Returns AI configuration for optional AI/LLM features.
+ * This is intentionally minimal — it only provides a default model and
+ * an "enable for all clients" switch. Frontend or server modules that
+ * integrate with AI providers can call this function to determine whether
+ * an LLM should be enabled by default.
+ */
+function getAIConfig() {
+  if (isNode) {
+    // Node.js server: read from environment variables
+    return {
+      defaultModel: process.env.AI_DEFAULT_MODEL || 'claude-sonnet-4.5',
+      enableForAllClients: (process.env.AI_ENABLE_FOR_ALL_CLIENTS || 'true').toLowerCase() === 'true'
+    };
+  }
+
+  // Browser: we allow window.AI_CONFIG override and fallback to the same defaults
+  if (typeof window !== 'undefined' && window.AI_CONFIG) {
+    return window.AI_CONFIG;
+  }
+
+  return {
+    defaultModel: 'claude-sonnet-4.5',
+    enableForAllClients: true
+  };
+}
+
 // Export for Node.js
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getFirebaseConfig };
+  module.exports = { getFirebaseConfig, getAIConfig };
 }

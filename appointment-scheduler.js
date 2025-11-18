@@ -636,6 +636,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // 4. Remove the request and re-render UI components
+        // Update booking document as cancelled with reason
+        try {
+            const db = window.firebase.firestore();
+            const reqDoc = await db.collection('rescheduleRequests').doc(requestId).get();
+            const reqData = reqDoc.exists ? reqDoc.data() : {};
+            await db.collection('bookings').doc(serviceId).update({
+                status: 'Cancelled',
+                cancelledAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                cancellationReason: reqData.reason || 'Reschedule Denied',
+                cancellationNotes: reqData.notes || '',
+            });
+        } catch (err) {
+            console.error('Error updating booking cancellation data:', err);
+        }
+
         removeRescheduleRequest(requestId);
         renderCalendar(); // This will update time slots and calendar dots
         if (typeof showSuccessToast === 'function') showSuccessToast(`Request denied. Appointment for ${appointmentToCancel.customer} has been cancelled.`);
