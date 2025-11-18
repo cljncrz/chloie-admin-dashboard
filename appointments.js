@@ -138,15 +138,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 const db = window.firebase.firestore();
-                // Fetch bookings, walkins, and technicians simultaneously for better performance
-                const [bookingsSnapshot, walkinsSnapshot, techniciansSnapshot] = await Promise.all([
+                // Fetch bookings, walkins, technicians, and users simultaneously for better performance
+                const [bookingsSnapshot, walkinsSnapshot, techniciansSnapshot, usersSnapshot] = await Promise.all([
                     db.collection('bookings').get(),
                     db.collection('walkins').get(),
-                    db.collection('technicians').get()
+                    db.collection('technicians').get(),
+                    db.collection('users').get()
                 ]);
 
                 // Process and store technicians data globally
                 window.appData.technicians = techniciansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // Process and store users data globally for customer lookup
+                window.appData.users = {};
+                usersSnapshot.docs.forEach(doc => {
+                    const userData = doc.data();
+                    window.appData.users[doc.id] = {
+                        id: doc.id,
+                        name: userData.fullName || userData.name || userData.customerName || 'Unknown Customer',
+                        email: userData.email || '',
+                        phone: userData.phone || userData.phoneNumber || '',
+                        ...userData
+                    };
+                });
 
                 // Process bookings data
                 if (bookingsSnapshot.empty) {
@@ -252,9 +266,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                         console.debug(`Booking doc ${doc.id} -> date field: ${selectedField} -> ${scheduleDateObj.toISOString()}`);
                     }
 
+                    // Get customer info from users collection
+                    const customer = window.appData.users[data.userId] || {};
+                    const customerName = customer.name || 'Unknown Customer';
+                    const customerPhone = customer.phone || data.phoneNumber || '';
+
                     return {
                         ...data,
                         serviceId: doc.id,
+                        customerName: customerName,
+                        customerPhone: customerPhone,
                         plate: data.plateNumber || data.plate || '',
                         service: data.serviceNames || data.service || '',
                         datetime: formattedDateTime,
@@ -451,12 +472,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 row.innerHTML = `
                     <td>${appt.serviceId}</td>
+                    <td>${appt.customerName || 'N/A'}</td>
                     <td>${appt.plate}</td>
-                    <td>${appt.carName}</td>
-                    <td>${appt.carType}</td>
+                    <td>${appt.carName || 'N/A'}</td>
+                    <td>${appt.carType || 'N/A'}</td>
                     <td>${appt.serviceNames}</td>
                     <td>${appt.datetime}</td>
-                    <td>${appt.price}</td>
+                    <td>₱${appt.price}</td>
                     <td>${technicianDropdown}</td>
                     <td class="text-center"><span class="${statusClass}">${appt.status}</span></td>
                     <td class="text-center">${paymentBadge}</td>
