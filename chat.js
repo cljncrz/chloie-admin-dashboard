@@ -86,39 +86,71 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Listens for real-time updates to the conversations list from Firestore.
+     * Now combines all users with existing chat data to show all customers.
      */
     const listenForConversations = () => {
-        // Order by the timestamp of the last message to show recent chats first
-        // Filter out archived chats
+        // Get all chats without complex filtering to avoid permission issues
         const chatsRef = db.collection('chats');
-        const q = chatsRef.where('archived', '!=', true).orderBy('archived').orderBy('timestamp', 'desc');
         
-        q.onSnapshot(snapshot => {
-            const newChats = [];
+        chatsRef.onSnapshot(snapshot => {
+            const existingChats = {};
             snapshot.forEach(doc => {
                 const data = doc.data();
-                // Get user info from the usersData cache, fallback to chat document data
-                const userInfo = usersData[doc.id] || {};
-                
-                newChats.push({
-                    id: doc.id, // The document ID is the chatId (e.g., customer's UID)
-                    customerName: userInfo.name || data.customerName || 'Unknown Customer',
-                    profilePic: userInfo.profilePic || data.customerProfilePic || './images/redicon.png', // Fallback avatar
-                    lastMessage: data.lastMessage || '...',
-                    // Convert Firestore timestamp to a readable string
-                    timestamp: data.timestamp ? formatTimestamp(data.timestamp) : '',
-                    isUnread: data.isUnreadForAdmin || false,
-                    isVerified: userInfo.isVerified || data.isVerified || false,
-                    phone: userInfo.phone || data.phone || '',
-                    // Messages will be fetched separately
-                });
+                // Filter out archived chats on the client side
+                if (data.archived !== true) {
+                    existingChats[doc.id] = {
+                        lastMessage: data.lastMessage || '...',
+                        timestamp: data.timestamp,
+                        isUnread: data.isUnreadForAdmin || false,
+                    };
+                }
             });
-            chats = newChats;
-            renderConversationList(searchInput.value);
+            
+            // Combine all users with their chat data (if any)
+            renderAllCustomers(existingChats);
         }, error => {
             console.error("Error listening for conversations:", error);
-            conversationListEl.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">Error loading chats.</p>';
+            // Even if there's a permission error, still show all users without chat data
+            renderAllCustomers({});
         });
+    };
+
+    /**
+     * Renders all customers with or without existing chat data
+     */
+    const renderAllCustomers = (existingChats) => {
+        const newChats = [];
+        
+        Object.keys(usersData).forEach(userId => {
+            const userInfo = usersData[userId];
+            const chatData = existingChats[userId];
+            
+            newChats.push({
+                id: userId,
+                customerName: userInfo.name || 'Unknown Customer',
+                profilePic: userInfo.profilePic || './images/redicon.png',
+                lastMessage: chatData ? chatData.lastMessage : 'No messages yet',
+                timestamp: chatData && chatData.timestamp ? formatTimestamp(chatData.timestamp) : '',
+                isUnread: chatData ? chatData.isUnread : false,
+                isVerified: userInfo.isVerified || false,
+                phone: userInfo.phone || '',
+                hasConversation: !!chatData,
+                timestampValue: chatData && chatData.timestamp ? chatData.timestamp.toMillis() : 0,
+            });
+        });
+        
+        // Sort: conversations with messages first (by timestamp desc), then users without messages (alphabetically)
+        newChats.sort((a, b) => {
+            if (a.hasConversation && !b.hasConversation) return -1;
+            if (!a.hasConversation && b.hasConversation) return 1;
+            if (a.hasConversation && b.hasConversation) {
+                return b.timestampValue - a.timestampValue;
+            }
+            return a.customerName.localeCompare(b.customerName);
+        });
+        
+        chats = newChats;
+        renderConversationList(searchInput.value);
     };
 
     const formatTimestamp = (firestoreTimestamp) => {

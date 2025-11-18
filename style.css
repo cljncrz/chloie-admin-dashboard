@@ -292,25 +292,41 @@ aside .sidebar-menu a:hover span {
 
 .action-icon-btn {
     background: transparent;
+    border: none;
     cursor: pointer;
     color: var(--color-info-dark);
     transition: all 300ms ease;
-    padding: 0.2rem;
-    border-radius: 50%;
+    padding: 0.5rem;
+    border-radius: var(--border-radius-2);
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    width: 36px;
+    height: 36px;
 }
 
 .action-icon-btn:hover {
-    background: var(--color-light);
-    color: var(--color-primary);
+    background: var(--color-primary-variant);
+    color: var(--color-white);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-icon-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .action-icon-btn:disabled {
     cursor: not-allowed;
     color: var(--color-info-light);
     background: transparent;
+    opacity: 0.5;
+}
+
+.action-icon-btn .material-symbols-outlined {
+    font-size: 20px;
 }
 
 /* ================== MAIN CONTENT ================== */
@@ -4120,6 +4136,23 @@ input[type="checkbox"]:checked::after {
 
 .chat-list-actions {
     position: relative;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chat-list-actions .action-icon-btn {
+    width: 36px;
+    height: 36px;
+}
+
+.chat-list-actions #new-message-btn {
+    background: var(--color-primary);
+    color: var(--color-white);
+}
+
+.chat-list-actions #new-message-btn:hover {
+    background: var(--color-primary-variant);
+    transform: scale(1.05) rotate(5deg);
 }
 
 .chat-list-header-dropdown {
@@ -4201,7 +4234,15 @@ input[type="checkbox"]:checked::after {
 }
 
 .conversation-item-actions .action-icon-btn {
-    padding: 0.2rem;
+    padding: 0.4rem;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--border-radius-1);
+}
+
+.conversation-item-actions .action-icon-btn:hover {
+    background: var(--color-primary);
+    color: var(--color-white);
 }
 
 .conversation-item-dropdown {
@@ -4369,20 +4410,38 @@ input[type="checkbox"]:checked::after {
 }
 
 .chat-page-container .chat-message-form .action-icon-btn {
-    align-self: center; /* Vertically center the send button */
+    align-self: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--border-radius-2);
+}
+
+.chat-page-container .chat-message-form .action-icon-btn[type="submit"],
+.chat-page-container .chat-message-form .action-icon-btn:last-child {
+    background: var(--color-primary);
+    color: var(--color-white);
+}
+
+.chat-page-container .chat-message-form .action-icon-btn[type="submit"]:hover,
+.chat-page-container .chat-message-form .action-icon-btn:last-child:hover {
+    background: var(--color-primary-variant);
+    transform: scale(1.05);
 }
 
 /* Style the input field within the form */
 .chat-page-container .chat-message-form input {
-    flex-grow: 1; /* Allow the input to take up all available space */
+    flex-grow: 1;
     background: var(--color-light);
     border-radius: var(--border-radius-2);
     padding: 0.8rem 1rem;
     color: var(--color-dark);
+    border: 2px solid transparent;
+    transition: all 300ms ease;
 }
 
-.chat-page-container .chat-message-form .action-icon-btn {
-    align-self: center; /* Vertically center the send button */
+.chat-page-container .chat-message-form input:focus {
+    border-color: var(--color-primary);
+    background: var(--color-white);
 }
 
 .chat-message {
