@@ -514,7 +514,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Queue Logic ---
     const renderQueue = () => {
-        // For this example, the queue shows 'Pending' appointments for the selected day
+        if (!queueList) return;
+        
+        // Show 'Pending' appointments for the selected day
         const pendingAppointments = (window.appData.appointments || []).filter(appt => {
            const apptDate = window.appData.parseCustomDate(appt.datetime);
             return apptDate && appt.status === 'Pending' &&
@@ -523,24 +525,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         queueList.innerHTML = '';
         if (pendingAppointments.length === 0) {
-            queueList.innerHTML = '<p class="text-muted">No pending appointments in the queue for this day.</p>';
+            queueList.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">No pending appointments for this date.</p>';
             return;
         }
 
+        const fragment = document.createDocumentFragment();
         pendingAppointments.forEach(appt => {
             const itemEl = document.createElement('div');
             itemEl.classList.add('queue-item');
+            const customerName = appt.customerName || appt.customer || 'Unknown Customer';
+            const serviceName = appt.serviceNames || appt.service || 'Service';
+            const plateNumber = appt.plate || appt.plateNumber || 'N/A';
+            const technicianName = appt.technician || 'Unassigned';
+            
+            // Parse the appointment time
+            const apptDate = window.appData.parseCustomDate(appt.datetime);
+            const timeStr = apptDate ? apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
+            
             itemEl.innerHTML = `
-                <div class="queue-item-info">
-                    <strong>${appt.customer}</strong>
-                    <small>${appt.service}</small>
+                <div class="queue-item-header">
+                    <strong>${customerName}</strong>
+                    <span class="queue-item-time">${timeStr}</span>
                 </div>
-                <div class="queue-item-time">
-                    ${window.appData.parseCustomDate(appt.datetime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                <div class="queue-item-details">
+                    <small><span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">local_car_wash</span> ${serviceName}</small>
+                    <small><span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">badge</span> ${plateNumber}</small>
+                    <small><span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">engineering</span> ${technicianName}</small>
                 </div>
             `;
-            queueList.appendChild(itemEl);
+            
+            // Make queue item clickable to view appointment details
+            itemEl.style.cursor = 'pointer';
+            itemEl.addEventListener('click', () => {
+                sessionStorage.setItem('previousPage', window.location.href);
+                sessionStorage.setItem('selectedAppointmentData', JSON.stringify(appt));
+                window.location.href = `appointment-details.html`;
+            });
+            
+            fragment.appendChild(itemEl);
         });
+        
+        queueList.appendChild(fragment);
     };
 
     // --- Reschedule Logic ---

@@ -107,6 +107,18 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please fill out the Service Name and Category.');
             return;
         }
+        // Determine pricing labels based on vehicle type
+        let pricingLabel1 = null;
+        let pricingLabel2 = null;
+        
+        if (vehicleType === 'Motorcycle') {
+            pricingLabel1 = '399cc below';
+            pricingLabel2 = '400cc above';
+        } else {
+            pricingLabel1 = '5-Seater';
+            pricingLabel2 = '7-Seater';
+        }
+
         const newService = {
             serviceId: `SER-${Date.now().toString().slice(-5)}`, // Generate a semi-unique ID
             service: serviceName,
@@ -115,6 +127,10 @@ document.addEventListener('DOMContentLoaded', () => {
             notes: serviceNotes,
             small: priceSmall,
             medium: priceMedium,
+            large: null,
+            xLarge: null,
+            pricingLabel1: pricingLabel1,
+            pricingLabel2: pricingLabel2,
             featured: isFeatured,
             availability: 'Available',
             imageUrl: imageSrc || null, // Store the Base64 image string

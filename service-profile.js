@@ -313,17 +313,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Helper function to gather form data ---
     const getFormData = () => {
+        const vehicleType = vehicleTypeSelect.value;
+        const priceSmall = parseFloat(document.getElementById('price-small').value) || null;
+        const priceMedium = parseFloat(document.getElementById('price-medium').value) || null;
+        
+        // Determine pricing labels based on vehicle type
+        let pricingLabel1 = null;
+        let pricingLabel2 = null;
+        
+        if (vehicleType === 'Motorcycle') {
+            pricingLabel1 = '399cc below';
+            pricingLabel2 = '400cc above';
+        } else {
+            pricingLabel1 = '5-Seater';
+            pricingLabel2 = '7-Seater';
+        }
+        
         return {
             ...serviceData, // Keep original ID and other unchanged properties
             service: serviceNameInput.value,
             notes: serviceNotesInput.value,
             category: serviceCategorySelect.value,
-            pricingScheme: vehicleTypeSelect.value === 'Motorcycle' ? 'Motorcycle CCs' : 'Car Sizes',
+            pricingScheme: vehicleType === 'Motorcycle' ? 'Motorcycle CCs' : 'Car Sizes',
             featured: featuredToggle.checked,
-            small: parseFloat(document.getElementById('price-small').value) || null,
-            medium: parseFloat(document.getElementById('price-medium').value) || null,
+            small: priceSmall,
+            medium: priceMedium,
             large: null, // Not used in this form
             xLarge: null, // Not used in this form
+            pricingLabel1: pricingLabel1,
+            pricingLabel2: pricingLabel2,
             imageUrl: serviceData.imageUrl,
         };
     };
@@ -360,13 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ...serviceData,
             ...formData,
             status: 'Published',
-            name: formData.service, // Firestore field for service name
-            pricing: {
-                small: formData.small,
-                medium: formData.medium,
-                large: formData.large,
-                xLarge: formData.xLarge,
-            },
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         };
 
@@ -375,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionStorage.removeItem('selectedServiceData');
         window.removeEventListener('storage', handleMediaSelection);
 
-        // Save to Firestore
+        // Save to Firestore - use flat structure matching create-service.js
         try {
             const db = window.firebase.firestore();
             const { serviceId, ...dataToSave } = updatedService;

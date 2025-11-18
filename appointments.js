@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // The previous updateAppointmentWidgets function is no longer needed
         // as the HTML structure and IDs have changed.
 
-        // --- Fetch and Populate Table from Firestore ---
+        // --- Fetch and Populate Table from Firestore with Real-time Updates ---
         const fetchAndPopulateAppointments = async () => {
             const tableBody = mainAppointmentsContainer.querySelector('tbody');
             const loader = mainAppointmentsContainer.querySelector('.table-loader');
@@ -138,10 +138,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 const db = window.firebase.firestore();
-                // Fetch bookings, walkins, technicians, and users simultaneously for better performance
-                const [bookingsSnapshot, walkinsSnapshot, techniciansSnapshot, usersSnapshot] = await Promise.all([
-                    db.collection('bookings').get(),
-                    db.collection('walkins').get(),
+                
+                // First, fetch technicians and users (one-time read)
+                const [techniciansSnapshot, usersSnapshot] = await Promise.all([
                     db.collection('technicians').get(),
                     db.collection('users').get()
                 ]);
@@ -162,17 +161,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     };
                 });
 
-                // Process bookings data
-                if (bookingsSnapshot.empty) {
-                    const noResultsRow = mainAppointmentsContainer.querySelector('.no-results-row');
-                    if (noResultsRow) noResultsRow.style.display = 'table-row';
-                    console.log('No booking documents found in Firestore.');
-                    // Continue — we still want to process walkins and technicians if available
-                }
+                // Set up REAL-TIME listener for bookings collection
+                const bookingsUnsubscribe = db.collection('bookings').onSnapshot((bookingsSnapshot) => {
+                    console.log('📡 Real-time update: Bookings collection changed');
+                    
+                    if (bookingsSnapshot.empty) {
+                        console.log('No booking documents found in Firestore.');
+                        window.appData.appointments = [];
+                    } else {
 
-                // Replace sample data with Firestore data
-                window.appData.appointments = bookingsSnapshot.docs.map(doc => {
-                    const data = doc.data() || {};
+                        // Process bookings data
+                        window.appData.appointments = bookingsSnapshot.docs.map(doc => {
+                            const data = doc.data() || {};
 
                     // helper: parse various firestore-like date shapes into Date or null
                     const parseFirestoreDate = (val) => {
@@ -271,25 +271,43 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const customerName = customer.name || 'Unknown Customer';
                     const customerPhone = customer.phone || data.phoneNumber || '';
 
-                    return {
-                        ...data,
-                        serviceId: doc.id,
-                        customerName: customerName,
-                        customerPhone: customerPhone,
-                        plate: data.plateNumber || data.plate || data.carPlate || data.licensePlate || data.vehiclePlate || '',
-                        service: data.serviceNames || data.service || '',
-                        datetime: formattedDateTime,
-                        datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
-                    };
+                            return {
+                                ...data,
+                                serviceId: doc.id,
+                                customerName: customerName,
+                                customerPhone: customerPhone,
+                                plate: data.plateNumber || data.plate || data.carPlate || data.licensePlate || data.vehiclePlate || '',
+                                service: data.serviceNames || data.service || '',
+                                datetime: formattedDateTime,
+                                datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
+                            };
+                        });
+                    }
+
+                    // Update UI with new data
+                    populateAppointmentsTable();
+                    renderCancelledTable();
+                    updateAppointmentPageStats();
+                    
+                    // Show notification for new pending appointments
+                    const newPendingCount = window.appData.appointments.filter(a => a.status === 'Pending').length;
+                    if (newPendingCount > 0 && typeof showSuccessToast === 'function') {
+                        console.log(`✨ ${newPendingCount} pending appointment(s) detected`);
+                    }
+                }, (error) => {
+                    console.error('Error in bookings real-time listener:', error);
                 });
 
-                // Now that we have live bookings, render cancelled table as well
-                renderCancelledTable();
+                // Store unsubscribe function for cleanup
+                window.bookingsUnsubscribe = bookingsUnsubscribe;
 
-                // --- Process walk-ins data ---
-                if (!walkinsSnapshot.empty) {
-                    window.appData.walkins = walkinsSnapshot.docs.map(doc => {
-                        const data = doc.data() || {};
+                // Set up REAL-TIME listener for walk-ins collection
+                const walkinsUnsubscribe = db.collection('walkins').onSnapshot((walkinsSnapshot) => {
+                    console.log('📡 Real-time update: Walk-ins collection changed');
+                    
+                    if (!walkinsSnapshot.empty) {
+                        window.appData.walkins = walkinsSnapshot.docs.map(doc => {
+                            const data = doc.data() || {};
 
                         // Reuse the same parseFirestoreDate helper defined above
                         const parseFirestoreDate = (val) => {
@@ -343,36 +361,43 @@ document.addEventListener('DOMContentLoaded', async () => {
                             formattedDateTime = `${datePart} - ${timePart}`;
                         }
 
-                        return {
-                            id: doc.id,
-                            ...data,
-                            customerName: data.customerName || data.customer || 'Walk-in Customer',
-                            phone: data.phone || data.phoneNumber || data.customerPhone || 'N/A',
-                            plate: data.plateNumber || data.plate || '',
-                            vehicleType: data.vehicleType || 'Car',
-                            service: data.serviceNames || data.service || data.serviceName || '',
-                            datetime: formattedDateTime,
-                            datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
-                        };
-                    });
-                } else {
-                    // Ensure walkins is at least an empty array when there are no documents
-                    window.appData.walkins = [];
-                }
+                            return {
+                                id: doc.id,
+                                ...data,
+                                customerName: data.customerName || data.customer || 'Walk-in Customer',
+                                phone: data.phone || data.phoneNumber || data.customerPhone || 'N/A',
+                                plate: data.plateNumber || data.plate || '',
+                                vehicleType: data.vehicleType || 'Car',
+                                service: data.serviceNames || data.service || data.serviceName || '',
+                                datetime: formattedDateTime,
+                                datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
+                            };
+                        });
+                    } else {
+                        // Ensure walkins is at least an empty array when there are no documents
+                        window.appData.walkins = [];
+                    }
 
-                // Initial population of tables
-                populateAppointmentsTable();
-                populateWalkinsTable(); // Assuming walk-ins might also come from bookings or a separate fetch
-                updateAppointmentPageStats(); // Update stats after fetching data
+                    // Update UI with new walk-in data
+                    populateWalkinsTable();
+                    updateAppointmentPageStats();
+                }, (error) => {
+                    console.error('Error in walk-ins real-time listener:', error);
+                });
+
+                // Store unsubscribe function for cleanup
+                window.walkinsUnsubscribe = walkinsUnsubscribe;
+
+                // Remove loader after setting up listeners
+                if (loader) loader.classList.remove('loading');
 
             } catch (error) {
-                console.error("Error fetching bookings from Firestore:", error);
+                console.error("Error setting up real-time listeners:", error);
                 const noResultsRow = mainAppointmentsContainer.querySelector('.no-results-row');
                 if (noResultsRow) {
                     noResultsRow.style.display = 'table-row';
                     noResultsRow.querySelector('td').textContent = 'Error loading appointments.';
                 }
-            } finally {
                 if (loader) loader.classList.remove('loading');
             }
         };
@@ -1373,6 +1398,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.initializeTableFunctionality('#walk-in-appointments-table');
             }
         }
+
+        // --- Cleanup listeners when page is hidden or unloaded ---
+        window.addEventListener('pagehide', () => {
+            if (window.bookingsUnsubscribe) {
+                window.bookingsUnsubscribe();
+                console.log('🔌 Unsubscribed from bookings real-time listener');
+            }
+            if (window.walkinsUnsubscribe) {
+                window.walkinsUnsubscribe();
+                console.log('🔌 Unsubscribed from walk-ins real-time listener');
+            }
+        });
 
         // --- Add event listener to refresh data when page is shown ---
         // This handles cases where the user navigates back to this page.
