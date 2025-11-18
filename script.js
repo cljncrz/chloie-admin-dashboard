@@ -567,12 +567,15 @@ const populateUserProfile = (user) => {
     const profilePageEmailInput = document.getElementById('profile-email-input');
     const profilePagePicture = document.getElementById('profile-page-picture');
 
+    // Default admin profile picture
+    const defaultAdminPic = 'images/redicon.png';
+
     // Use data from Firebase Auth object first
     if (profileHeaderName) profileHeaderName.textContent = user.displayName || 'Admin';
-    if (profileHeaderPhoto && user.photoURL) profileHeaderPhoto.src = user.photoURL;
+    if (profileHeaderPhoto) profileHeaderPhoto.src = user.photoURL || defaultAdminPic;
     if (profilePageNameInput) profilePageNameInput.value = user.displayName || '';
     if (profilePageEmailInput) profilePageEmailInput.value = user.email || '';
-    if (profilePagePicture && user.photoURL) profilePagePicture.src = user.photoURL;
+    if (profilePagePicture) profilePagePicture.src = user.photoURL || defaultAdminPic;
 
     // You can also fetch from Firestore if you store more data there
     // Use window.firebase.firestore() to ensure it's initialized
@@ -584,9 +587,17 @@ const populateUserProfile = (user) => {
                 // Override with Firestore data if it's more up-to-date
                 if (profileHeaderName) profileHeaderName.textContent = userData.name || 'Admin';
                 if (profilePageNameInput) profilePageNameInput.value = userData.name || '';
-                if (userData.photoURL) {
-                    if (profileHeaderPhoto) profileHeaderPhoto.src = userData.photoURL;
-                    if (profilePagePicture) profilePagePicture.src = userData.photoURL;
+                // Use photoURL from Firestore or default to redicon
+                const photoURL = userData.photoURL || defaultAdminPic;
+                if (profileHeaderPhoto) profileHeaderPhoto.src = photoURL;
+                if (profilePagePicture) profilePagePicture.src = photoURL;
+            } else {
+                // If no Firestore doc exists, ensure default picture is set
+                if (profileHeaderPhoto && !profileHeaderPhoto.src.includes('http')) {
+                    profileHeaderPhoto.src = defaultAdminPic;
+                }
+                if (profilePagePicture && !profilePagePicture.src.includes('http')) {
+                    profilePagePicture.src = defaultAdminPic;
                 }
             }
         }).catch(error => console.error("Error fetching user data from Firestore:", error));
