@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         serviceId: doc.id,
                         customerName: customerName,
                         customerPhone: customerPhone,
-                        plate: data.plateNumber || data.plate || '',
+                        plate: data.plateNumber || data.plate || data.carPlate || data.licensePlate || data.vehiclePlate || '',
                         service: data.serviceNames || data.service || '',
                         datetime: formattedDateTime,
                         datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
