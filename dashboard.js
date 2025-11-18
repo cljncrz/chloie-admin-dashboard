@@ -506,6 +506,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
 
+    // --- Event Listener for Add To-Do Button ---
+    const setupAddTodoButton = () => {
+        const addTodoLink = document.querySelector('.add-item-link[href="add-to-do.html"]');
+        if (addTodoLink) {
+            addTodoLink.addEventListener('click', (e) => {
+                // The default behavior will navigate to add-to-do.html
+                // You can add any additional logic here if needed
+                console.log('Navigating to Add To-Do page...');
+            });
+        }
+    };
+
     // --- Initial Dashboard Load ---
     // We wrap the initialization in a function to call it.
     const initializeDashboard = async () => {
@@ -515,6 +527,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         populateServiceReviews();
         setupRowClickNavigation(); // Set up the click listener
         setupRealtimeUpdates(); // Set up real-time listeners
+        setupAddTodoButton(); // Set up Add To-Do button listener
     };
 
     // --- Real-Time Updates for Dashboard Cards ---

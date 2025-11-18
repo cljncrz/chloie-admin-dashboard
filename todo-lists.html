@@ -211,14 +211,13 @@
                     <span class="material-symbols-outlined">archive</span>
                     Archive Completed
                   </button>
-                  <button
-                    class="btn-primary open-modal-btn"
-                    data-modal-title="Add New To-Do"
-                    data-content-id="add-todo-content"
+                  <a
+                    href="add-to-do.html"
+                    class="btn-primary"
                   >
                     <span class="material-symbols-outlined">add</span>
                     Add To-Do
-                  </button>
+                  </a>
                 </div>
               </div>
               <div
@@ -271,36 +270,7 @@
             <p>This is where the form or content for the action will go.</p>
           </div>
 
-          <!-- Add To-Do Form (This is the content we need) -->
-          <div class="modal-content" id="add-todo-content">
-            <form id="add-todo-form" class="modal-form">
-              <div class="form-group">
-                <label for="todo-text">Task Description</label>
-                <input
-                  type="text"
-                  id="todo-text"
-                  placeholder="e.g., Order new microfiber towels"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="todo-priority">Priority</label>
-                <select id="todo-priority">
-                  <option value="low">Low</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="todo-due-date">Due Date (Optional)</label>
-                <div class="form-row">
-                  <input type="date" id="todo-due-date" />
-                  <input type="time" id="todo-due-time" />
-                </div>
-              </div>
-              <button type="submit" class="btn-primary">Add Task</button>
-            </form>
-          </div>
+
         </div>
       </div>
     </div>

@@ -1,4 +1,7 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to be initialized
+    await window.firebaseInitPromise;
+    
     const paymentsTable = document.getElementById('payments-table');
 
     // Only run if the main table element exists
@@ -53,49 +56,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Fetch paid bookings from Firestore
             const bookingsSnapshot = await db.collection('bookings').where('paymentStatus', '==', 'Paid').get();
+            console.log(`Found ${bookingsSnapshot.docs.length} paid bookings`);
+            
             const paidAppointments = bookingsSnapshot.docs.map(doc => {
                 const data = doc.data();
+                console.log('Booking data:', doc.id, data);
+                
                 const scheduleDate = data.scheduleDate?.toDate ? data.scheduleDate.toDate() : (data.scheduleDate ? new Date(data.scheduleDate) : new Date());
-                const customerData = customersMap[data.userId] || { name: 'Unknown', email: '', phone: '', plateNumber: '', carType: data.carType || '' };
+                
+                // Try to get customer data from the users map, or use data stored directly in the booking
+                const customerData = customersMap[data.userId] || {};
+                const customerName = data.customer || data.customerName || customerData.name || 'Unknown';
+                const customerEmail = data.email || customerData.email || '';
+                const customerPhone = data.phone || customerData.phone || '';
+                const plateNumber = data.plate || data.plateNumber || customerData.plateNumber || 'N/A';
+                const carType = data.carType || customerData.carType || '';
+                
+                console.log('Extracted data:', {
+                    customerName,
+                    customerEmail,
+                    plateNumber,
+                    userId: data.userId,
+                    hasCustomerData: !!customerData.name
+                });
 
-                // Compute amount: prefer stored amount; otherwise derive from serviceNames and carType
-                const bookingCarType = (data.carType || customerData.carType || '').toString();
-                const extractServiceName = (svc) => {
-                    if (!svc && svc !== 0) return '';
-                    if (typeof svc === 'string') return svc;
-                    if (typeof svc === 'object') return svc.service || svc.name || svc.title || svc.label || svc.serviceName || svc.id || svc.serviceId || '';
-                    return String(svc);
-                };
+                // Use the stored amount/price from the booking
+                // The booking should have stored the price when it was created
+                let bookingAmount = 0;
+                if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
+                    bookingAmount = data.amount;
+                } else if (typeof data.price === 'number' && !isNaN(data.price) && data.price > 0) {
+                    bookingAmount = data.price;
+                } else if (typeof data.totalAmount === 'number' && !isNaN(data.totalAmount) && data.totalAmount > 0) {
+                    bookingAmount = data.totalAmount;
+                }
 
-                let bookingAmount = (typeof data.amount === 'number' && !isNaN(data.amount)) ? data.amount : 0;
-                if (!bookingAmount) {
-                    if (Array.isArray(data.serviceNames) && data.serviceNames.length > 0) {
-                        bookingAmount = data.serviceNames.reduce((sum, svc) => {
-                            const svcName = extractServiceName(svc);
-                            if (!svcName) return sum;
-                            try {
-                                return sum + (getPriceForService(svcName, bookingCarType) || 0);
-                            } catch (e) {
-                                return sum;
-                            }
-                        }, 0);
-                    } else if (data.serviceNames) {
-                        const svcName = extractServiceName(data.serviceNames);
-                        bookingAmount = getPriceForService(svcName, bookingCarType) || 0;
-                    }
+                // Format service names
+                let serviceName = 'Unknown';
+                if (Array.isArray(data.serviceNames)) {
+                    serviceName = data.serviceNames.join(', ');
+                } else if (data.serviceNames) {
+                    serviceName = data.serviceNames;
+                } else if (data.service) {
+                    serviceName = data.service;
                 }
 
                 return {
                     transactionId: doc.id,
                     date: scheduleDate,
-                    customer: customerData.name,
-                    email: customerData.email,
-                    plateNumber: customerData.plateNumber,
-                    service: Array.isArray(data.serviceNames) ? data.serviceNames.join(', ') : (data.serviceNames || 'Unknown'),
+                    customer: customerName,
+                    email: customerEmail,
+                    phone: customerPhone,
+                    plateNumber: plateNumber,
+                    service: serviceName,
                     paymentMethod: data.paymentMethod || 'Unknown',
                     amount: bookingAmount,
                     technician: data.technician || '',
-                    carType: data.carType || customerData.carType,
+                    carType: carType,
                     userId: data.userId,
                     isBooking: true,
                 };
@@ -108,27 +125,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 const scheduleDate = data.dateTime?.toDate ? data.dateTime.toDate() : (data.dateTime ? new Date(data.dateTime) : new Date());
                 const customerData = customersMap[data.customerId] || { name: data.customerName || 'Walk-in Customer', email: data.email || '', phone: data.phone || '', plateNumber: data.plateNumber || '', carType: data.carType || '' };
 
-                // Compute amount: prefer stored amount; otherwise derive from service and carType
-                const walkinCarType = (data.carType || customerData.carType || '').toString();
-                const extractServiceNameWalkin = (svc) => {
-                    if (!svc && svc !== 0) return '';
-                    if (typeof svc === 'string') return svc;
-                    if (typeof svc === 'object') return svc.service || svc.name || svc.title || svc.label || svc.serviceName || svc.id || svc.serviceId || '';
-                    return String(svc);
-                };
+                // Use the stored amount/price from the walk-in
+                let walkinAmount = 0;
+                if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
+                    walkinAmount = data.amount;
+                } else if (typeof data.price === 'number' && !isNaN(data.price) && data.price > 0) {
+                    walkinAmount = data.price;
+                } else if (typeof data.totalAmount === 'number' && !isNaN(data.totalAmount) && data.totalAmount > 0) {
+                    walkinAmount = data.totalAmount;
+                }
 
-                let walkinAmount = (typeof data.amount === 'number' && !isNaN(data.amount)) ? data.amount : 0;
-                if (!walkinAmount) {
-                    if (Array.isArray(data.service) && data.service.length > 0) {
-                        walkinAmount = data.service.reduce((sum, svc) => {
-                            const svcName = extractServiceNameWalkin(svc);
-                            if (!svcName) return sum;
-                            return sum + (getPriceForService(svcName, walkinCarType) || 0);
-                        }, 0);
-                    } else if (data.service) {
-                        const svcName = extractServiceNameWalkin(data.service);
-                        walkinAmount = getPriceForService(svcName, walkinCarType) || 0;
-                    }
+                // Format service name
+                let serviceName = 'Unknown';
+                if (Array.isArray(data.service)) {
+                    serviceName = data.service.join(', ');
+                } else if (data.service) {
+                    serviceName = data.service;
+                } else if (data.serviceNames) {
+                    serviceName = data.serviceNames;
                 }
 
                 return {
@@ -138,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     email: customerData.email,
                     phone: customerData.phone,
                     plateNumber: customerData.plateNumber,
-                    service: data.service || 'Unknown',
+                    service: serviceName,
                     amount: walkinAmount,
                     paymentMethod: data.paymentMethod || 'Unknown',
                     technician: data.technician || '',
@@ -150,6 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Combine all sources into one master list
             const allPayments = [...paidAppointments, ...paidWalkins];
+            
+            console.log('Total payments:', allPayments.length);
+            console.log('Sample payment:', allPayments[0]);
 
             return allPayments.sort((a, b) => b.date - a.date);
         } catch (error) {
@@ -162,31 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const formatCurrency = (amount) => {
         return `₱${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    };
-
-    // --- Get Price for Service ---
-    const getPriceForService = (serviceName, carType) => {
-        const serviceData = (window.appData?.services || []).find(
-            (s) => s.service === serviceName
-        );
-        if (!serviceData) return 250 + Math.floor(Math.random() * 1000); // Fallback random price
-
-        // Map car types to price categories
-        const carTypeLower = (carType || '').toLowerCase();
-        let priceCategory = 'medium'; // Default
-        if (['sedan', 'hatchback'].includes(carTypeLower)) priceCategory = 'small';
-        if (['suv', 'pickup'].includes(carTypeLower)) priceCategory = 'large';
-        if (['van', 'truck'].includes(carTypeLower)) priceCategory = 'xLarge';
-
-        // Find the most relevant price
-        return (
-            serviceData[priceCategory] ||
-            serviceData.medium ||
-            serviceData.small ||
-            serviceData.large ||
-            serviceData.xLarge ||
-            250 + Math.floor(Math.random() * 1000)
-        ); // Final fallback
     };
 
     // --- Reusable Data Calculation ---

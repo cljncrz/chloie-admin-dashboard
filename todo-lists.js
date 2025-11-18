@@ -310,24 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
         archiveCompletedBtn.addEventListener('click', archiveCompletedTodos);
     }
 
-    // --- Form Submission Handler (moved from script.js) ---
-    if (addToDoForm) {
-        addToDoForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const todoTextInput = document.getElementById('todo-text');
-            const todoDueDateInput = document.getElementById('todo-due-date');
-            const todoDueTimeInput = document.getElementById('todo-due-time');
-            const todoPriorityInput = document.getElementById('todo-priority');
-            // The validateForm function is globally available from script.js
-            if (typeof validateForm === 'function' && !validateForm([todoTextInput], 'Please enter a task description.')) return;
-
-            window.addTodoItem(todoTextInput.value.trim(), todoDueDateInput.value, todoDueTimeInput.value, todoPriorityInput.value);
-            if (typeof showSuccessToast === 'function') showSuccessToast('New to-do item added!');
-            if (typeof closeModal === 'function') closeModal();
-            addToDoForm.reset();
-        });
-    }
-
     // --- Initialization ---
     renderTodos();
 });

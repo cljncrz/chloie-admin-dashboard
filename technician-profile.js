@@ -281,57 +281,126 @@ document.addEventListener('DOMContentLoaded', () => {
     populateAssignedTasks(techData.name);
 
     // --- Populate Technician Reviews ---
-    const populateTechnicianReviews = (technicianName) => {
+    const populateTechnicianReviews = async (technicianName) => {
         const feedbackContainer = document.getElementById('technician-feedback-container');
         if (!feedbackContainer) return;
 
-        // Check if global review and appointment data is available
-        if (typeof window.appData?.reviews === 'undefined' || typeof window.appData?.appointments === 'undefined') {
-            feedbackContainer.innerHTML = '<p class="text-muted" style="text-align: center; padding: 2rem;">Could not load review data.</p>';
-            return;
-        }
+        try {
+            const db = window.firebase.firestore();
+            
+            // Fetch reviews from technician_feedbacks collection for this technician
+            const feedbacksSnapshot = await db.collection('technician_feedbacks')
+                .where('technicianName', '==', technicianName)
+                .get();
 
-        // Find reviews linked to this technician's completed services
-        const technicianReviews = window.appData.reviews.filter(review => {
-            const matchingAppointment = window.appData.appointments.find(appt => 
-                appt.customer === review.customer && 
-                appt.service === review.service &&
-                appt.technician === technicianName
-            );
-            return matchingAppointment;
-        });
+            if (feedbacksSnapshot.empty) {
+                feedbackContainer.innerHTML = '<p class="text-muted" style="text-align: center; padding: 2rem;">No customer feedback yet.</p>';
+                return;
+            }
 
-        if (technicianReviews.length > 0) {
-            feedbackContainer.innerHTML = ''; // Clear the "no reviews" message
+            feedbackContainer.innerHTML = ''; // Clear any existing content
             const fragment = document.createDocumentFragment();
-            technicianReviews.forEach(review => {
+
+            // Convert to array and sort by timestamp (most recent first)
+            const feedbackDocs = feedbacksSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .sort((a, b) => {
+                    const aTime = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+                    const bTime = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+                    return bTime - aTime;
+                });
+
+            // Process each feedback and fetch related data
+            const feedbackPromises = feedbackDocs.map(async (feedback) => {
+                let customerName = 'Anonymous';
+                let serviceName = 'Service';
+                let carType = 'sedan';
+
+                // Fetch customer name from userId
+                if (feedback.userId) {
+                    try {
+                        const userDoc = await db.collection('users').doc(feedback.userId).get();
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            customerName = userData.fullName || userData.name || userData.displayName || userData.email || 'Anonymous';
+                        }
+                    } catch (err) {
+                        console.warn('Could not fetch user data for feedback', feedback.id, err);
+                    }
+                }
+
+                // Fetch service details from bookingId
+                if (feedback.bookingId) {
+                    try {
+                        // Try bookings collection first
+                        let bookingDoc = await db.collection('bookings').doc(feedback.bookingId).get();
+                        
+                        // If not found in bookings, try walkins collection
+                        if (!bookingDoc.exists) {
+                            bookingDoc = await db.collection('walkins').doc(feedback.bookingId).get();
+                        }
+
+                        if (bookingDoc.exists) {
+                            const bookingData = bookingDoc.data();
+                            serviceName = bookingData.serviceNames || bookingData.service || bookingData.serviceName || 'Service';
+                            carType = bookingData.carType || 'sedan';
+                        }
+                    } catch (err) {
+                        console.warn('Could not fetch booking data for feedback', feedback.id, err);
+                    }
+                }
+
+                return { feedback, customerName, serviceName, carType };
+            });
+
+            const enrichedFeedbacks = await Promise.all(feedbackPromises);
+
+            enrichedFeedbacks.forEach(({ feedback, customerName, serviceName, carType }) => {
                 const reviewCard = document.createElement('div');
                 reviewCard.classList.add('feedback-card');
 
+                // Generate star rating HTML
                 let stars = '';
+                const rating = feedback.rating || 0;
                 for (let i = 0; i < 5; i++) {
-                    stars += `<span class="material-symbols-outlined ${i < review.rating ? 'filled' : ''}">star</span>`;
+                    stars += `<span class="material-symbols-outlined ${i < rating ? 'filled' : ''}">star</span>`;
                 }
 
-                const matchingAppointment = window.appData.appointments.find(appt => appt.customer === review.customer && appt.service === review.service);
-                const carImageSrc = getCarImage(matchingAppointment?.carType);
+                // Get car image
+                const carImageSrc = getCarImage(carType);
+
+                // Format date
+                let dateStr = 'N/A';
+                if (feedback.timestamp) {
+                    try {
+                        const date = feedback.timestamp.toDate ? feedback.timestamp.toDate() : new Date(feedback.timestamp);
+                        dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    } catch (e) {
+                        console.warn('Could not parse timestamp:', e);
+                    }
+                }
 
                 reviewCard.innerHTML = `
                     <div class="feedback-media">
-                        <img src="${carImageSrc}" alt="${matchingAppointment?.carName || 'Customer car'}">
+                        <img src="${carImageSrc}" alt="Customer car">
                     </div>
                     <div class="feedback-content">
                         <div class="review-header">
-                            <h3>${review.customer}</h3>
-                            <small class="text-muted">${review.service} &bull; ${review.date}</small>
+                            <h3>${customerName}</h3>
+                            <small class="text-muted">${serviceName} &bull; ${dateStr}</small>
                         </div>
                         <div class="review-rating">${stars}</div>
-                        <p class="review-comment">"${review.comment}"</p>
+                        <p class="review-comment">"${feedback.comment || feedback.feedback || 'No comment provided'}"</p>
                     </div>
                 `;
                 fragment.appendChild(reviewCard);
             });
+            
             feedbackContainer.appendChild(fragment);
+
+        } catch (error) {
+            console.error("Error fetching technician feedbacks:", error);
+            feedbackContainer.innerHTML = '<p class="text-muted" style="text-align: center; padding: 2rem;">Error loading customer feedback.</p>';
         }
     };
 
@@ -346,6 +415,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+function getCarImage(carType) {
+    // Return a default car image based on car type
+    // You can customize this to return different images for different car types
+    const carImages = {
+        'sedan': './images/sedan.png',
+        'suv': './images/suv.png',
+        'truck': './images/truck.png',
+        'van': './images/van.png',
+        'coupe': './images/coupe.png',
+        'hatchback': './images/hatchback.png'
+    };
+    
+    const type = (carType || 'sedan').toLowerCase();
+    return carImages[type] || './images/redicon.png'; // Default fallback image
+}
 
 function updateTechnicianRole(techData, newRole) {
     // Find the technician in the technicians array in technicians.js and update the role
