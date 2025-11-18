@@ -74,11 +74,30 @@ try {
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
+// Load central config (includes the AI feature flag we added to config.js)
+let aiConfig = null;
+try {
+  const { getAIConfig } = require('./config');
+  aiConfig = getAIConfig();
+  console.log('🔎 AI config loaded:', aiConfig);
+} catch (e) {
+  console.warn('⚠️ Could not load AI config. Using defaults.');
+}
+
 /**
  * Health check endpoint
  */
 app.get('/health', (req, res) => {
   res.json({ status: '✅ Server is running' });
+});
+
+/**
+ * Debug endpoint for AI config — returns whether the default model is enabled
+ * and the model id. This is a harmless read-only endpoint useful for verifying
+ * the setting has been enabled for "all clients".
+ */
+app.get('/api/ai-config', (req, res) => {
+  res.json({ success: true, aiConfig: aiConfig || { defaultModel: 'claude-sonnet-4.5', enableForAllClients: true } });
 });
 
 /**

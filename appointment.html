@@ -324,64 +324,7 @@
               </div>
             </div>
 
-            <!-- Pending Reschedule Requests Table -->
-            <div
-              class="recent-appointments-container"
-              id="pending-reschedule-table-container"
-            >
-              <div
-                class="recent-appointments pending-reschedule-appointments"
-                id="pending-reschedule-table"
-              >
-                <div class="table-header">
-                  <h2>Pending Reschedule Requests</h2>
-                  <span class="pending-reschedule-badge" id="pending-reschedule-count" style="background: #ff9800; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem;">0</span>
-                </div>
-                <div class="table-controls">
-                  <div class="table-search-container">
-                    <input
-                      type="search"
-                      id="reschedule-search"
-                      placeholder="Search reschedule requests..."
-                    />
-                  </div>
-                </div>
-                <div class="table-responsive-wrapper">
-                  <div class="table-loader">
-                    <div class="spinner"></div>
-                  </div>
-                  <table>
-                    <thead>
-                      <tr class="sortable-header">
-                        <th>Request ID</th>
-                        <th>Customer</th>
-                        <th>Service</th>
-                        <th>Current Date & Time</th>
-                        <th>Requested New Date & Time</th>
-                        <th>Reason</th>
-                        <th class="text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr class="no-results-row">
-                        <td colspan="7" class="text-center text-muted">
-                          No pending reschedule requests.
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div class="table-pagination">
-                  <button class="pagination-btn" data-action="prev">
-                    &laquo; Previous
-                  </button>
-                  <span class="page-info"></span>
-                  <button class="pagination-btn" data-action="next">
-                    Next &raquo;
-                  </button>
-                </div>
-              </div>
-            </div>
+            <!-- Pending Reschedule Requests section removed -->
 
             <div
               class="recent-appointments-container"
@@ -451,6 +394,44 @@
                 </div>
               </div>
             </div>
+
+            <!-- Cancelled Appointments Table -->
+            <div class="recent-appointments-container" id="cancelled-appointments-table-container">
+              <div class="recent-appointments" id="cancelled-appointments-table">
+                <div class="table-header">
+                  <h2>Cancelled Appointments</h2>
+                </div>
+                <div class="table-controls">
+                  <div class="table-search-container">
+                    <input type="search" id="cancelled-appointment-search" placeholder="Search cancelled appointments..." />
+                  </div>
+                </div>
+                <div class="table-responsive-wrapper">
+                  <div class="table-loader">
+                    <div class="spinner"></div>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr class="sortable-header">
+                        <th>Appt ID</th>
+                        <th>Customer</th>
+                        <th>Service</th>
+                        <th>Date & Time</th>
+                        <th>Cancelled At</th>
+                        <th>Reason</th>
+                        <th>Description / Notes</th>
+                        <th class="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="no-results-row">
+                        <td colspan="8" class="text-center text-muted">No cancelled appointments found.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </section>
         </div>
         <!-- ========== End of Page Content ========== -->
@@ -486,6 +467,30 @@
           <!-- Default Content -->
           <div class="modal-content" id="default-modal-content">
             <p>This is where the form or content for the action will go.</p>
+          </div>
+
+          <!-- Cancel Appointment Modal Content -->
+          <div class="modal-content" id="cancel-appointment-content">
+            <form id="cancel-appointment-form" class="modal-form">
+              <div class="form-group">
+                <label for="cancel-reason">Cancellation Reason</label>
+                <select id="cancel-reason" required>
+                  <option value="">Select reason</option>
+                  <option value="Customer Request">Customer Request</option>
+                  <option value="No Show">No Show</option>
+                  <option value="Reschedule Denied">Reschedule Denied</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="cancel-notes">Description / Notes (optional)</label>
+                <textarea id="cancel-notes" rows="4" placeholder="Add notes about cancellation, e.g., reason details..."></textarea>
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="cancel-cancel-btn">Close</button>
+                <button type="submit" class="btn-primary">Confirm Cancel</button>
+              </div>
+            </form>
           </div>
 
           <!-- Appointment Details Content -->

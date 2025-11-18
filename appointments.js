@@ -262,6 +262,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     };
                 });
 
+                // Now that we have live bookings, render cancelled table as well
+                renderCancelledTable();
+
                 // --- Process walk-ins data ---
                 if (!walkinsSnapshot.empty) {
                     window.appData.walkins = walkinsSnapshot.docs.map(doc => {
@@ -825,26 +828,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             return;
                         }
 
-                        const db = window.firebase.firestore();
-                        try {
-                            await db.collection('bookings').doc(appointment.serviceId).update({
-                                status: 'Cancelled',
-                                cancelledAt: window.firebase.firestore().FieldValue.serverTimestamp()
-                            });
-                        } catch (err) {
-                            console.error('Error updating booking to Cancelled:', err);
-                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to cancel service (database error).', 'error');
-                            else alert('Failed to cancel service (database error).');
-                            return;
-                        }
+                        // Instead of immediately cancelling, open the cancel modal to collect reason and notes
+                        openCancelModal(appointment, row, originalStatus);
 
-                        // Update status in data model
-                        appointment.status = 'Cancelled';
-                        row.dataset.status = 'Cancelled';
-
-                        // Update status in UI
-                        const statusCell = row.querySelector('td:nth-last-child(3)'); // The 3rd cell from the end is Status
-                        statusCell.innerHTML = `<span class="cancelled">Cancelled</span>`;
+                        // UI update will be handled after the admin confirms cancel in the modal
 
                         // If it was a pending or in-progress task, free up the technician
                         if (originalStatus === 'Pending' || originalStatus === 'In Progress') {
@@ -1519,7 +1506,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await NotificationService.notifyAppointmentCancelled(customerId, {
                 id: appointment.serviceId,
                 serviceName: appointment.serviceNames || appointment.service,
-                reason: 'Your appointment was cancelled by the admin'
+                reason: appointment.cancellationReason || 'Your appointment was cancelled by the admin'
             });
 
             console.log(`✅ Appointment cancelled notification sent to ${customerId}`);
@@ -1528,213 +1515,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // --- Pending Reschedule Requests Table Management ---
-    const rescheduleContainer = document.getElementById('pending-reschedule-table');
-    const rescheduleTable = rescheduleContainer?.querySelector('table tbody');
-    let rescheduleCurrentPage = 1;
-    const rescheduleRowsPerPage = 10;
-    let rescheduleSearchTerm = '';
-
-    const renderRescheduleTable = () => {
-        if (!rescheduleTable) return;
-
-        let rescheduleRequests = (window.appData.rescheduleRequests || []).filter(req => req.status === 'Pending');
-
-        // Apply search filter
-        if (rescheduleSearchTerm) {
-            rescheduleRequests = rescheduleRequests.filter(req => 
-                (req.customer || '').toLowerCase().includes(rescheduleSearchTerm.toLowerCase()) ||
-                (req.service || '').toLowerCase().includes(rescheduleSearchTerm.toLowerCase()) ||
-                (req.requestId || '').toLowerCase().includes(rescheduleSearchTerm.toLowerCase())
-            );
-        }
-
-        // Update badge count
-        const badge = document.getElementById('pending-reschedule-count');
-        if (badge) {
-            badge.textContent = rescheduleRequests.length;
-        }
-
-        // Calculate pagination
-        const totalPages = Math.ceil(rescheduleRequests.length / rescheduleRowsPerPage);
-        const startIdx = (rescheduleCurrentPage - 1) * rescheduleRowsPerPage;
-        const endIdx = startIdx + rescheduleRowsPerPage;
-        const paginatedRequests = rescheduleRequests.slice(startIdx, endIdx);
-
-        // Clear table
-        rescheduleTable.innerHTML = '';
-
-        if (paginatedRequests.length === 0) {
-            rescheduleTable.innerHTML = `
-                <tr class="no-results-row">
-                    <td colspan="7" class="text-center text-muted">
-                        ${rescheduleRequests.length === 0 ? 'No pending reschedule requests.' : 'No results found.'}
-                    </td>
-                </tr>
-            `;
-        } else {
-            paginatedRequests.forEach(req => {
-                const row = document.createElement('tr');
-                const currentDateTime = new Date(req.currentDateTime || req.dateTime).toLocaleString();
-                const requestedDateTime = new Date(req.requestedDateTime || req.newDateTime).toLocaleString();
-
-                row.innerHTML = `
-                    <td>${req.requestId || 'N/A'}</td>
-                    <td>${req.customer || 'N/A'}</td>
-                    <td>${req.service || 'N/A'}</td>
-                    <td>${currentDateTime}</td>
-                    <td>${requestedDateTime}</td>
-                    <td>${req.reason || 'No reason provided'}</td>
-                    <td class="text-center">
-                        <button class="btn-primary-small approve-reschedule-btn" data-request-id="${req.requestId}" data-service-id="${req.serviceId}" title="Approve Reschedule">
-                            <span class="material-symbols-outlined" style="font-size: 1.2rem;">check_circle</span>
-                        </button>
-                        <button class="btn-danger-small deny-reschedule-btn" data-request-id="${req.requestId}" data-service-id="${req.serviceId}" title="Deny Reschedule">
-                            <span class="material-symbols-outlined" style="font-size: 1.2rem;">cancel</span>
-                        </button>
-                    </td>
-                `;
-                rescheduleTable.appendChild(row);
-            });
-        }
-
-        // Update pagination
-        const paginationInfo = rescheduleContainer?.querySelector('.page-info');
-        if (paginationInfo) {
-            paginationInfo.textContent = `Page ${rescheduleCurrentPage} of ${totalPages || 1}`;
-        }
-
-        // Attach event listeners to buttons
-        const approveButtons = rescheduleContainer?.querySelectorAll('.approve-reschedule-btn');
-        const denyButtons = rescheduleContainer?.querySelectorAll('.deny-reschedule-btn');
-
-        approveButtons?.forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                const requestId = btn.dataset.requestId;
-                const serviceId = btn.dataset.serviceId;
-                
-                if (confirm('Approve this reschedule request?')) {
-                    try {
-                        const db = window.firebase.firestore();
-                        const req = rescheduleRequests.find(r => r.requestId === requestId);
-                        
-                        if (!req) return;
-
-                        // Update reschedule request status
-                        await db.collection('rescheduleRequests').doc(requestId).update({
-                            status: 'Approved',
-                            approvedBy: currentUserFullName,
-                            approvedAt: window.firebase.firestore.FieldValue.serverTimestamp()
-                        });
-
-                        // Update the original appointment with new datetime
-                        if (req.serviceId) {
-                            await db.collection('bookings').doc(req.serviceId).update({
-                                datetime: req.requestedDateTime || req.newDateTime,
-                                lastModified: window.firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                        }
-
-                        // Create admin notification
-                        if (typeof window.addNewNotification === 'function') {
-                            await window.addNewNotification({
-                                title: 'Reschedule Approved',
-                                message: `Approved reschedule request for ${req.customer}`,
-                                link: 'appointment.html',
-                                data: { action: 'reschedule_approved', itemId: requestId }
-                            }, true);
-                        }
-
-                        // Refresh table
-                        window.appData.rescheduleRequests = (window.appData.rescheduleRequests || []).map(r => 
-                            r.requestId === requestId ? { ...r, status: 'Approved' } : r
-                        );
-                        renderRescheduleTable();
-                        updateAppointmentPageStats();
-
-                        alert('Reschedule request approved!');
-                    } catch (error) {
-                        console.error('Error approving reschedule:', error);
-                        alert('Error approving reschedule request');
-                    }
-                }
-            });
-        });
-
-        denyButtons?.forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                const requestId = btn.dataset.requestId;
-                
-                if (confirm('Deny this reschedule request? The appointment will remain cancelled.')) {
-                    try {
-                        const db = window.firebase.firestore();
-                        
-                        // Update reschedule request status
-                        await db.collection('rescheduleRequests').doc(requestId).update({
-                            status: 'Denied',
-                            deniedBy: currentUserFullName,
-                            deniedAt: window.firebase.firestore.FieldValue.serverTimestamp()
-                        });
-
-                        // Create admin notification
-                        if (typeof window.addNewNotification === 'function') {
-                            const req = rescheduleRequests.find(r => r.requestId === requestId);
-                            await window.addNewNotification({
-                                title: 'Reschedule Denied',
-                                message: `Denied reschedule request for ${req?.customer || 'customer'}`,
-                                link: 'appointment.html',
-                                data: { action: 'reschedule_denied', itemId: requestId }
-                            }, true);
-                        }
-
-                        // Refresh table
-                        window.appData.rescheduleRequests = (window.appData.rescheduleRequests || []).map(r => 
-                            r.requestId === requestId ? { ...r, status: 'Denied' } : r
-                        );
-                        renderRescheduleTable();
-                        updateAppointmentPageStats();
-
-                        alert('Reschedule request denied!');
-                    } catch (error) {
-                        console.error('Error denying reschedule:', error);
-                        alert('Error denying reschedule request');
-                    }
-                }
-            });
-        });
-    };
-
-    // Search functionality for reschedule requests
-    const rescheduleSearchInput = document.getElementById('reschedule-search');
-    if (rescheduleSearchInput) {
-        rescheduleSearchInput.addEventListener('input', (e) => {
-            rescheduleSearchTerm = e.target.value;
-            rescheduleCurrentPage = 1;
-            renderRescheduleTable();
-        });
-    }
-
-    // Pagination for reschedule requests
-    const reschedulePaginationBtns = rescheduleContainer?.querySelectorAll('.pagination-btn');
-    reschedulePaginationBtns?.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const action = btn.dataset.action;
-            const totalPages = Math.ceil(((window.appData.rescheduleRequests || []).filter(r => r.status === 'Pending').length) / rescheduleRowsPerPage);
-            
-            if (action === 'prev' && rescheduleCurrentPage > 1) {
-                rescheduleCurrentPage--;
-            } else if (action === 'next' && rescheduleCurrentPage < totalPages) {
-                rescheduleCurrentPage++;
-            }
-            
-            renderRescheduleTable();
-        });
-    });
-
-    // Initial render of reschedule table
-    renderRescheduleTable();
+    // TODO: Pending reschedule requests table removed - UI and handlers deleted
 
     // --- Payment Form Handler ---
     const paymentForm = document.getElementById('payment-form');
@@ -1830,6 +1611,106 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // --- Cancel Appointment Modal & Handler ---
+    const cancelModalContent = document.getElementById('cancel-appointment-content');
+    const cancelForm = document.getElementById('cancel-appointment-form');
+    const cancelReasonSelect = document.getElementById('cancel-reason');
+    const cancelNotesInput = document.getElementById('cancel-notes');
+    const cancelCloseBtn = document.getElementById('cancel-cancel-btn');
+
+    // Hold selected appointment while the modal is open
+    let pendingCancelAppointment = null;
+
+    const openCancelModal = (appointment, row, originalStatus) => {
+    // Keep a copy of original status so the modal logic can decide about technician counting
+    if (appointment && originalStatus) appointment._originalStatus = originalStatus;
+        if (!appointment) return;
+        pendingCancelAppointment = { appointment, row };
+        // Show modal with cancel form
+        document.querySelectorAll('.modal-content').forEach(c => c.classList.remove('active'));
+        if (cancelModalContent) cancelModalContent.classList.add('active');
+        if (cancelReasonSelect) cancelReasonSelect.value = '';
+        if (cancelNotesInput) cancelNotesInput.value = '';
+        document.getElementById('modal-title').textContent = `Cancel Appointment: ${appointment.customer}`;
+        document.getElementById('modal-overlay').classList.add('show');
+        document.body.classList.add('modal-open');
+    };
+
+    const closeCancelModal = () => {
+        pendingCancelAppointment = null;
+        document.getElementById('modal-overlay').classList.remove('show');
+        document.body.classList.remove('modal-open');
+        if (cancelModalContent) cancelModalContent.classList.remove('active');
+    };
+
+    if (cancelCloseBtn) {
+        cancelCloseBtn.addEventListener('click', () => {
+            closeCancelModal();
+        });
+    }
+
+    if (cancelForm) {
+        cancelForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!pendingCancelAppointment) return closeCancelModal();
+
+            const { appointment, row } = pendingCancelAppointment;
+            const reason = cancelReasonSelect?.value || '';
+            const notes = cancelNotesInput?.value || '';
+
+            if (!reason) {
+                if (typeof showSuccessToast === 'function') showSuccessToast('Please select a cancellation reason', 'error');
+                else alert('Please select a cancellation reason');
+                return;
+            }
+
+            try {
+                const db = window.firebase.firestore();
+                await db.collection('bookings').doc(appointment.serviceId).update({
+                    status: 'Cancelled',
+                    cancelledAt: window.firebase.firestore().FieldValue.serverTimestamp(),
+                    cancellationReason: reason,
+                    cancellationNotes: notes,
+                    cancelledBy: currentUserFullName || null
+                });
+
+                // Update local model
+                appointment.status = 'Cancelled';
+                appointment.cancelledAt = new Date().toISOString();
+                appointment.cancellationReason = reason;
+                appointment.cancellationNotes = notes;
+                appointment.cancelledBy = currentUserFullName || null;
+
+                // Update UI row
+                row.dataset.status = 'Cancelled';
+                const statusCell = row.querySelector('td:nth-last-child(3)');
+                if (statusCell) statusCell.innerHTML = `<span class="cancelled">Cancelled</span>`;
+
+                // Decrease technician if needed
+                if (appointment.technician && (appointment._originalStatus === 'Pending' || appointment._originalStatus === 'In Progress')) {
+                    decreaseTechnicianTaskCount(appointment.technician);
+                }
+
+                // Render cancelled table
+                renderCancelledTable();
+
+                // Notifications
+                if (typeof sendAppointmentCancelledNotification === 'function') {
+                    sendAppointmentCancelledNotification(appointment);
+                }
+
+                // Close modal and refresh lists
+                closeCancelModal();
+                updateAppointmentPageStats();
+                populateAppointmentsTable();
+                if (typeof showSuccessToast === 'function') showSuccessToast('Appointment cancelled.');
+            } catch (err) {
+                console.error('Error cancelling appointment:', err);
+                if (typeof showSuccessToast === 'function') showSuccessToast('Failed to cancel appointment (database error).', 'error');
+            }
+        });
+    }
+
     // Close modal when clicking outside of it
     if (modalOverlay) {
         modalOverlay.addEventListener('click', (e) => {
@@ -1841,6 +1722,105 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 window.pendingPaymentAppointment = null;
                 window.pendingPaymentRow = null;
+            }
+        });
+    }
+
+    // --- Cancelled Appointments Table ---
+    const cancelledContainer = document.getElementById('cancelled-appointments-table');
+    const cancelledTableBody = cancelledContainer?.querySelector('tbody');
+    let cancelledSearchTerm = '';
+
+    function renderCancelledTable() {
+        if (!cancelledTableBody) return;
+
+        const cancelled = (window.appData.appointments || []).filter(a => String(a.status || '').toLowerCase() === 'cancelled');
+
+        // Apply search filter
+        const filtered = cancelled.filter(a => {
+            const term = cancelledSearchTerm.toLowerCase();
+            if (!term) return true;
+            return (a.serviceId || '').toLowerCase().includes(term) ||
+                   (a.customer || '').toLowerCase().includes(term) ||
+                   (a.service || '').toLowerCase().includes(term) ||
+                   (a.cancellationReason || '').toLowerCase().includes(term) ||
+                   (a.cancellationNotes || '').toLowerCase().includes(term);
+        });
+
+        cancelledTableBody.innerHTML = '';
+
+        if (filtered.length === 0) {
+            const tr = document.createElement('tr');
+            tr.classList.add('no-results-row');
+            tr.innerHTML = `<td colspan="8" class="text-center text-muted">No cancelled appointments found.</td>`;
+            cancelledTableBody.appendChild(tr);
+            return;
+        }
+
+        filtered.forEach(a => {
+            const row = document.createElement('tr');
+            const cancelledAt = a.cancelledAt ? (new Date(a.cancelledAt)).toLocaleString() : 'N/A';
+            row.innerHTML = `
+                <td>${a.serviceId}</td>
+                <td>${a.customer || 'N/A'}</td>
+                <td>${a.service || 'N/A'}</td>
+                <td>${a.datetime || 'N/A'}</td>
+                <td>${cancelledAt}</td>
+                <td>${a.cancellationReason || 'N/A'}</td>
+                <td>${a.cancellationNotes || ''}</td>
+                <td class="text-center">
+                    <button class="action-icon-btn view-cancel-btn" data-id="${a.serviceId}" title="View"><span class="material-symbols-outlined">visibility</span></button>
+                    <button class="action-icon-btn reinstate-btn" data-id="${a.serviceId}" title="Reinstate"><span class="material-symbols-outlined">restore</span></button>
+                </td>
+            `;
+            cancelledTableBody.appendChild(row);
+        });
+    }
+
+    const cancelledSearchInput = document.getElementById('cancelled-appointment-search');
+    if (cancelledSearchInput) {
+        cancelledSearchInput.addEventListener('input', (e) => {
+            cancelledSearchTerm = e.target.value || '';
+            renderCancelledTable();
+        });
+    }
+
+    const cancelledTableEl = document.querySelector('#cancelled-appointments-table tbody');
+    if (cancelledTableEl) {
+        cancelledTableEl.addEventListener('click', async (e) => {
+            const viewBtn = e.target.closest('.view-cancel-btn');
+            const reinstateBtn = e.target.closest('.reinstate-btn');
+            if (viewBtn) {
+                const id = viewBtn.dataset.id;
+                const appointment = (window.appData.appointments || []).find(a => a.serviceId === id);
+                if (appointment) {
+                    sessionStorage.setItem('previousPage', window.location.href);
+                    sessionStorage.setItem('selectedAppointmentData', JSON.stringify(appointment));
+                    window.location.href = 'appointment-details.html';
+                }
+            }
+
+            if (reinstateBtn) {
+                const id = reinstateBtn.dataset.id;
+                if (!confirm('Reinstate this appointment? This will set the appointment status back to Pending.')) return;
+                try {
+                    const db = window.firebase.firestore();
+                    await db.collection('bookings').doc(id).update({
+                        status: 'Pending',
+                        cancelledAt: window.firebase.firestore.FieldValue.delete(),
+                        cancellationReason: window.firebase.firestore.FieldValue.delete(),
+                        cancellationNotes: window.firebase.firestore.FieldValue.delete()
+                    });
+                    // Update local model
+                    window.appData.appointments = (window.appData.appointments || []).map(a => a.serviceId === id ? ({ ...a, status: 'Pending', cancelledAt: null, cancellationReason: null, cancellationNotes: null }) : a);
+                    renderCancelledTable();
+                    populateAppointmentsTable();
+                    updateAppointmentPageStats();
+                    if (typeof showSuccessToast === 'function') showSuccessToast('Appointment reinstated.');
+                } catch (err) {
+                    console.error('Error reinstating appointment:', err);
+                    if (typeof showSuccessToast === 'function') showSuccessToast('Failed to reinstate appointment.', 'error');
+                }
             }
         });
     }
