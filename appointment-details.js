@@ -1,26 +1,10 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Wait for the Firebase initialization promise (created in firebase-config.js)
-    const ensureFirebaseReady = async () => {
-        if (window.firebaseInitPromise) {
-            try {
-                await window.firebaseInitPromise;
-            } catch (e) {
-                console.warn('window.firebaseInitPromise rejected or failed:', e);
-            }
-        }
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for Firebase to initialize
+    await window.firebaseInitPromise;
 
-        if (!window.firebase || typeof window.firebase.firestore !== 'function') {
-            // If the compat-style wrapper wasn't created, throw a helpful error
-            console.error("Firebase not initialized or compat wrapper missing. Check firebase-config.js");
-            return null;
-        }
-
-        return window.firebase;
-    };
-
-    ensureFirebaseReady().then((firebaseWrapper) => {
-        if (!firebaseWrapper) return; // abort if firebase unavailable
-        const db = firebaseWrapper.firestore();
+    const firebase = window.firebase;
+    const db = firebase.firestore();
+    const auth = firebase.auth();
 
     // --- DOM Elements ---
     const customerNameEl = document.getElementById('detail-customer-name');
@@ -58,10 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Creates and populates the service progress tracker.
+     * Creates and populates the service progress tracker with appointment info card.
      * @param {string} currentStatus The current status of the appointment.
+     * @param {object} apptData Full appointment data for displaying additional info.
      */
-    const createStatusTracker = (currentStatus) => {
+    const createStatusTracker = (currentStatus, apptData) => {
         const profileHistorySection = document.querySelector('.profile-history');
         if (!profileHistorySection || !currentStatus) return;
 
@@ -72,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const trackerContainer = document.createElement('div');
-        trackerContainer.className = 'status-tracker-container widget-card'; // Added widget-card for styling
+        trackerContainer.className = 'status-tracker-container widget-card';
 
         const statuses = ['Pending', 'In Progress', 'Completed'];
         const currentStatusIndex = statuses.indexOf(currentStatus);
@@ -81,9 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
         statuses.forEach((status, index) => {
             const isCompleted = index < currentStatusIndex;
             const isActive = index === currentStatusIndex;
+            const isCancelled = currentStatus === 'Cancelled';
             const icon = status === 'Pending' ? 'pending_actions' : status === 'In Progress' ? 'autorenew' : 'check_circle';
             stepsHTML += `
-               <div class="status-step clickable ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}" data-status="${status}">
+               <div class="status-step ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''} ${isCancelled ? 'cancelled' : ''}" data-status="${status}">
                     <div class="icon">
                         <span class="material-symbols-outlined">${icon}</span>
                     </div>
@@ -92,6 +78,10 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
+        // Get payment status badge
+        const paymentStatus = apptData.paymentStatus || 'Unpaid';
+        const paymentStatusClass = paymentStatus.toLowerCase();
+
         trackerContainer.innerHTML = `
             <div class="widget-header">
                 <h3>Service Progress</h3>
@@ -99,22 +89,58 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="status-tracker">
                 ${stepsHTML}
             </div>
+            <div class="appointment-info-card" style="margin-top: 1.5rem; padding: 1rem; background: var(--color-light); border-radius: 8px;">
+                <h4 style="margin-bottom: 1rem; color: var(--color-dark);">Appointment Information</h4>
+                <div class="detail-item" style="margin-bottom: 0.75rem;">
+                    <span class="material-symbols-outlined">calendar_month</span>
+                    <div>
+                        <small class="text-muted">Date & Time</small>
+                        <p>${apptData.datetime || 'N/A'}</p>
+                    </div>
+                </div>
+                <div class="detail-item" style="margin-bottom: 0.75rem;">
+                    <span class="material-symbols-outlined">payments</span>
+                    <div>
+                        <small class="text-muted">Price</small>
+                        <p>₱${apptData.price || '0'}</p>
+                    </div>
+                </div>
+                <div class="detail-item" style="margin-bottom: 0.75rem;">
+                    <span class="material-symbols-outlined">engineering</span>
+                    <div>
+                        <small class="text-muted">Technician</small>
+                        <p>${apptData.technician || 'Unassigned'}</p>
+                    </div>
+                </div>
+                <div class="detail-item" style="margin-bottom: 0.75rem;">
+                    <span class="material-symbols-outlined">credit_card</span>
+                    <div>
+                        <small class="text-muted">Payment Status</small>
+                        <p><span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span></p>
+                    </div>
+                </div>
+                ${apptData.status === 'Cancelled' ? `
+                <div class="detail-item" style="margin-bottom: 0.75rem;">
+                    <span class="material-symbols-outlined">info</span>
+                    <div>
+                        <small class="text-muted">Cancellation Reason</small>
+                        <p>${apptData.cancellationReason || 'N/A'}</p>
+                    </div>
+                </div>
+                ${apptData.cancellationNotes ? `
+                <div class="detail-item" style="margin-bottom: 0.75rem;">
+                    <span class="material-symbols-outlined">description</span>
+                    <div>
+                        <small class="text-muted">Notes</small>
+                        <p>${apptData.cancellationNotes}</p>
+                    </div>
+                </div>
+                ` : ''}
+                ` : ''}
+            </div>
         `;
 
         profileHistorySection.prepend(trackerContainer);
-
-        // Add event listener for status updates
-        trackerContainer.querySelector('.status-tracker').addEventListener('click', (e) => {
-            const step = e.target.closest('.status-step');
-            if (!step || !step.dataset.status) return;
-
-            const newStatus = step.dataset.status;
-            // In a real app, you would have a function here to update the status in Firestore.
-            // For now, we'll just update the local data and re-render the tracker.
-            appointmentData.status = newStatus;
-            createStatusTracker(newStatus); // Re-render the tracker
-            if (typeof showSuccessToast === 'function') showSuccessToast(`Status updated to "${newStatus}"`);
-        });
     };
 
     /**
@@ -158,8 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarImg.src = './images/redicon.png';
         }
 
-        // 3. Populate the service progress tracker
-        createStatusTracker(apptData.status);
+        // 3. Populate the service progress tracker with full appointment data
+        createStatusTracker(apptData.status, apptData);
     };
 
     /**
@@ -178,16 +204,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Handles the back button click.
-     * It tries to return to the previous page in history.
-     * If history is not available, it defaults to appointment.html.
      */
     const handleBackClick = (e) => {
         e.preventDefault();
-        // Check if there's a previous page in the history to go back to
-        if (document.referrer && document.referrer.includes(window.location.host)) {
+        const previousPage = sessionStorage.getItem('previousPage');
+        if (previousPage) {
+            window.location.href = previousPage;
+        } else if (document.referrer && document.referrer.includes(window.location.host)) {
             window.history.back();
         } else {
-            // Fallback for direct access or if the referrer is external
             window.location.href = 'appointment.html';
         }
     };
@@ -197,12 +222,10 @@ document.addEventListener('DOMContentLoaded', () => {
         backBtn.addEventListener('click', handleBackClick);
     }
 
-        // --- Initial Load ---
-        // Ensure Firebase is ready before we try to use it.
-        firebaseWrapper.auth().onAuthStateChanged((user) => {
-            if (user) {
-                initializePage();
-            }
-        });
+    // --- Initial Load ---
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            initializePage();
+        }
     });
 });

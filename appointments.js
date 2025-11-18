@@ -84,11 +84,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const counts = allAppointments.reduce((acc, appt) => {
                 acc.total++;
-                const status = appt.status.toLowerCase();
-                if (status === 'pending') acc.pending++;
-                else if (status === 'in progress') acc.inProgress++;
-                else if (status === 'completed') acc.completed++;
-                else if (status === 'cancelled') acc.cancelled++;
+                const status = appt.status; // Keep original case
+                if (status === 'Pending') acc.pending++;
+                else if (status === 'In Progress') acc.inProgress++;
+                else if (status === 'Completed') acc.completed++;
+                else if (status === 'Cancelled') acc.cancelled++;
                 return acc;
              }, { total: 0, pending: 0, inProgress: 0, completed: 0, cancelled: 0 });
 
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // The previous updateAppointmentWidgets function is no longer needed
         // as the HTML structure and IDs have changed.
 
-        // --- Fetch and Populate Table from Firestore ---
+        // --- Fetch and Populate Table from Firestore with Real-time Updates ---
         const fetchAndPopulateAppointments = async () => {
             const tableBody = mainAppointmentsContainer.querySelector('tbody');
             const loader = mainAppointmentsContainer.querySelector('.table-loader');
@@ -138,27 +138,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 const db = window.firebase.firestore();
-                // Fetch bookings, walkins, and technicians simultaneously for better performance
-                const [bookingsSnapshot, walkinsSnapshot, techniciansSnapshot] = await Promise.all([
-                    db.collection('bookings').get(),
-                    db.collection('walkins').get(),
-                    db.collection('technicians').get()
+                
+                // First, fetch technicians and users (one-time read)
+                const [techniciansSnapshot, usersSnapshot] = await Promise.all([
+                    db.collection('technicians').get(),
+                    db.collection('users').get()
                 ]);
 
                 // Process and store technicians data globally
                 window.appData.technicians = techniciansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // Process bookings data
-                if (bookingsSnapshot.empty) {
-                    const noResultsRow = mainAppointmentsContainer.querySelector('.no-results-row');
-                    if (noResultsRow) noResultsRow.style.display = 'table-row';
-                    console.log('No booking documents found in Firestore.');
-                    // Continue — we still want to process walkins and technicians if available
-                }
+                // Process and store users data globally for customer lookup
+                window.appData.users = {};
+                usersSnapshot.docs.forEach(doc => {
+                    const userData = doc.data();
+                    window.appData.users[doc.id] = {
+                        id: doc.id,
+                        name: userData.fullName || userData.name || userData.customerName || 'Unknown Customer',
+                        email: userData.email || '',
+                        phone: userData.phone || userData.phoneNumber || '',
+                        ...userData
+                    };
+                });
 
-                // Replace sample data with Firestore data
-                window.appData.appointments = bookingsSnapshot.docs.map(doc => {
-                    const data = doc.data() || {};
+                // Set up REAL-TIME listener for bookings collection
+                const bookingsUnsubscribe = db.collection('bookings').onSnapshot((bookingsSnapshot) => {
+                    console.log('📡 Real-time update: Bookings collection changed');
+                    
+                    if (bookingsSnapshot.empty) {
+                        console.log('No booking documents found in Firestore.');
+                        window.appData.appointments = [];
+                    } else {
+
+                        // Process bookings data
+                        window.appData.appointments = bookingsSnapshot.docs.map(doc => {
+                            const data = doc.data() || {};
 
                     // helper: parse various firestore-like date shapes into Date or null
                     const parseFirestoreDate = (val) => {
@@ -252,23 +266,48 @@ document.addEventListener('DOMContentLoaded', async () => {
                         console.debug(`Booking doc ${doc.id} -> date field: ${selectedField} -> ${scheduleDateObj.toISOString()}`);
                     }
 
-                    return {
-                        ...data,
-                        serviceId: doc.id,
-                        plate: data.plateNumber || data.plate || '',
-                        service: data.serviceNames || data.service || '',
-                        datetime: formattedDateTime,
-                        datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
-                    };
+                    // Get customer info from users collection
+                    const customer = window.appData.users[data.userId] || {};
+                    const customerName = customer.name || 'Unknown Customer';
+                    const customerPhone = customer.phone || data.phoneNumber || '';
+
+                            return {
+                                ...data,
+                                serviceId: doc.id,
+                                customerName: customerName,
+                                customerPhone: customerPhone,
+                                plate: data.plateNumber || data.plate || data.carPlate || data.licensePlate || data.vehiclePlate || '',
+                                service: data.serviceNames || data.service || '',
+                                datetime: formattedDateTime,
+                                datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
+                            };
+                        });
+                    }
+
+                    // Update UI with new data
+                    populateAppointmentsTable();
+                    renderCancelledTable();
+                    updateAppointmentPageStats();
+                    
+                    // Show notification for new pending appointments
+                    const newPendingCount = window.appData.appointments.filter(a => a.status === 'Pending').length;
+                    if (newPendingCount > 0 && typeof showSuccessToast === 'function') {
+                        console.log(`✨ ${newPendingCount} pending appointment(s) detected`);
+                    }
+                }, (error) => {
+                    console.error('Error in bookings real-time listener:', error);
                 });
 
-                // Now that we have live bookings, render cancelled table as well
-                renderCancelledTable();
+                // Store unsubscribe function for cleanup
+                window.bookingsUnsubscribe = bookingsUnsubscribe;
 
-                // --- Process walk-ins data ---
-                if (!walkinsSnapshot.empty) {
-                    window.appData.walkins = walkinsSnapshot.docs.map(doc => {
-                        const data = doc.data() || {};
+                // Set up REAL-TIME listener for walk-ins collection
+                const walkinsUnsubscribe = db.collection('walkins').onSnapshot((walkinsSnapshot) => {
+                    console.log('📡 Real-time update: Walk-ins collection changed');
+                    
+                    if (!walkinsSnapshot.empty) {
+                        window.appData.walkins = walkinsSnapshot.docs.map(doc => {
+                            const data = doc.data() || {};
 
                         // Reuse the same parseFirestoreDate helper defined above
                         const parseFirestoreDate = (val) => {
@@ -322,33 +361,43 @@ document.addEventListener('DOMContentLoaded', async () => {
                             formattedDateTime = `${datePart} - ${timePart}`;
                         }
 
-                        return {
-                            id: doc.id,
-                            ...data,
-                            plate: data.plateNumber || data.plate || '',
-                            service: data.serviceNames || data.service || data.serviceName || '',
-                            datetime: formattedDateTime,
-                            datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
-                        };
-                    });
-                } else {
-                    // Ensure walkins is at least an empty array when there are no documents
-                    window.appData.walkins = [];
-                }
+                            return {
+                                id: doc.id,
+                                ...data,
+                                customerName: data.customerName || data.customer || 'Walk-in Customer',
+                                phone: data.phone || data.phoneNumber || data.customerPhone || 'N/A',
+                                plate: data.plateNumber || data.plate || '',
+                                vehicleType: data.vehicleType || 'Car',
+                                service: data.serviceNames || data.service || data.serviceName || '',
+                                datetime: formattedDateTime,
+                                datetimeRaw: scheduleDateObj ? scheduleDateObj.getTime() : null,
+                            };
+                        });
+                    } else {
+                        // Ensure walkins is at least an empty array when there are no documents
+                        window.appData.walkins = [];
+                    }
 
-                // Initial population of tables
-                populateAppointmentsTable();
-                populateWalkinsTable(); // Assuming walk-ins might also come from bookings or a separate fetch
-                updateAppointmentPageStats(); // Update stats after fetching data
+                    // Update UI with new walk-in data
+                    populateWalkinsTable();
+                    updateAppointmentPageStats();
+                }, (error) => {
+                    console.error('Error in walk-ins real-time listener:', error);
+                });
+
+                // Store unsubscribe function for cleanup
+                window.walkinsUnsubscribe = walkinsUnsubscribe;
+
+                // Remove loader after setting up listeners
+                if (loader) loader.classList.remove('loading');
 
             } catch (error) {
-                console.error("Error fetching bookings from Firestore:", error);
+                console.error("Error setting up real-time listeners:", error);
                 const noResultsRow = mainAppointmentsContainer.querySelector('.no-results-row');
                 if (noResultsRow) {
                     noResultsRow.style.display = 'table-row';
                     noResultsRow.querySelector('td').textContent = 'Error loading appointments.';
                 }
-            } finally {
                 if (loader) loader.classList.remove('loading');
             }
         };
@@ -448,12 +497,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 row.innerHTML = `
                     <td>${appt.serviceId}</td>
+                    <td>${appt.customerName || 'N/A'}</td>
                     <td>${appt.plate}</td>
-                    <td>${appt.carName}</td>
-                    <td>${appt.carType}</td>
+                    <td>${appt.carName || 'N/A'}</td>
+                    <td>${appt.carType || 'N/A'}</td>
                     <td>${appt.serviceNames}</td>
                     <td>${appt.datetime}</td>
-                    <td>${appt.price}</td>
+                    <td>₱${appt.price}</td>
                     <td>${technicianDropdown}</td>
                     <td class="text-center"><span class="${statusClass}">${appt.status}</span></td>
                     <td class="text-center">${paymentBadge}</td>
@@ -553,14 +603,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Add data attributes for modal functionality
                 row.dataset.plate = walkin.plate;
                 row.dataset.serviceId = walkin.id; // Use the unique walkin ID
+                row.dataset.customerName = walkin.customerName;
+                row.dataset.phone = walkin.phone;
                 row.dataset.carName = walkin.carName;
                 row.dataset.carType = walkin.carType;
+                row.dataset.vehicleType = walkin.vehicleType;
                 row.dataset.service = walkin.service;
                 row.dataset.datetime = walkin.datetime;
                 row.dataset.price = walkin.price;
                 row.dataset.technician = walkin.technician;
                 row.dataset.status = walkin.status;
                 row.dataset.paymentStatus = walkin.paymentStatus;
+                row.dataset.paymentMethod = walkin.paymentMethod;
 
                 let actionButtons = '';
                 if (walkin.status === 'Pending') {
@@ -577,23 +631,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const technicianDropdown = window.appData.createTechnicianDropdown(walkin.technician, walkin.status !== 'Pending');
 
-                const paymentStatusClass = walkin.paymentStatus.toLowerCase();
-                const paymentBadge = `<span class="payment-status-badge ${paymentStatusClass}">${walkin.paymentStatus}</span>`;
+                const paymentStatus = walkin.paymentStatus || 'Unpaid';
+                const paymentStatusClass = paymentStatus.toLowerCase();
+                const paymentBadge = `<span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span>`;
 
                 let paymentActionButton = '';
-                if (walkin.paymentStatus === 'Unpaid') {
+                if (paymentStatus === 'Unpaid') {
                     paymentActionButton = `
                         <button class="action-icon-btn mark-paid-btn" title="Mark as Paid">
                             <span class="material-symbols-outlined">payments</span>
                         </button>`;
                 }
+
+                // Display vehicle type badge
+                const vehicleTypeBadge = walkin.vehicleType ? `<span class="badge-secondary">${walkin.vehicleType}</span>` : '';
+
                 row.innerHTML = `
+                    <td><small class="text-muted">${walkin.id.substring(0, 8)}</small></td>
+                    <td>${walkin.customerName || 'Walk-in'}</td>
+                    <td>${walkin.phone || 'N/A'}</td>
                     <td>${walkin.plate}</td>
-                    <td>${walkin.carName}</td>
+                    <td>${walkin.carName} ${vehicleTypeBadge}</td>
                     <td>${walkin.carType}</td>
                     <td>${walkin.service}</td>
                     <td>${walkin.datetime}</td>
-                    <td>${walkin.price}</td>
+                    <td>₱${parseFloat(walkin.price || 0).toFixed(2)}</td>
                     <td>${technicianDropdown}</td>
                     <td class="text-center"><span class="${statusClass}">${walkin.status}</span></td>
                     <td class="text-center">${paymentBadge}</td>
@@ -1123,37 +1185,54 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (markPaidButton) {
                     const walkins = window.appData.walkins || [];
-                    const walkin = walkins.find(w => w.plate === row.dataset.plate && w.service === row.dataset.service);
+                    const walkin = walkins.find(w => w.id === row.dataset.serviceId);
 
                     // Normalize current payment status (treat undefined/null as 'Unpaid')
                     const currentPaymentStatus = (walkin && walkin.paymentStatus) ? String(walkin.paymentStatus) : 'Unpaid';
 
                     if (walkin && currentPaymentStatus.toLowerCase() === 'unpaid') {
-                        const db = window.firebase.firestore();
-                        try {
-                            // Update payment status in Firestore
-                            await db.collection('walkins').doc(walkin.id).update({
-                                paymentStatus: 'Paid',
-                                paidAt: window.firebase.firestore().FieldValue.serverTimestamp()
-                            });
-                        } catch (err) {
-                            console.error('Error updating walk-in payment status:', err);
-                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to mark as paid (database error).', 'error');
-                            else alert('Failed to mark as paid (database error).');
-                            return;
+                        // Show payment modal
+                        const modalOverlay = document.getElementById('modal-overlay');
+                        const modalTitle = document.getElementById('modal-title');
+                        const paymentModalContent = document.getElementById('payment-modal-content');
+                        const paymentAmountInput = document.getElementById('payment-amount');
+                        const paymentMethodSelect = document.getElementById('payment-method');
+                        const paymentForm = document.getElementById('payment-form');
+                        const paymentCancelBtn = document.getElementById('payment-cancel-btn');
+
+                        // Show payment modal and hide other content
+                        document.querySelectorAll('.modal-content').forEach(content => {
+                            content.style.display = 'none';
+                        });
+
+                        if (paymentModalContent) {
+                            paymentModalContent.style.display = 'block';
                         }
 
-                        // Local/UI updates after successful DB update
-                        walkin.paymentStatus = 'Paid';
-                        row.dataset.paymentStatus = 'Paid';
+                        // Set the amount field
+                        const amount = walkin.price || 0;
+                        if (paymentAmountInput) {
+                            paymentAmountInput.value = parseFloat(amount).toFixed(2);
+                        }
 
-                        const paymentCell = row.querySelector('td:nth-last-child(2)');
-                        if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+                        // Reset payment method
+                        if (paymentMethodSelect) {
+                            paymentMethodSelect.value = '';
+                        }
 
-                        if (typeof showSuccessToast === 'function') showSuccessToast(`Walk-in for ${walkin.plate} marked as paid.`);
-                        
-                        // Remove the button after it's clicked
-                        markPaidButton.remove();
+                        // Update modal title
+                        if (modalTitle) {
+                            modalTitle.textContent = `Process Payment for ${walkin.customerName || 'Walk-in'}`;
+                        }
+
+                        // Show the modal overlay
+                        if (modalOverlay) {
+                            modalOverlay.style.display = 'flex';
+                        }
+
+                        // Store the walkin for later use in the form submission
+                        window.pendingPaymentWalkin = walkin;
+                        window.pendingPaymentWalkinRow = row;
                     }
                     return;
                 }
@@ -1319,6 +1398,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.initializeTableFunctionality('#walk-in-appointments-table');
             }
         }
+
+        // --- Cleanup listeners when page is hidden or unloaded ---
+        window.addEventListener('pagehide', () => {
+            if (window.bookingsUnsubscribe) {
+                window.bookingsUnsubscribe();
+                console.log('🔌 Unsubscribed from bookings real-time listener');
+            }
+            if (window.walkinsUnsubscribe) {
+                window.walkinsUnsubscribe();
+                console.log('🔌 Unsubscribed from walk-ins real-time listener');
+            }
+        });
 
         // --- Add event listener to refresh data when page is shown ---
         // This handles cases where the user navigates back to this page.
@@ -1537,43 +1628,75 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             const appointment = window.pendingPaymentAppointment;
-            const row = window.pendingPaymentRow;
+            const appointmentRow = window.pendingPaymentRow;
+            const walkin = window.pendingPaymentWalkin;
+            const walkinRow = window.pendingPaymentWalkinRow;
 
-            if (!appointment || !row) {
-                alert('Error: Could not find appointment data.');
+            if (!appointment && !walkin) {
+                alert('Error: Could not find payment data.');
                 return;
             }
 
             const db = window.firebase.firestore();
             try {
-                // Update payment status in Firestore with paymentMethod and price
-                await db.collection('bookings').doc(appointment.serviceId).update({
-                    paymentStatus: 'Paid',
-                    paymentMethod: paymentMethod,
-                    price: amount,
-                    paidAt: window.firebase.firestore.FieldValue.serverTimestamp()
-                });
+                // Handle appointment payment
+                if (appointment && appointmentRow) {
+                    await db.collection('bookings').doc(appointment.serviceId).update({
+                        paymentStatus: 'Paid',
+                        paymentMethod: paymentMethod,
+                        price: amount,
+                        paidAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                    });
 
-                // Local/UI updates after successful DB update
-                appointment.paymentStatus = 'Paid';
-                appointment.paymentMethod = paymentMethod;
-                appointment.price = amount;
-                row.dataset.paymentStatus = 'Paid';
+                    // Local/UI updates after successful DB update
+                    appointment.paymentStatus = 'Paid';
+                    appointment.paymentMethod = paymentMethod;
+                    appointment.price = amount;
+                    appointmentRow.dataset.paymentStatus = 'Paid';
 
-                const paymentCell = row.querySelector('td:nth-last-child(2)');
-                if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+                    const paymentCell = appointmentRow.querySelector('td:nth-last-child(2)');
+                    if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
 
-                if (typeof showSuccessToast === 'function') {
-                    showSuccessToast(`Appointment ${appointment.serviceId} marked as paid with ${paymentMethod}.`);
+                    if (typeof showSuccessToast === 'function') {
+                        showSuccessToast(`Appointment ${appointment.serviceId} marked as paid with ${paymentMethod}.`);
+                    }
+
+                    // Remove the mark paid button
+                    const markPaidBtn = appointmentRow.querySelector('.mark-paid-btn');
+                    if (markPaidBtn) markPaidBtn.remove();
+
+                    // Send notification to mobile app user
+                    if (typeof sendPaymentReceivedNotification === 'function') {
+                        sendPaymentReceivedNotification(appointment);
+                    }
                 }
 
-                // Remove the mark paid button
-                const markPaidBtn = row.querySelector('.mark-paid-btn');
-                if (markPaidBtn) markPaidBtn.remove();
+                // Handle walk-in payment
+                if (walkin && walkinRow) {
+                    await db.collection('walkins').doc(walkin.id).update({
+                        paymentStatus: 'Paid',
+                        paymentMethod: paymentMethod,
+                        price: amount,
+                        paidAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                    });
 
-                // Send notification to mobile app user
-                if (typeof sendPaymentReceivedNotification === 'function') {
-                    sendPaymentReceivedNotification(appointment);
+                    // Local/UI updates after successful DB update
+                    walkin.paymentStatus = 'Paid';
+                    walkin.paymentMethod = paymentMethod;
+                    walkin.price = amount;
+                    walkinRow.dataset.paymentStatus = 'Paid';
+                    walkinRow.dataset.paymentMethod = paymentMethod;
+
+                    const paymentCell = walkinRow.querySelector('td:nth-last-child(2)');
+                    if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+
+                    if (typeof showSuccessToast === 'function') {
+                        showSuccessToast(`Walk-in for ${walkin.customerName || walkin.plate} marked as paid with ${paymentMethod}.`);
+                    }
+
+                    // Remove the mark paid button
+                    const markPaidBtn = walkinRow.querySelector('.mark-paid-btn');
+                    if (markPaidBtn) markPaidBtn.remove();
                 }
 
                 // Close the modal
@@ -1581,10 +1704,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     modalOverlay.style.display = 'none';
                 }
 
-                // Reset form
+                // Reset form and clear pending data
                 paymentForm.reset();
                 window.pendingPaymentAppointment = null;
                 window.pendingPaymentRow = null;
+                window.pendingPaymentWalkin = null;
+                window.pendingPaymentWalkinRow = null;
 
             } catch (err) {
                 console.error('Error updating payment status:', err);
@@ -1608,6 +1733,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             window.pendingPaymentAppointment = null;
             window.pendingPaymentRow = null;
+            window.pendingPaymentWalkin = null;
+            window.pendingPaymentWalkinRow = null;
         });
     }
 
@@ -1722,6 +1849,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 window.pendingPaymentAppointment = null;
                 window.pendingPaymentRow = null;
+                window.pendingPaymentWalkin = null;
+                window.pendingPaymentWalkinRow = null;
             }
         });
     }

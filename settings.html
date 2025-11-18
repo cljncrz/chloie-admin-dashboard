@@ -18,7 +18,17 @@
     />
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css" />  
+  <!-- Prevent dark mode flash -->
+  <script>
+    (function() {
+      const theme = localStorage.getItem('theme');
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark-theme-variables');
+        document.body.classList.add('dark-theme-variables');
+      }
+    })();
+  </script>
 
   <!-- Firebase (compat) SDKs from CDN - required by the compat initializer -->
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -277,10 +287,169 @@
 
               <!-- Notification Settings Tab -->
               <div id="notification-settings" class="tab-content">
-                <!-- Notification settings content will go here -->
-                <p class="text-muted" style="text-align: center; padding: 2rem">
-                  Notification settings coming soon.
-                </p>
+                <div class="editor-card">
+                  <div class="editor-card-header">
+                    <h3>Notification Preferences</h3>
+                    <small>Choose which notifications you want to receive.</small>
+                  </div>
+                  <div class="editor-card-content">
+                    <!-- Appointments Notifications -->
+                    <div class="notification-section">
+                      <h4>
+                        <span class="material-symbols-outlined">book_online</span>
+                        Appointments
+                      </h4>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>New Appointments</strong>
+                          <p class="text-muted">Get notified when customers book new appointments</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-new-appointments" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>Appointment Cancellations</strong>
+                          <p class="text-muted">Get notified when appointments are cancelled</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-cancellations" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>Reschedule Requests</strong>
+                          <p class="text-muted">Get notified when customers request to reschedule</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-reschedule" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- Payment Notifications -->
+                    <div class="notification-section">
+                      <h4>
+                        <span class="material-symbols-outlined">payments</span>
+                        Payments
+                      </h4>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>Payment Received</strong>
+                          <p class="text-muted">Get notified when payments are received</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-payments" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>Payment Pending</strong>
+                          <p class="text-muted">Get notified about pending payments</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-pending-payments" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- Customer Notifications -->
+                    <div class="notification-section">
+                      <h4>
+                        <span class="material-symbols-outlined">groups</span>
+                        Customers
+                      </h4>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>New Customer Registration</strong>
+                          <p class="text-muted">Get notified when new customers register via the app</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-new-customers" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>Customer Messages</strong>
+                          <p class="text-muted">Get notified when customers send you messages</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-customer-messages" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- Review Notifications -->
+                    <div class="notification-section">
+                      <h4>
+                        <span class="material-symbols-outlined">reviews</span>
+                        Reviews & Feedback
+                      </h4>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>New Reviews</strong>
+                          <p class="text-muted">Get notified when customers leave reviews</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-new-reviews" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>Low Rating Alerts</strong>
+                          <p class="text-muted">Get notified about reviews with 2 stars or less</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-low-ratings" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- System Notifications -->
+                    <div class="notification-section">
+                      <h4>
+                        <span class="material-symbols-outlined">info</span>
+                        System
+                      </h4>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>Daily Summary</strong>
+                          <p class="text-muted">Receive a daily summary of activities and metrics</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-daily-summary" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-group-toggle">
+                        <div class="toggle-label">
+                          <strong>System Updates</strong>
+                          <p class="text-muted">Get notified about system updates and maintenance</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="notify-system-updates" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="form-actions">
+                      <button type="button" class="btn-primary" id="save-notification-settings">
+                        Save Notification Settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -305,9 +474,16 @@
       <!-- ========== End of Main Content ========== -->
     </div>
 
+    <!-- ========== Success Message Toast ========== -->
+    <div class="success-toast" id="success-toast">
+      <span class="material-symbols-outlined">check_circle</span>
+      <p>Success!</p>
+    </div>
+
     <script src="all-data.js"></script>
     <script src="global-updates.js"></script>
     <script src="script.js"></script>
     <script src="notifications.js"></script>
+    <script src="settings.js"></script>
   </body>
 </html>
