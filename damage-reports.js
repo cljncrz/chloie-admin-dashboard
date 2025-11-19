@@ -185,29 +185,21 @@
           if (snapshot.docs.indexOf(doc) === 0) {
             console.log('DEBUG - First document fields:', Object.keys(data));
             console.log('DEBUG - First document data:', data);
-            console.log('DEBUG - Contact field check:', {
-              contact: data.contact,
-              contactNo: data.contactNo,
-              contactNumber: data.contactNumber,
-              phone: data.phone,
-              phoneNumber: data.phoneNumber
-            });
-            console.log('DEBUG - userId field:', data.userId);
           }
           
-          // Format timestamp to readable date if it exists
+          // Format timestamp to readable date
           let formattedDate = 'N/A';
-          if (data.timestamp) {
+          if (data.createdAt) {
             try {
               // Handle Firestore Timestamp
-              const date = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+              const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
               formattedDate = date.toLocaleDateString('en-US', { 
                 month: '2-digit', 
                 day: '2-digit', 
                 year: 'numeric' 
               });
             } catch (e) {
-              console.warn('Error formatting date:', e);
+              console.warn('Error formatting createdAt date:', e);
               formattedDate = data.date || 'N/A';
             }
           } else if (data.date) {
@@ -217,11 +209,14 @@
           return {
             reportId: doc.id,
             userId: data.userId || null,
-            customer: data.customerName || data.customer || data.name || data.fullName || null,
-            contactNo: data.contact || data.contactNo || data.contactNumber || data.phone || data.phoneNumber || 'N/A',
-            location: data.location || data.address || 'N/A',
-            reportText: data.damageReport || data.reportText || data.description || data.report || 'No description',
+            customer: null, // Will be fetched from users collection
+            contact: data.contact || 'N/A',
+            location: data.location || 'N/A',
+            description: data.description || 'No description',
             date: formattedDate,
+            status: data.status || 'Submitted',
+            imageUrls: data.imageUrls || [],
+            createdAt: data.createdAt,
             // Keep original data for details page
             ...data
           };
@@ -270,22 +265,49 @@
     }
   }
 
+  // Get status badge HTML
+  function getStatusBadge(status) {
+    const statusColors = {
+      'Submitted': 'background: #3498db; color: white;',
+      'Under Review': 'background: #f39c12; color: white;',
+      'Resolved': 'background: #2ecc71; color: white;',
+      'Closed': 'background: #95a5a6; color: white;'
+    };
+    const style = statusColors[status] || statusColors['Submitted'];
+    return `<span style="padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; ${style}">${status || 'Submitted'}</span>`;
+  }
+
+  let filteredReports = [];
+
   function renderDamageReports() {
     const table = $('#damage-reports-table');
     if (!table) return;
     const tbody = table.querySelector('tbody');
     if (!tbody) return;
 
+    // Get filter value
+    const statusFilter = document.getElementById('status-filter')?.value || 'all';
+    
+    // Apply filter
+    if (statusFilter === 'all') {
+      filteredReports = [...damageReports];
+    } else {
+      filteredReports = damageReports.filter(rep => rep.status === statusFilter);
+    }
+
     // clear existing rows except the no-results-row template
     tbody.querySelectorAll('tr').forEach(tr => {
       if (!tr.classList.contains('no-results-row')) tr.remove();
     });
 
-    if (damageReports.length === 0) {
+    if (filteredReports.length === 0) {
       // Show no results row if it exists
       const noResultsRow = tbody.querySelector('.no-results-row');
       if (noResultsRow) {
         noResultsRow.style.display = '';
+        noResultsRow.querySelector('td').textContent = statusFilter === 'all' 
+          ? 'No damage reports found.' 
+          : `No reports with status "${statusFilter}".`;
       }
       updateTotals(0);
       return;
@@ -297,21 +319,22 @@
       noResultsRow.style.display = 'none';
     }
 
-    damageReports.forEach((rep) => {
+    filteredReports.forEach((rep) => {
       const row = document.createElement('tr');
       row.dataset.reportId = rep.reportId;
       
       // Truncate long text for display
-      const displayText = rep.reportText.length > 50 
-        ? rep.reportText.substring(0, 50) + '...' 
-        : rep.reportText;
+      const displayText = rep.description.length > 40 
+        ? rep.description.substring(0, 40) + '...' 
+        : rep.description;
       
       row.innerHTML = `
         <td><input type="checkbox" class="damage-review-checkbox"></td>
         <td>${rep.customer}</td>
-        <td>${rep.contactNo}</td>
+        <td>${rep.contact}</td>
         <td>${rep.location}</td>
-        <td class="damage-comment" title="${rep.reportText}">${displayText}</td>
+        <td class="damage-comment" title="${rep.description}">${displayText}</td>
+        <td>${getStatusBadge(rep.status)}</td>
         <td>${rep.date}</td>
         <td class="text-center actions-cell">
           <button type="button" class="action-icon-btn view-btn" title="View Full Details">
@@ -323,7 +346,184 @@
     });
 
     // update totals
-    updateTotals(damageReports.length);
+    updateTotals(filteredReports.length);
+  }
+
+  // Setup batch actions
+  function setupBatchActions() {
+    const selectAllCheckbox = $('#select-all-damage-reports');
+    const deleteBtn = $('#delete-selected-damage-reports-btn');
+    const markReviewedBtn = $('#mark-reviewed-btn');
+
+    // Select all functionality
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener('change', (e) => {
+        const checkboxes = $$('.damage-review-checkbox');
+        checkboxes.forEach(cb => cb.checked = e.target.checked);
+        updateBatchButtonStates();
+      });
+    }
+
+    // Update button states when individual checkboxes change
+    document.addEventListener('change', (e) => {
+      if (e.target.classList.contains('damage-review-checkbox')) {
+        updateBatchButtonStates();
+      }
+    });
+
+    // Mark as reviewed
+    if (markReviewedBtn) {
+      markReviewedBtn.addEventListener('click', async () => {
+        const selectedIds = getSelectedReportIds();
+        if (selectedIds.length === 0) return;
+
+        const confirmed = confirm(`Mark ${selectedIds.length} report(s) as "Under Review"?`);
+        if (!confirmed) return;
+
+        try {
+          markReviewedBtn.disabled = true;
+          markReviewedBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Updating...';
+
+          await window.firebaseInitPromise;
+          const db = window.firebase.firestore();
+          const batch = db.batch();
+
+          selectedIds.forEach(id => {
+            const ref = db.collection('damage_reports').doc(id);
+            batch.update(ref, {
+              status: 'Under Review',
+              statusUpdatedAt: new Date().toISOString(),
+              statusUpdatedBy: window.firebase.auth().currentUser?.email || 'admin'
+            });
+          });
+
+          await batch.commit();
+
+          // Update local data
+          damageReports.forEach(rep => {
+            if (selectedIds.includes(rep.reportId)) {
+              rep.status = 'Under Review';
+            }
+          });
+
+          console.log(`✅ ${selectedIds.length} report(s) marked as Under Review`);
+          showSuccessToast(`${selectedIds.length} report(s) marked as Under Review`);
+
+          // Refresh display
+          renderDamageReports();
+          updateBatchButtonStates();
+        } catch (error) {
+          console.error('❌ Error updating reports:', error);
+          alert('Failed to update reports: ' + error.message);
+        } finally {
+          markReviewedBtn.disabled = false;
+          markReviewedBtn.innerHTML = '<span class="material-symbols-outlined">check</span> Mark as Reviewed';
+        }
+      });
+    }
+
+    // Delete selected
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        const selectedIds = getSelectedReportIds();
+        if (selectedIds.length === 0) return;
+
+        const confirmed = confirm(`Are you sure you want to delete ${selectedIds.length} report(s)? This action cannot be undone.`);
+        if (!confirmed) return;
+
+        try {
+          deleteBtn.disabled = true;
+          deleteBtn.textContent = 'Deleting...';
+
+          await window.firebaseInitPromise;
+          const db = window.firebase.firestore();
+          const batch = db.batch();
+
+          selectedIds.forEach(id => {
+            const ref = db.collection('damage_reports').doc(id);
+            batch.delete(ref);
+          });
+
+          await batch.commit();
+
+          // Remove from local data
+          damageReports = damageReports.filter(rep => !selectedIds.includes(rep.reportId));
+
+          console.log(`✅ ${selectedIds.length} report(s) deleted`);
+          showSuccessToast(`${selectedIds.length} report(s) deleted successfully`);
+
+          // Refresh display
+          renderDamageReports();
+          updateBatchButtonStates();
+        } catch (error) {
+          console.error('❌ Error deleting reports:', error);
+          alert('Failed to delete reports: ' + error.message);
+        } finally {
+          deleteBtn.disabled = false;
+          deleteBtn.textContent = 'Delete Selected';
+        }
+      });
+    }
+  }
+
+  function getSelectedReportIds() {
+    const checkedBoxes = $$('.damage-review-checkbox:checked');
+    return checkedBoxes.map(cb => cb.closest('tr').dataset.reportId).filter(Boolean);
+  }
+
+  function updateBatchButtonStates() {
+    const selectedIds = getSelectedReportIds();
+    const deleteBtn = $('#delete-selected-damage-reports-btn');
+    const markReviewedBtn = $('#mark-reviewed-btn');
+
+    if (deleteBtn) deleteBtn.disabled = selectedIds.length === 0;
+    if (markReviewedBtn) markReviewedBtn.disabled = selectedIds.length === 0;
+
+    // Update select all checkbox state
+    const selectAllCheckbox = $('#select-all-damage-reports');
+    const allCheckboxes = $$('.damage-review-checkbox');
+    if (selectAllCheckbox && allCheckboxes.length > 0) {
+      selectAllCheckbox.checked = allCheckboxes.every(cb => cb.checked);
+      selectAllCheckbox.indeterminate = selectedIds.length > 0 && !selectAllCheckbox.checked;
+    }
+  }
+
+  function showSuccessToast(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      animation: slideIn 0.3s ease-out;
+    `;
+    toast.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span class="material-symbols-outlined">check_circle</span>
+        <strong>${message}</strong>
+      </div>
+    `;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease-in';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  // Setup status filter
+  function setupStatusFilter() {
+    const statusFilter = $('#status-filter');
+    if (statusFilter) {
+      statusFilter.addEventListener('change', () => {
+        renderDamageReports();
+      });
+    }
   }
 
   // Initialize when DOM is ready
@@ -338,6 +538,8 @@
       ensureArrowButtons();
       setupArrowHandler();
       observeTableMutations();
+      setupBatchActions();
+      setupStatusFilter();
     } catch (error) {
       console.error('Error initializing damage reviews:', error);
       hideLoader();

@@ -70,7 +70,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const applyTheme = (theme) => {
         const isDark = theme === 'dark';
 
-        // 1. Apply theme to the body
+        // 1. Apply theme to the html element (already applied by inline script, but ensure consistency)
+        document.documentElement.classList.toggle('dark-theme-variables', isDark);
         document.body.classList.toggle('dark-theme-variables', isDark);
 
         // 2. Update the header theme toggler's active state
@@ -103,7 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Add event listener for the header theme toggler
     if (themeToggler) {
         themeToggler.addEventListener('click', () => {
-            const currentTheme = document.body.classList.contains('dark-theme-variables') ? 'dark' : 'light';
+            const currentTheme = document.documentElement.classList.contains('dark-theme-variables') ? 'dark' : 'light';
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             localStorage.setItem('theme', newTheme);
             applyTheme(newTheme);

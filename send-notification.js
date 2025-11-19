@@ -52,12 +52,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function initializeApp() {
     try {
+      // Wait for Firebase to be ready
+      await window.firebaseInitPromise;
+      
+      // Load admin profile
+      await loadAdminProfile();
+      
       // Load users from Firestore
       await loadUsers();
+      
       // Load recent notifications
       await loadRecentNotifications();
+      
       // Setup event listeners
       setupEventListeners();
+      
       // Validate form on input
       validateForm();
     } catch (error) {
@@ -66,29 +75,88 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  async function loadAdminProfile() {
+    try {
+      const auth = window.firebase.auth();
+      const user = await new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          unsubscribe();
+          resolve(user);
+        });
+      });
+
+      if (user) {
+        const db = window.firebase.firestore();
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          const displayName = userData.fullName || userData.name || userData.displayName || user.email.split('@')[0];
+          const headerName = document.getElementById('profile-header-name');
+          if (headerName) {
+            headerName.textContent = displayName;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading admin profile:', error);
+    }
+  }
+
   // ========== User Management ==========
   async function loadUsers() {
     try {
+      // Wait for Firebase to initialize
+      await window.firebaseInitPromise;
+      
       const db = window.firebase.firestore();
+      const auth = window.firebase.auth();
+
+      // Ensure user is authenticated
+      const user = await new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          unsubscribe();
+          resolve(user);
+        });
+      });
+
+      if (!user) {
+        showStatus('Please log in to send notifications', 'error');
+        return;
+      }
+
+      // Show loading state
+      elements.userSelect.innerHTML = '<option value="">Loading users...</option>';
+      
       const usersSnapshot = await db.collection('users').get();
       state.users = [];
 
       usersSnapshot.forEach(doc => {
         const userData = doc.data();
-        state.users.push({
-          id: doc.id,
-          name: userData.name || 'Unknown',
-          email: userData.email || '',
-          phoneNumber: userData.phoneNumber || '',
-          fcmTokens: userData.fcmTokens || []
-        });
+        const userRole = userData.role || '';
+        
+        // Exclude admin accounts (only include customers/regular users)
+        if (userRole !== 'admin') {
+          state.users.push({
+            id: doc.id,
+            name: userData.fullName || userData.name || userData.displayName || 'Unknown',
+            email: userData.email || '',
+            phoneNumber: userData.phoneNumber || '',
+            fcmTokens: userData.fcmTokens || [],
+            role: userRole
+          });
+        }
       });
 
       // Sort by name
       state.users.sort((a, b) => a.name.localeCompare(b.name));
       populateUserSelect(state.users);
+
+      console.log(`Loaded ${state.users.length} users (admins excluded)`);
     } catch (error) {
       console.error('Error loading users:', error);
+      showStatus('Error loading users: ' + error.message, 'error');
+      elements.userSelect.innerHTML = '<option value="">Error loading users</option>';
       throw error;
     }
   }
@@ -116,6 +184,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    // Optional settings toggle
+    const optionalToggle = document.getElementById('optional-settings-toggle');
+    const optionalContent = document.getElementById('optional-settings-content');
+    const optionalIcon = document.getElementById('optional-settings-icon');
+    
+    if (optionalToggle && optionalContent && optionalIcon) {
+      optionalToggle.addEventListener('click', () => {
+        const isHidden = optionalContent.style.display === 'none';
+        optionalContent.style.display = isHidden ? 'block' : 'none';
+        optionalIcon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+      });
+    }
+
     // User search
     elements.userSearch.addEventListener('input', (e) => {
       const searchTerm = e.target.value.toLowerCase();
@@ -133,10 +214,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (selectedOption.value) {
         state.selectedUserName = selectedOption.dataset.name;
         const email = selectedOption.dataset.email;
-        elements.selectedUserInfo.textContent = `Selected: ${state.selectedUserName} (${email})`;
+        elements.selectedUserInfo.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-symbols-outlined" style="font-size: 1.25rem; color: var(--color-primary);">check_circle</span>
+            <div>
+              <strong style="color: var(--color-dark);">${state.selectedUserName}</strong>
+              <div style="font-size: 0.8rem; color: var(--color-info-dark); margin-top: 0.1rem;">${email}</div>
+            </div>
+          </div>
+        `;
+        elements.selectedUserInfo.style.display = 'block';
       } else {
         state.selectedUserName = null;
         elements.selectedUserInfo.textContent = '';
+        elements.selectedUserInfo.style.display = 'none';
       }
       validateForm();
     });
@@ -218,6 +309,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const imageUrl = elements.imageInput.value.trim();
     const timestamp = new Date().toLocaleString();
 
+    // Validate before showing preview
+    if (!title || !message) {
+      showStatus('Please enter a title and message first', 'warning');
+      return;
+    }
+
     // Store preview data for sending
     state.previewData = {
       title,
@@ -230,11 +327,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update modal content
     elements.previewTitle.textContent = title;
     elements.previewMessage.textContent = message;
-    elements.previewTimestamp.textContent = `Sent at: ${timestamp}`;
+    
+    // Format timestamp
+    const now = new Date();
+    const formattedTime = now.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    let recipientText = '';
+    if (state.notificationTarget === 'single' && state.selectedUserName) {
+      recipientText = ` • To: ${state.selectedUserName}`;
+    } else if (state.notificationTarget === 'all') {
+      recipientText = ` • To: All Users (${state.users.length})`;
+    }
+    
+    elements.previewTimestamp.textContent = `Will be sent at: ${formattedTime}${recipientText}`;
 
     if (imageUrl) {
       elements.previewImage.src = imageUrl;
       elements.previewImageSection.style.display = 'block';
+      // Handle image load error
+      elements.previewImage.onerror = () => {
+        elements.previewImageSection.style.display = 'none';
+        console.warn('Failed to load preview image');
+      };
     } else {
       elements.previewImageSection.style.display = 'none';
     }
@@ -328,30 +447,43 @@ document.addEventListener('DOMContentLoaded', async () => {
       let successCount = 0;
       let failureCount = 0;
       const results = [];
+      const batch = db.batch();
+
+      // Create a record in admin_notifications
+      const adminNotifRef = db.collection('admin_notifications').doc();
+      batch.set(adminNotifRef, {
+        ...notificationPayload,
+        targetType: state.notificationTarget,
+        targetUserIds: targetUserIds,
+        targetCount: targetUserIds.length
+      });
 
       for (const userId of targetUserIds) {
         try {
           // Store notification in Firestore under user's notifications collection
-          const docRef = await db
+          const userNotifRef = db
             .collection('users')
             .doc(userId)
             .collection('notifications')
-            .add({
-              ...notificationPayload,
-              userId: userId
-            });
+            .doc();
+          
+          batch.set(userNotifRef, {
+            ...notificationPayload,
+            userId: userId
+          });
 
-          // Also send push notification via Cloud Function
-          await sendPushNotification(userId, notificationPayload);
+          // Try to send push notification via Cloud Function (optional, won't fail the batch)
+          sendPushNotification(userId, notificationPayload).catch(err => {
+            console.warn(`Push notification failed for user ${userId}:`, err);
+          });
 
           results.push({
             userId,
-            success: true,
-            docId: docRef.id
+            success: true
           });
           successCount++;
         } catch (error) {
-          console.error(`Failed to send to user ${userId}:`, error);
+          console.error(`Failed to prepare notification for user ${userId}:`, error);
           results.push({
             userId,
             success: false,
@@ -359,6 +491,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           });
           failureCount++;
         }
+      }
+
+      // Commit the batch
+      try {
+        await batch.commit();
+        console.log('Batch write successful');
+      } catch (error) {
+        console.error('Batch write failed:', error);
+        throw new Error('Failed to save notifications to database');
       }
 
       // Show results
@@ -382,6 +523,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function sendPushNotification(userId, notificationPayload) {
     try {
+      // Check if user has FCM tokens first
+      const db = window.firebase.firestore();
+      const userDoc = await db.collection('users').doc(userId).get();
+      
+      if (!userDoc.exists) {
+        console.warn(`User ${userId} not found`);
+        return;
+      }
+
+      const userData = userDoc.data();
+      const fcmTokens = userData.fcmTokens || [];
+
+      if (fcmTokens.length === 0) {
+        console.warn(`User ${userId} has no FCM tokens registered`);
+        return;
+      }
+
+      // Try to send via Cloud Function
       const response = await fetch(
         'https://us-central1-kingsleycarwashapp.cloudfunctions.net/sendNotificationToUser',
         {
@@ -401,6 +560,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const error = await response.json();
         console.warn(`Push notification to ${userId} failed:`, error);
         // Don't throw - notification is still stored in Firestore
+      } else {
+        console.log(`Push notification sent successfully to ${userId}`);
       }
     } catch (error) {
       console.warn(`Could not send push notification to ${userId}:`, error);
@@ -415,10 +576,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const currentUser = firebase.auth().currentUser;
       if (!currentUser) return;
 
-      // Load recent notifications sent by this admin
+      // Load recent notifications from admin_notifications collection
       const snapshot = await db
-        .collectionGroup('notifications') // This now returns a queryable object
-        .where('sentBy', '==', currentUser.email) // These methods are chained
+        .collection('admin_notifications')
+        .where('sentBy', '==', currentUser.email)
         .orderBy('timestamp', 'desc')
         .limit(10)
         .get();

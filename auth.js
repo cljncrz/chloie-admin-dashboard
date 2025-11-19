@@ -52,14 +52,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     const auth = window.firebase.auth();
     const db = window.firebase.firestore();
 
+    // Check if user is already logged in
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        // User is logged in, check if they're an admin
+        db.collection('users').doc(user.uid).get()
+          .then((docSnapshot) => {
+            if (docSnapshot.exists && docSnapshot.data().role === 'admin') {
+              // Redirect to dashboard
+              console.log('User already logged in as admin, redirecting...');
+              window.location.href = 'index.html';
+            } else {
+              // Not an admin, sign them out
+              auth.signOut();
+            }
+          })
+          .catch((error) => {
+            console.error('Error checking user role:', error);
+          });
+      }
+    });
+
     // --- Login Handler ---
     if (loginForm) {
       loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
+        const loginBtn = loginForm.querySelector('button[type="submit"]');
 
         loginError.textContent = '';
+        
+        // Disable button and show loading state
+        loginBtn.disabled = true;
+        const originalText = loginBtn.textContent;
+        loginBtn.textContent = 'Logging in...';
 
         auth.signInWithEmailAndPassword(email, password)
           .then((userCredential) => {
@@ -79,8 +106,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           .catch((error) => {
             console.error('Login Error:', error);
             let errorMessage = 'An unexpected error occurred. Please try again.';
-            if (error.code === 'auth/wrong-password') {
-              errorMessage = 'Incorrect password. Please try again.';
+            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+              errorMessage = 'Incorrect email or password. Please try again.';
             } else if (error.code === 'auth/user-not-found') {
               errorMessage = 'No account found with this email address.';
             } else if (error.code === 'auth/invalid-email') {
@@ -89,6 +116,10 @@ document.addEventListener('DOMContentLoaded', async () => {
               errorMessage = 'Access to this account has been temporarily disabled due to too many failed login attempts. Please try again later.';
             }
             loginError.textContent = errorMessage;
+            
+            // Re-enable button
+            loginBtn.disabled = false;
+            loginBtn.textContent = originalText;
           });
       });
     }
@@ -100,8 +131,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         const name = document.getElementById('register-name').value;
         const email = document.getElementById('register-email').value;
         const password = document.getElementById('register-password').value;
+        const registerBtn = registerForm.querySelector('button[type="submit"]');
 
         registerError.textContent = '';
+        
+        // Validation
+        if (name.trim().length < 2) {
+          registerError.textContent = 'Please enter a valid name.';
+          return;
+        }
+        
+        if (password.length < 6) {
+          registerError.textContent = 'Password must be at least 6 characters long.';
+          return;
+        }
+        
+        // Disable button and show loading state
+        registerBtn.disabled = true;
+        const originalText = registerBtn.textContent;
+        registerBtn.textContent = 'Creating account...';
 
         auth.createUserWithEmailAndPassword(email, password)
           .then((userCredential) => {
@@ -111,7 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               fullName: name,
               email: user.email,
               role: 'admin',
-              createdAt: db.FieldValue.serverTimestamp(),
+              createdAt: window.firebase.firestore().FieldValue.serverTimestamp(),
             });
           })
           .then(() => {
@@ -120,7 +168,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           })
           .catch((error) => {
             console.error('Registration Error:', error);
-            registerError.textContent = error.message;
+            let errorMessage = 'An unexpected error occurred. Please try again.';
+            if (error.code === 'auth/email-already-in-use') {
+              errorMessage = 'This email is already registered.';
+            } else if (error.code === 'auth/weak-password') {
+              errorMessage = 'Password should be at least 6 characters.';
+            } else if (error.code === 'auth/invalid-email') {
+              errorMessage = 'The email address is not valid.';
+            } else {
+              errorMessage = error.message;
+            }
+            registerError.textContent = errorMessage;
+            
+            // Re-enable button
+            registerBtn.disabled = false;
+            registerBtn.textContent = originalText;
           });
       });
     }

@@ -202,8 +202,51 @@ window.firebase = {
         arrayRemove: (elements) => arrayRemove(...(Array.isArray(elements) ? elements : [elements]))
       },
       Timestamp: Timestamp,
-      // very small batch stub to avoid runtime errors where batch is referenced
-      batch: () => ({ set: () => {}, update: () => {}, delete: () => {}, commit: async () => {} })
+      // Batch write implementation
+      batch: () => {
+        const batchInstance = writeBatch(db);
+        return {
+          set: (docRef, data) => {
+            // docRef should be a document reference path object or a result from collection().doc()
+            let ref;
+            if (typeof docRef === 'string') {
+              ref = fsDoc(db, docRef);
+            } else if (docRef._path) {
+              // It's our compat wrapper
+              ref = fsDoc(db, docRef._path);
+            } else {
+              console.error('Invalid docRef for batch.set:', docRef);
+              return;
+            }
+            batchInstance.set(ref, data);
+          },
+          update: (docRef, data) => {
+            let ref;
+            if (typeof docRef === 'string') {
+              ref = fsDoc(db, docRef);
+            } else if (docRef._path) {
+              ref = fsDoc(db, docRef._path);
+            } else {
+              console.error('Invalid docRef for batch.update:', docRef);
+              return;
+            }
+            batchInstance.update(ref, data);
+          },
+          delete: (docRef) => {
+            let ref;
+            if (typeof docRef === 'string') {
+              ref = fsDoc(db, docRef);
+            } else if (docRef._path) {
+              ref = fsDoc(db, docRef._path);
+            } else {
+              console.error('Invalid docRef for batch.delete:', docRef);
+              return;
+            }
+            batchInstance.delete(ref);
+          },
+          commit: () => batchInstance.commit()
+        };
+      }
     };
   },
 

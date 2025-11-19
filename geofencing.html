@@ -19,6 +19,205 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
+  
+  <style>
+    /* Geofencing Page Styles */
+    .locations-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .location-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 1rem;
+      background: var(--color-background);
+      border: 1px solid var(--color-info-light);
+      border-radius: 0.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .location-card:hover {
+      border-color: var(--color-primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .location-info h4 {
+      margin: 0 0 0.5rem 0;
+      color: var(--color-dark);
+    }
+
+    .location-info p {
+      margin: 0.25rem 0;
+      font-size: 0.9rem;
+      color: var(--color-info-dark);
+    }
+
+    .location-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .operating-hours-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .operating-hours-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 1fr auto;
+      gap: 1rem;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--color-background);
+      border-radius: 0.5rem;
+    }
+
+    .day-label {
+      color: var(--color-dark);
+      font-weight: 600;
+    }
+
+    .small-toggle {
+      transform: scale(0.8);
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--color-light);
+    }
+
+    .stat-item:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      color: var(--color-info-dark);
+      font-weight: 500;
+    }
+
+    .stat-value {
+      color: var(--color-dark);
+      font-weight: 600;
+    }
+
+    .stat-value.active {
+      color: var(--color-success);
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+
+    .form-group-toggle {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 0.5rem 0;
+    }
+
+    .toggle-label {
+      flex: 1;
+    }
+
+    .toggle-label strong {
+      display: block;
+      color: var(--color-dark);
+      margin-bottom: 0.25rem;
+    }
+
+    .toggle-label .text-muted {
+      font-size: 0.875rem;
+      line-height: 1.4;
+    }
+
+    /* Enhanced toggle switch */
+    .theme-toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 52px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .theme-toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .theme-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--color-info-light);
+      transition: 0.4s;
+      border-radius: 34px;
+    }
+
+    .theme-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .theme-slider {
+      background-color: var(--color-primary);
+    }
+
+    input:checked + .theme-slider:before {
+      transform: translateX(24px);
+    }
+
+    input:disabled + .theme-slider {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+  
+  <!-- Apply theme immediately to prevent flash -->
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark-theme-variables');
+      }
+    })();
+  </script>
 
   <!-- Initialize Firebase via module-based initializer (provides a compat shim) -->
   <script type="module" src="firebase-setup.js"></script>
@@ -46,47 +245,66 @@
             <span class="material-symbols-outlined">dashboard</span>
             <h3>Dashboard</h3>
           </a>
+          
           <a href="appointment.html">
             <span class="material-symbols-outlined">book_online</span>
             <h3>Appointments</h3>
           </a>
-          <a href="technicians.html">
-            <span class="material-symbols-outlined">engineering</span>
-            <h3>Technicians</h3>
-          </a>
+          
           <a href="customers.html">
             <span class="material-symbols-outlined">groups</span>
             <h3>Customers</h3>
           </a>
+          
+          <a href="technicians.html">
+            <span class="material-symbols-outlined">engineering</span>
+            <h3>Technicians</h3>
+          </a>
+          
           <a href="services.html">
             <span class="material-symbols-outlined">local_car_wash</span>
-            <h3>Services & Pricing</h3>
+            <h3>Services</h3>
           </a>
+          
           <a href="promotions.html">
             <span class="material-symbols-outlined">campaign</span>
             <h3>Promotions</h3>
           </a>
-          <a href="media-manager.html">
-            <span class="material-symbols-outlined">perm_media</span>
-            <h3>Media Manager</h3>
-          </a>
+          
           <a href="sales.html">
             <span class="material-symbols-outlined">trending_up</span>
             <h3>Sales</h3>
           </a>
+          
+          <a href="payment-monitoring.html">
+            <span class="material-symbols-outlined">payments</span>
+            <h3>Payments</h3>
+          </a>
+          
           <a href="reviews.html">
-            <span class="material-symbols-outlined">reviews</span>
+            <span class="material-symbols-outlined">star</span>
             <h3>Reviews</h3>
           </a>
-          <a href="payment-monitoring.html">
-            <span class="material-symbols-outlined">payment</span>
-            <h3>Payment Monitoring</h3>
+          
+          <a href="damage-reports.html">
+            <span class="material-symbols-outlined">report_problem</span>
+            <h3>Damage Reports</h3>
           </a>
+          
+          <a href="media-manager.html">
+            <span class="material-symbols-outlined">collections</span>
+            <h3>Media</h3>
+          </a>
+          
+          <a href="send-notification.html">
+            <span class="material-symbols-outlined">notifications_active</span>
+            <h3>Notifications</h3>
+          </a>
+          
           <a href="geofencing.html" class="active">
             <span class="material-symbols-outlined">location_on</span>
             <h3>Geofencing</h3>
           </a>
-          
         </div>
       </aside>
       <!-- ========== End of Sidebar ========== -->
@@ -279,6 +497,18 @@
                   <div class="editor-card-content">
                     <div class="operating-hours-grid" id="operating-hours-grid">
                       <!-- Day rows will be populated by JS -->
+                    </div>
+                    
+                    <!-- Save Button for Operating Hours -->
+                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid var(--color-light);">
+                      <button 
+                        type="button" 
+                        id="save-operating-hours-btn"
+                        style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 1rem; background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; font-weight: 700; font-size: 1rem; border: none; border-radius: 10px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3); cursor: pointer; transition: all 0.3s;"
+                      >
+                        <span class="material-symbols-outlined" style="font-size: 1.5rem;">save</span>
+                        Save Operating Hours
+                      </button>
                     </div>
                   </div>
                 </div>

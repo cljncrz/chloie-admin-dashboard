@@ -19,6 +19,16 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
+  
+  <!-- Apply theme immediately to prevent flash -->
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark-theme-variables');
+      }
+    })();
+  </script>
 
   <!-- Initialize Firebase via module-based initializer (provides a compat shim) -->
   <script type="module" src="firebase-setup.js"></script>
@@ -48,47 +58,66 @@
             <span class="material-symbols-outlined">dashboard</span>
             <h3>Dashboard</h3>
           </a>
+          
           <a href="appointment.html" class="active">
             <span class="material-symbols-outlined">book_online</span>
             <h3>Appointments</h3>
           </a>
-          <a href="technicians.html">
-            <span class="material-symbols-outlined">engineering</span>
-            <h3>Technicians</h3>
-          </a>
+          
           <a href="customers.html">
             <span class="material-symbols-outlined">groups</span>
             <h3>Customers</h3>
           </a>
+          
+          <a href="technicians.html">
+            <span class="material-symbols-outlined">engineering</span>
+            <h3>Technicians</h3>
+          </a>
+          
           <a href="services.html">
             <span class="material-symbols-outlined">local_car_wash</span>
-            <h3>Services & Pricing</h3>
+            <h3>Services</h3>
           </a>
+          
           <a href="promotions.html">
             <span class="material-symbols-outlined">campaign</span>
             <h3>Promotions</h3>
           </a>
-         
-          <a href="media-manager.html">
-            <span class="material-symbols-outlined">perm_media</span>
-            <h3>Media Manager</h3>
-          </a>
+          
           <a href="sales.html">
             <span class="material-symbols-outlined">trending_up</span>
             <h3>Sales</h3>
           </a>
+          
+          <a href="payment-monitoring.html">
+            <span class="material-symbols-outlined">payments</span>
+            <h3>Payments</h3>
+          </a>
+          
           <a href="reviews.html">
-            <span class="material-symbols-outlined">reviews</span>
+            <span class="material-symbols-outlined">star</span>
             <h3>Reviews</h3>
           </a>
-          <a href="payment-monitoring.html">
-            <span class="material-symbols-outlined">payment</span>
-            <h3>Payment Monitoring</h3>
+          
+          <a href="damage-reports.html">
+            <span class="material-symbols-outlined">report_problem</span>
+            <h3>Damage Reports</h3>
           </a>
-           <a href="geofencing.html">
-                <span class="material-symbols-outlined">location_on</span>
-                <h3>Geofencing</h3>
-            </a>
+          
+          <a href="media-manager.html">
+            <span class="material-symbols-outlined">collections</span>
+            <h3>Media</h3>
+          </a>
+          
+          <a href="send-notification.html">
+            <span class="material-symbols-outlined">notifications_active</span>
+            <h3>Notifications</h3>
+          </a>
+          
+          <a href="geofencing.html">
+            <span class="material-symbols-outlined">location_on</span>
+            <h3>Geofencing</h3>
+          </a>
         </div>
       </aside>
       <!-- ========== End of Sidebar ========== -->
