@@ -1,8 +1,8 @@
-// damage-reviews.js
-// Fetches damage reports from Firestore and renders them into the damage reviews table
+// damage-reports.js
+// Fetches damage reports from Firestore and renders them into the damage reports table
 // Provides a view action that stores the selected item in sessionStorage (for a details page).
 (function () {
-  console.log('damage-reviews.js loaded');
+  console.log('damage-reports.js loaded');
 
   // Simple DOM helpers
   const $ = (sel) => document.querySelector(sel);
@@ -16,13 +16,13 @@
 
   // Hide loader
   function hideLoader() {
-    const loader = document.querySelector('#damage-reviews-table-container .table-loader');
+    const loader = document.querySelector('#damage-reports-table-container .table-loader');
     if (loader) loader.style.display = 'none';
   }
 
   // Show error message
   function showErrorMessage(message) {
-    const table = $('#damage-reviews-table');
+    const table = $('#damage-reports-table');
     if (!table) return;
     const tbody = table.querySelector('tbody');
     if (!tbody) return;
@@ -44,7 +44,7 @@
 
   // Ensure each row has an Actions cell with an arrow button
   function ensureArrowButtons() {
-    const table = $('#damage-reviews-table');
+    const table = $('#damage-reports-table');
     if (!table) return;
     const tbody = table.querySelector('tbody');
     if (!tbody) return;
@@ -75,7 +75,7 @@
 
   // Click handler for visibility buttons (delegated)
   function setupArrowHandler() {
-    const table = $('#damage-reviews-table');
+    const table = $('#damage-reports-table');
     if (!table) return;
     const tbody = table.querySelector('tbody');
     tbody.addEventListener('click', (e) => {
@@ -99,14 +99,14 @@
       }
 
       // Navigate to a details page if available
-      const detailsPage = 'damage-review-details.html';
+      const detailsPage = 'damage-reports-details.html';
       window.location.href = detailsPage;
     });
   }
 
   // Observe tbody for new rows and inject arrow buttons
   function observeTableMutations() {
-    const table = $('#damage-reviews-table');
+    const table = $('#damage-reports-table');
     if (!table) return;
     const tbody = table.querySelector('tbody');
     if (!tbody) return;
@@ -177,8 +177,23 @@
         showErrorMessage('No damage reports found. The collection is empty.');
         hideLoader();
       } else {
-        damageReports = snapshot.docs.map(doc => {
+        // First, map all reports with basic data
+        const reportsWithBasicData = snapshot.docs.map(doc => {
           const data = doc.data();
+          
+          // Debug: Log all available fields in the first document
+          if (snapshot.docs.indexOf(doc) === 0) {
+            console.log('DEBUG - First document fields:', Object.keys(data));
+            console.log('DEBUG - First document data:', data);
+            console.log('DEBUG - Contact field check:', {
+              contact: data.contact,
+              contactNo: data.contactNo,
+              contactNumber: data.contactNumber,
+              phone: data.phone,
+              phoneNumber: data.phoneNumber
+            });
+            console.log('DEBUG - userId field:', data.userId);
+          }
           
           // Format timestamp to readable date if it exists
           let formattedDate = 'N/A';
@@ -201,14 +216,41 @@
 
           return {
             reportId: doc.id,
-            customer: data.customerName || data.customer || 'Unknown',
-            service: data.service || data.serviceName || 'N/A',
-            reportText: data.damageReport || data.reportText || data.description || 'No description',
+            userId: data.userId || null,
+            customer: data.customerName || data.customer || data.name || data.fullName || null,
+            contactNo: data.contact || data.contactNo || data.contactNumber || data.phone || data.phoneNumber || 'N/A',
+            location: data.location || data.address || 'N/A',
+            reportText: data.damageReport || data.reportText || data.description || data.report || 'No description',
             date: formattedDate,
             // Keep original data for details page
             ...data
           };
         });
+
+        // Fetch user data for reports that have userId but no customer name
+        damageReports = await Promise.all(reportsWithBasicData.map(async (report) => {
+          if (!report.customer && report.userId) {
+            try {
+              console.log(`Fetching user data for userId: ${report.userId}`);
+              const userDoc = await db.collection('users').doc(report.userId).get();
+              if (userDoc.exists) {
+                const userData = userDoc.data();
+                report.customer = userData.fullName || userData.name || userData.displayName || userData.email || 'Unknown';
+                console.log(`Found user data for ${report.userId}: ${report.customer}`);
+              } else {
+                console.warn(`User document not found for userId: ${report.userId}`);
+                report.customer = 'Unknown';
+              }
+            } catch (err) {
+              console.error(`Error fetching user data for userId ${report.userId}:`, err);
+              report.customer = 'Unknown';
+            }
+          } else if (!report.customer) {
+            report.customer = 'Unknown';
+          }
+          return report;
+        }));
+
         console.log('Damage reports loaded from Firestore. Total count:', damageReports.length);
         console.log('Sample report data:', damageReports[0]);
       }
@@ -229,7 +271,7 @@
   }
 
   function renderDamageReports() {
-    const table = $('#damage-reviews-table');
+    const table = $('#damage-reports-table');
     if (!table) return;
     const tbody = table.querySelector('tbody');
     if (!tbody) return;
@@ -267,7 +309,8 @@
       row.innerHTML = `
         <td><input type="checkbox" class="damage-review-checkbox"></td>
         <td>${rep.customer}</td>
-        <td>${rep.service}</td>
+        <td>${rep.contactNo}</td>
+        <td>${rep.location}</td>
         <td class="damage-comment" title="${rep.reportText}">${displayText}</td>
         <td>${rep.date}</td>
         <td class="text-center actions-cell">

@@ -40,6 +40,20 @@ Three server-side Cloud Functions have been implemented to automatically create 
   - `data.action`: "appointment_cancelled"
   - `data.itemId`: booking ID
 
+#### **Function 4: `onNewDamageReport`**
+- **Trigger**: Firestore `damage_reports` collection document write
+- **Condition**: New document created (not an update)
+- **Action**: Creates an admin notification document
+- **Fields Created**:
+  - `title`: "New Damage Report"
+  - `body`: "{Customer} submitted a damage report at {Location}."
+  - `data.action`: "damage_report"
+  - `data.itemId`: report ID
+  - `link`: "damage-reports.html"
+  - `type`: "admin"
+- **Customer Name Resolution**: Attempts to fetch customer name from report data fields (`customerName`, `customer`, `name`, `fullName`) or looks up the `userId` in the `users` collection if not available
+- **Deduplication**: Queries existing notifications before creating to prevent duplicates
+
 ### 2. Client-Side Updates
 
 #### **`appointment-scheduler.js`**
@@ -47,10 +61,15 @@ Three server-side Cloud Functions have been implemented to automatically create 
 - **Reason**: Cloud Functions now handle this server-side, which is more reliable and efficient
 - **Note Added**: Comment explaining that notifications are now created by Cloud Functions
 
-#### **`notifications.js`** (Already Updated Previously)
+#### **`notifications.js`**
 - **Existing Feature**: Firestore snapshot listener that listens to `notifications` collection
 - **Integration**: Will automatically display any notifications created by Cloud Functions
 - **Behavior**: Persists notification read/unread state and displays on admin bell + notifications page
+- **Icon Mapping Updated**: Added icons for:
+  - `'New Damage Report'`: `'report_problem'`
+  - `'Pending Approval'`: `'schedule'`
+  - `'Reschedule Request'`: `'event_repeat'`
+  - `'Appointment Cancelled'`: `'event_busy'`
 
 ### 3. Documentation Created
 

@@ -4,22 +4,31 @@
 
 Admin notifications are now **created server-side by Cloud Functions** instead of client-side listeners. This makes them more reliable and available to all admins across devices.
 
-## Three Notification Types (Automatic)
+## Four Notification Types (Automatic)
 
 ### 1. 📅 Pending Approval
 **When**: New booking created with `status: 'Pending'`
 **Message**: "{Customer} has a new pending booking for {Service}."
 **Action**: Admin can approve or deny
+**Link**: `appointment.html`
 
 ### 2. 🔄 Reschedule Request  
 **When**: New reschedule request with `status: 'Pending'`
 **Message**: "{Customer} requested to reschedule {Service}."
 **Action**: Admin can approve or deny
+**Link**: `appointment.html`
 
 ### 3. ❌ Appointment Cancelled
 **When**: Booking status changed to `'Cancelled'`
 **Message**: "{Customer}'s appointment for {Service} was cancelled."
 **Action**: Admin is notified
+**Link**: `appointment.html`
+
+### 4. 📋 New Damage Report
+**When**: New damage report submitted to `damage_reports` collection
+**Message**: "{Customer} submitted a damage report at {Location}."
+**Action**: Admin can review the damage report
+**Link**: `damage-reports.html`
 
 ## How to Use
 

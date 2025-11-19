@@ -43,6 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
         'New Review': 'reviews',
         'Payment Received': 'payments',
         'Cancellation': 'cancel',
+        'New Damage Report': 'report_problem',
+        'Pending Approval': 'schedule',
+        'Reschedule Request': 'event_repeat',
+        'Appointment Cancelled': 'event_busy',
         'default': 'notifications'
       };
         const iconKey = item.type || item.title || 'default';

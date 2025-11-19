@@ -475,3 +475,60 @@ exports.onBookingCancelled = onDocumentWritten(
     }
   }
 );
+
+/**
+ * Cloud Function: Trigger when new damage report is submitted
+ * Creates an admin notification for damage report
+ */
+exports.onNewDamageReport = onDocumentWritten(
+  "damage_reports/{reportId}",
+  async (event) => {
+    try {
+      const reportId = event.params.reportId;
+      const newData = event.data.after.data();
+      const oldData = event.data.before.data();
+
+      // Only process new documents
+      if (!newData || oldData) {
+        return; // Not a new report
+      }
+
+      logger.log(`📋 New damage report submitted: ${reportId}`);
+
+      // Try to get customer name from the report data or fetch from users collection
+      let customerName = newData.customerName || newData.customer || newData.name || newData.fullName;
+      
+      // If no customer name but we have userId, fetch from users collection
+      if (!customerName && newData.userId) {
+        try {
+          const userDoc = await admin.firestore()
+            .collection('users')
+            .doc(newData.userId)
+            .get();
+          
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            customerName = userData.fullName || userData.name || userData.displayName || userData.email;
+          }
+        } catch (err) {
+          logger.error(`❌ Error fetching user data: ${err.message}`);
+        }
+      }
+
+      customerName = customerName || 'Customer';
+      const location = newData.location || newData.address || 'Unknown location';
+      const title = 'New Damage Report';
+      const message = `${customerName} submitted a damage report at ${location}.`;
+
+      await createAdminNotificationIfMissing(
+        'damage_report',
+        reportId,
+        title,
+        message,
+        'damage-reports.html'
+      );
+    } catch (error) {
+      logger.error(`❌ Error in onNewDamageReport: ${error.message}`, error);
+    }
+  }
+);

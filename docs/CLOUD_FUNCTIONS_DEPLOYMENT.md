@@ -2,11 +2,12 @@
 
 ## Overview
 
-The admin notification system has been moved to **Cloud Functions** for server-side, reliable notification creation. Three Cloud Functions now automatically create persisted admin notifications when:
+The admin notification system has been moved to **Cloud Functions** for server-side, reliable notification creation. Four Cloud Functions now automatically create persisted admin notifications when:
 
 1. **New pending booking** is created (`onNewPendingBooking`)
 2. **New reschedule request** is created (`onNewRescheduleRequest`)
 3. **Booking is cancelled** (`onBookingCancelled`)
+4. **New damage report** is submitted (`onNewDamageReport`)
 
 ## Cloud Functions Added
 
@@ -26,6 +27,13 @@ The admin notification system has been moved to **Cloud Functions** for server-s
 - **Trigger**: Firestore document write to `bookings` collection
 - **Condition**: Document status changed to `'Cancelled'`
 - **Action**: Creates admin notification in `notifications` collection
+- **Deduplication**: Checks for existing notification with same `action:itemId` before creating
+
+### 4. `onNewDamageReport`
+- **Trigger**: Firestore document write to `damage_reports` collection
+- **Condition**: New document created (not an update)
+- **Action**: Creates admin notification in `notifications` collection
+- **Customer Resolution**: Fetches customer name from report data or looks up `userId` in `users` collection
 - **Deduplication**: Checks for existing notification with same `action:itemId` before creating
 
 ## Deployment Steps
@@ -54,7 +62,7 @@ The admin notification system has been moved to **Cloud Functions** for server-s
 
    Or deploy specific functions:
    ```bash
-   firebase deploy --only functions:onNewPendingBooking,functions:onNewRescheduleRequest,functions:onBookingCancelled
+   firebase deploy --only functions:onNewPendingBooking,functions:onNewRescheduleRequest,functions:onBookingCancelled,functions:onNewDamageReport
    ```
 
 4. View logs to verify deployment:
@@ -103,6 +111,22 @@ The admin notification system has been moved to **Cloud Functions** for server-s
 4. Check `notifications` collection - a new "Appointment Cancelled" admin notification should appear
 5. In the admin dashboard notification bell, the notification should display
 
+#### Test 4: Submit a Damage Report
+1. In Firebase Console → Firestore → `damage_reports` collection
+2. Add a new document with:
+   ```json
+   {
+     "customerName": "Sarah Johnson",
+     "location": "Downtown Location",
+     "damageReport": "Scratch on passenger door",
+     "userId": "user123",
+     "timestamp": "2025-11-15T10:00:00Z"
+   }
+   ```
+3. Check `notifications` collection - a new "New Damage Report" admin notification should appear
+4. In the admin dashboard notification bell, the notification should display
+5. Clicking the notification should navigate to `damage-reports.html`
+
 ### Monitoring
 
 #### View Real-Time Logs
@@ -117,6 +141,7 @@ firebase functions:log --follow
 - 📅 `New pending booking detected: {bookingId}` - Booking trigger fired
 - 🔄 `New reschedule request detected: {requestId}` - Reschedule trigger fired
 - ❌ `Booking cancelled detected: {bookingId}` - Cancellation trigger fired
+- 📋 `New damage report submitted: {reportId}` - Damage report trigger fired
 
 ## Client-Side Changes
 
@@ -144,7 +169,7 @@ If you need to disable these functions temporarily:
 
 ```bash
 # Delete specific functions
-firebase functions:delete onNewPendingBooking onNewRescheduleRequest onBookingCancelled
+firebase functions:delete onNewPendingBooking onNewRescheduleRequest onBookingCancelled onNewDamageReport
 
 # Or redeploy without these functions
 # (remove their exports from functions/index.js)

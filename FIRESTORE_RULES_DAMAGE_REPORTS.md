@@ -97,7 +97,7 @@ If the collection doesn't exist or is named differently in your Firestore:
    - `bookings` (with a damageReport field)
    - `reports`
 
-If the collection name is different, update line 126 in `damage-reviews.js`:
+If the collection name is different, update line 126 in `damage-reports.js`:
 ```javascript
 const snapshot = await db.collection('YOUR_ACTUAL_COLLECTION_NAME').get();
 ```
@@ -105,6 +105,6 @@ const snapshot = await db.collection('YOUR_ACTUAL_COLLECTION_NAME').get();
 ## Testing
 
 After updating the rules:
-1. Refresh the damage-reviews.html page
+1. Refresh the damage-reports.html page
 2. Check the browser console for any errors
 3. You should see: "Damage reports loaded from Firestore: [...]"

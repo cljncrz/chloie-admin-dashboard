@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Damage Report Details - Kingsley Carwash</title>
+    <title>Damage Reports - Kingsley Carwash</title>
 
     <!-- Google Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -55,6 +55,7 @@
             <span class="material-symbols-outlined">book_online</span>
             <h3>Appointments</h3>
           </a>
+
           <a href="technicians.html">
             <span class="material-symbols-outlined">engineering</span>
             <h3>Technicians</h3>
@@ -71,6 +72,7 @@
             <span class="material-symbols-outlined">campaign</span>
             <h3>Promotions</h3>
           </a>
+
           <a href="media-manager.html">
             <span class="material-symbols-outlined">perm_media</span>
             <h3>Media Manager</h3>
@@ -91,6 +93,7 @@
             <span class="material-symbols-outlined">location_on</span>
             <h3>Geofencing</h3>
           </a>
+          <!-- New link for Damage Reviews -->
         </div>
       </aside>
       <!-- ========== End of Sidebar ========== -->
@@ -103,11 +106,11 @@
             <span class="material-symbols-outlined">menu</span>
           </button>
           <div class="header-title-container">
-            <a href="damage-reviews.html" class="action-icon-btn" id="back-btn">
+            <a href="index.html" class="action-icon-btn" id="back-btn">
               <span class="material-symbols-outlined">arrow_back</span>
             </a>
-            <h1>Damage Report Details</h1>
-          </div>
+          <h1>Damage Reports</h1>
+           </div>
           <div class="header-right">
             <div class="theme-toggler">
               <span class="material-symbols-outlined active">light_mode</span>
@@ -164,7 +167,7 @@
                   <span class="material-symbols-outlined">person</span>
                   <h3>Profile</h3>
                 </a>
-                <a href="settings.html">
+                <a href="index.html#settings">
                   <span class="material-symbols-outlined">settings</span>
                   <h3>Settings</h3>
                 </a>
@@ -180,96 +183,65 @@
 
         <!-- ========== Page Content ========== -->
         <div class="page-content">
-          <section id="damage-review-details-page" class="page active">
-            <div class="review-details-container">
-              <div class="review-details-main-column">
-                <!-- Damage Report Info Card -->
-                <div class="review-info-card widget-card">
-                  <div class="review-header">
-                    <div class="review-customer-info">
-                      <h3 id="damage-customer-name">Customer Name</h3>
-                      <small id="damage-service-name">Service Name</small>
-                    </div>
-                  </div>
-                  <p class="review-comment" id="damage-full-report">
-                    "Full damage report will be displayed here."
-                  </p>
-                  <small class="review-date text-muted" id="damage-report-date"
-                    >Reported on: Month Day, Year</small
-                  >
+          <section id="damage-reports-page" class="page active">
+            <!-- Quick Stats Section -->
+            <div class="insights" id="damage-reports-page-insights">
+              <div class="widget-card stat-card">
+                <span class="material-symbols-outlined">report</span>
+                <div class="stat-info">
+                  <h3>Total Damage Reports</h3>
+                  <h1 id="total-damage-reports-stat">0</h1>
                 </div>
+              </div>
+            </div>
 
-                <!-- Admin Response Section -->
-                <div class="admin-reply-card widget-card">
-                  <!-- This section shows an existing response -->
-                  <div
-                    id="existing-response-container"
-                    class="reply-container"
-                    style="display: none"
-                  >
-                    <div class="reply-header">
-                      <h3>Admin's Response</h3>
-                      <button class="btn-secondary" id="edit-response-btn">
-                        <span class="material-symbols-outlined">edit</span> Edit
-                      </button>
-                    </div>
-                    <div class="admin-reply-content">
-                      <p id="admin-response-text"></p>
-                    </div>
-                  </div>
-
-                  <!-- This form is for submitting a new response -->
-                  <form
-                    id="admin-response-form"
-                    class="modal-form"
-                    style="display: none"
-                  >
-                    <h3 id="response-form-title">Respond to Damage Report</h3>
-                    <div class="form-group">
-                      <textarea
-                        id="response-textarea"
-                        rows="5"
-                        placeholder="Write your response here..."
-                      ></textarea>
-                    </div>
-                    <div class="form-actions reply-actions">
-                      <button
-                        type="button"
-                        class="btn-secondary"
-                        id="cancel-response-btn"
-                      >
-                        Cancel
-                      </button>
-                      <button type="submit" class="btn-primary">
-                        Submit Response
-                      </button>
-                    </div>
-                  </form>
-
-                  <!-- This button shows when there is no response yet -->
+            <div class="recent-appointments" id="damage-reports-table-container">
+              <div class="table-controls">
+                <div class="table-search-container">
+                  <input
+                    type="search"
+                    id="damage-report-search"
+                    placeholder="Search by customer, service, or review..."
+                  />
+                </div>
+                <div class="table-action-buttons">
                   <button
-                    class="btn-primary"
-                    id="show-response-form-btn"
-                    style="display: none"
+                    class="btn-danger"
+                    id="delete-selected-damage-reports-btn"
+                    disabled
                   >
-                    <span class="material-symbols-outlined">reply</span> Respond
-                    to Customer
+                    Delete Selected
                   </button>
                 </div>
               </div>
-
-              <!-- Right Column -->
-              <div class="review-details-right-column">
-                <!-- Customer Media Section -->
-                <div class="customer-media-card widget-card">
-                  <h3>Customer Media</h3>
-                  <div class="media-container">
-                    <div class="media-placeholder">
-                      <span class="material-symbols-outlined">image_not_supported</span>
-                      <p>No media submitted for this review.</p>
-                    </div>
-                  </div>
+              <div class="table-responsive-wrapper">
+                <div class="table-loader">
+                  <div class="spinner"></div>
                 </div>
+                <table id="damage-reports-table">
+                  <thead>
+                    <tr>
+                      <th><input type="checkbox" id="select-all-damage-reports" /></th>
+                      <th data-sortable="true" data-sort-by="customer">Customer Name</th>
+                       <th data-sortable="true" data-sort-by="customer">Contact No.</th>
+                      <th data-sortable="true" data-sort-by="service">Location</th>
+                      <th>Report</th>
+                      <th data-sortable="true" data-sort-by="date">Date</th>
+                      <th class="text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Damage review data will be injected here by JavaScript -->
+                    <tr class="no-results-row" style="display: none">
+                      <td colspan="6" class="text-center text-muted">No damage reports found.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="table-pagination">
+                <button class="pagination-btn" data-action="prev" disabled>&laquo; Previous</button>
+                <span class="page-info"></span>
+                <button class="pagination-btn" data-action="next" disabled>Next &raquo;</button>
               </div>
             </div>
           </section>
@@ -291,12 +263,14 @@
           </div>
         </footer>
       </main>
+      <!-- ========== End of Main Content ========== -->
     </div>
-    <div class="chat-flyout-footer"></div>
 
     <script src="all-data.js"></script>
     <script src="global-updates.js"></script>
     <script src="script.js"></script>
-    <script src="damage-review-details.js"></script>
+    <script src="notifications.js"></script>
+    <!-- Specific script for damage reviews -->
+    <script src="damage-reports.js"></script>
   </body>
 </html>
