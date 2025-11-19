@@ -18,17 +18,7 @@
     />
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css" />  
-  <!-- Prevent dark mode flash -->
-  <script>
-    (function() {
-      const theme = localStorage.getItem('theme');
-      if (theme === 'dark' && document.documentElement && document.body) {
-        document.documentElement.classList.add('dark-theme-variables');
-        document.body.classList.add('dark-theme-variables');
-      }
-    })();
-  </script>
+  <link rel="stylesheet" href="style.css" />
 
   <!-- Initialize Firebase via module-based initializer (provides a compat shim) -->
   <script type="module" src="firebase-setup.js"></script>
@@ -299,22 +289,23 @@
                     <thead>
                       <tr class="sortable-header">
                         <th data-sortable="true" data-sort-by="serviceId">ID</th>
-                        <th data-sortable="true" data-sort-by="customerName">Customer</th>
-                        <th data-sortable="true" data-sort-by="plate">Plate No.</th>
-                        <th data-sortable="true" data-sort-by="carName">Vehicle</th>
+                        <th data-sortable="true" data-sort-by="plate">Plate No</th>
+                        <th data-sortable="true" data-sort-by="carName">CarName</th>
                         <th data-sortable="true" data-sort-by="carType">Type</th>
                         <th data-sortable="true" data-sort-by="serviceNames">Service</th>
-                        <th data-sortable="true" data-sort-by="datetime">Date & Time</th>
+                        <th data-sortable="true" data-sort-by="datetime">Date&Time</th>
                         <th data-sortable="true" data-sort-by="price">Price</th>
                         <th data-sortable="true" data-sort-by="technician">Technician</th>
                         <th data-sortable="true" data-sort-by="status" class="text-center">Status</th>
-                        <th data-sortable="true" class="text-center">Payment</th>
+                        <th data-sortable="true" class="text-center">
+                          Payment
+                        </th>
                         <th class="text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr class="no-results-row">
-                        <td colspan="12" class="text-center text-muted">
+                        <td colspan="11" class="text-center text-muted">
                           No appointments found.
                         </td>
                       </tr>
@@ -369,24 +360,23 @@
                   <table>
                     <thead>
                       <tr class="sortable-header">
-                        <th data-sortable="true" data-sort-by="id">ID</th>
-                        <th data-sortable="true" data-sort-by="customerName">Customer</th>
-                        <th data-sortable="true" data-sort-by="phone">Phone</th>
                         <th data-sortable="true" data-sort-by="plate">Plate No.</th>
-                        <th data-sortable="true" data-sort-by="carName">Vehicle</th>
-                        <th data-sortable="true" data-sort-by="carType">Type</th>
-                        <th data-sortable="true" data-sort-by="service">Service</th>
-                        <th data-sortable="true" data-sort-by="datetime">Date & Time</th>
-                        <th data-sortable="true" data-sort-by="price">Price</th>
-                        <th data-sortable="true" data-sort-by="technician">Technician</th>
-                        <th data-sortable="true" data-sort-by="status" class="text-center">Status</th>
-                        <th data-sortable="true" class="text-center">Payment</th>
+                        <th data-sortable="true">CarName</th>
+                        <th data-sortable="true">CarType</th>
+                        <th data-sortable="true">Service</th>
+                        <th data-sortable="true">Date&Time</th>
+                        <th data-sortable="true">Price</th>
+                        <th data-sortable="true">Technician</th>
+                        <th data-sortable="true" class="text-center">Status</th>
+                        <th data-sortable="true" class="text-center">
+                          Payment
+                        </th>
                         <th class="text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr class="no-results-row">
-                        <td colspan="13" class="text-center text-muted">
+                        <td colspan="9" class="text-center text-muted">
                           No walk-ins found.
                         </td>
                       </tr>
@@ -423,21 +413,11 @@
                   <table>
                     <thead>
                       <tr class="sortable-header">
-<<<<<<< HEAD
                         <th>ID</th>
                         <th>Customer Name</th>
                         <th>Service</th>
                         <th>Date & Time</th>
                         <th>Reason</th>
-=======
-                        <th data-sortable="true" data-sort-by="id">ID</th>
-                        <th data-sortable="true" data-sort-by="customerName">Customer</th>
-                        <th data-sortable="true" data-sort-by="service">Service</th>
-                        <th data-sortable="true" data-sort-by="datetime">Date & Time</th>
-                        <th data-sortable="true" data-sort-by="cancelledAt">Cancelled At</th>
-                        <th data-sortable="true" data-sort-by="reason">Reason</th>
-                        <th>Notes</th>
->>>>>>> 03670624e8d8cdd0131982c3e785baa93909b98f
                         <th class="text-center">Actions</th>
                       </tr>
                     </thead>

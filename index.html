@@ -18,17 +18,7 @@
     />
 
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="style.css" />  
-  <!-- Prevent dark mode flash -->
-  <script>
-    (function() {
-      const theme = localStorage.getItem('theme');
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark-theme-variables');
-        document.body.classList.add('dark-theme-variables');
-      }
-    })();
-  </script>
+    <link rel="stylesheet" href="style.css" />
 
   <!-- We will load Firebase via modules in our JS files -->
   <!-- The 'defer' attribute is not strictly needed with type="module" as modules are deferred by default, but it's good practice. -->

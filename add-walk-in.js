@@ -46,34 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const option = document.createElement('option');
                 option.value = service.service;
                 option.textContent = service.service;
-                
-                // Check the pricing labels to determine correct mapping
-                // In the database, the labels are: pricingLabel1 = "7-seater", pricingLabel2 = "5-seater"
-                // But the values are: small = 12500 (5-seater), medium = 10500 (7-seater)
-                const pricing = service.pricing || {};
-                const label1 = service.pricingLabel1 || '';
-                const label2 = service.pricingLabel2 || '';
-                
-                let price5Seater = 0;
-                let price7Seater = 0;
-                
-                // Map based on labels to get correct prices
-                if (label1.toLowerCase().includes('5')) {
-                    price5Seater = parseFloat(pricing.small || service.small) || 0;
-                    price7Seater = parseFloat(pricing.medium || service.medium) || 0;
-                } else if (label2.toLowerCase().includes('5')) {
-                    price5Seater = parseFloat(pricing.medium || service.medium) || 0;
-                    price7Seater = parseFloat(pricing.small || service.small) || 0;
-                } else {
-                    // Fallback: assume small=5seater, medium=7seater
-                    price5Seater = parseFloat(pricing.small || service.small) || 0;
-                    price7Seater = parseFloat(pricing.medium || service.medium) || 0;
-                }
-                
-                option.dataset.price5Seater = price5Seater;
-                option.dataset.price7Seater = price7Seater;
-                
-                console.log(`Service: ${service.service}, Labels: [${label1}, ${label2}], 5-Seater: ₱${price5Seater}, 7-Seater: ₱${price7Seater}`);
+                // Store both 5-seater (small) and 7-seater (medium) prices
+                option.dataset.price5Seater = service.small || 0;
+                option.dataset.price7Seater = service.medium || 0;
                 select.appendChild(option);
             });
 
@@ -161,17 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const price = parseFloat(priceInput.value);
             const date = dateInput.value;
             const time = timeInput.value;
-            const paymentStatus = document.getElementById('walkin-payment-status').value;
-            const paymentMethod = document.getElementById('walkin-payment-method').value;
 
-            if (!customerName || !carPlate || !customerPhone || !vehicleType || !carName || !carType || services.length === 0 || !date || !time || !paymentStatus) {
+            if (!customerName || !carPlate || !customerPhone || !vehicleType || !carName || !carType || services.length === 0 || !date || !time) {
                 alert('Please fill out all required fields and select at least one service.');
-                return;
-            }
-
-            // Validate payment method if status is Paid
-            if (paymentStatus === 'Paid' && !paymentMethod) {
-                alert('Please select a payment method for paid transactions.');
+                alert('Please fill out all required fields.');
                 return;
             }
 
@@ -181,29 +149,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const newWalkinData = {
                 customerName,
                 plate: carPlate,
-                plateNumber: carPlate, // Also store as plateNumber for consistency
                 phone: customerPhone,
-                phoneNumber: customerPhone, // Also store as phoneNumber for consistency
-                customerPhone: customerPhone, // Also store as customerPhone for consistency
                 carName,
                 carType,
                 vehicleType, // Save the selected vehicle type
                 service: services.join(', '), // Store as a comma-separated string
-                serviceNames: services.join(', '), // Also store as serviceNames for consistency
                 price,
                 dateTime, // Store as a Firestore timestamp
                 status: 'Pending',
-                paymentStatus: paymentStatus,
-                paymentMethod: paymentStatus === 'Paid' ? paymentMethod : null,
+                paymentStatus: 'Unpaid',
+                paymentMethod: null, // Will be set when payment is processed
                 technician: 'Unassigned', // Default technician
-                isWalkin: true,
-                createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                isWalkin: true
             };
-
-            // Add paidAt timestamp if payment status is Paid
-            if (paymentStatus === 'Paid') {
-                newWalkinData.paidAt = window.firebase.firestore.FieldValue.serverTimestamp();
-            }
 
             try {
                 const db = window.firebase.firestore();
@@ -239,22 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Recalculate price when the type changes
             updateTotalPrice();
         };
-
-        // --- Toggle payment method field based on payment status ---
-        const paymentStatusSelect = document.getElementById('walkin-payment-status');
-        const paymentMethodGroup = document.getElementById('payment-method-group');
-        const paymentMethodSelect = document.getElementById('walkin-payment-method');
-
-        paymentStatusSelect.addEventListener('change', () => {
-            if (paymentStatusSelect.value === 'Paid') {
-                paymentMethodGroup.style.display = 'block';
-                paymentMethodSelect.required = true;
-            } else {
-                paymentMethodGroup.style.display = 'none';
-                paymentMethodSelect.required = false;
-                paymentMethodSelect.value = ''; // Reset selection
-            }
-        });
 
         // --- Initialization ---
         setDefaultDateTime();

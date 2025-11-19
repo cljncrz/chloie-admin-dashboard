@@ -1,11 +1,7 @@
 {
   "firestore": {
-<<<<<<< HEAD
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
-=======
-    "rules": "firestore.rules"
->>>>>>> 03670624e8d8cdd0131982c3e785baa93909b98f
   },
   "functions": [
     {

@@ -43,11 +43,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const toggleSelectionModeBtn = document.getElementById('toggle-selection-mode-btn');
     const markAllReadBtn = document.getElementById('mark-all-read-btn');
     const deleteSelectedBtn = document.getElementById('delete-selected-conversations-btn');
-    const newMessageBtn = document.getElementById('new-message-btn');
-    const newMessageModal = document.getElementById('new-message-modal');
-    const closeNewMessageModal = document.getElementById('close-new-message-modal');
-    const userSearchInput = document.getElementById('user-search-input');
-    const userListContainer = document.getElementById('user-list-container');
 
     // --- State ---
     let chats = [];
@@ -60,55 +55,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Functions ---
 
     /**
-<<<<<<< HEAD
-=======
-     * Fetches all users who signed up in the mobile app from Firestore.
-     * This ensures we have access to customer data for chat initialization.
-     * Excludes users with admin role.
-     */
-    const fetchMobileAppUsers = async () => {
-        try {
-            const usersSnapshot = await db.collection('users').get();
-            usersData = {}; // Reset user data storage
-            
-            usersSnapshot.forEach(doc => {
-                const userData = doc.data();
-                
-                // Exclude users with admin role
-                const userRole = (userData.role || '').toLowerCase();
-                const isAdmin = userRole === 'admin' || 
-                                userRole === 'administrator' || 
-                                userData.isAdmin === true ||
-                                userData.admin === true;
-                
-                if (!isAdmin) {
-                    usersData[doc.id] = {
-                        uid: doc.id,
-                        name: userData.fullName || userData.name || userData.customerName || 'Unknown User',
-                        email: userData.email || '',
-                        phone: userData.phone || '',
-                        profilePic: userData.profilePic || userData.customerProfilePic || './images/redicon.png',
-                        isVerified: userData.isVerified || false,
-                        createdAt: userData.createdAt || userData.registrationDate || null,
-                    };
-                }
-            });
-            
-            console.log(`Fetched ${Object.keys(usersData).length} non-admin users from Firebase`, usersData);
-            return usersData;
-        } catch (error) {
-            console.error("Error fetching mobile app users:", error);
-            return {};
-        }
-    };
-
-    /**
->>>>>>> 03670624e8d8cdd0131982c3e785baa93909b98f
      * Listens for real-time updates to the conversations list from Firestore.
-     * Now combines all users with existing chat data to show all customers.
      */
     const listenForConversations = () => {
-<<<<<<< HEAD
         // Get the chats collection
         const chatsRef = db.collection('chats');
         
@@ -152,70 +101,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error("Error setting up chat listener:", error);
             conversationListEl.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">Error initializing chat system. Please refresh the page.</p>';
         }
-=======
-        // Get all chats without complex filtering to avoid permission issues
-        const chatsRef = db.collection('chats');
-        
-        chatsRef.onSnapshot(snapshot => {
-            const existingChats = {};
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                // Filter out archived chats on the client side
-                if (data.archived !== true) {
-                    existingChats[doc.id] = {
-                        lastMessage: data.lastMessage || '...',
-                        timestamp: data.timestamp,
-                        isUnread: data.isUnreadForAdmin || false,
-                    };
-                }
-            });
-            
-            // Combine all users with their chat data (if any)
-            renderAllCustomers(existingChats);
-        }, error => {
-            console.error("Error listening for conversations:", error);
-            // Even if there's a permission error, still show all users without chat data
-            renderAllCustomers({});
-        });
->>>>>>> 03670624e8d8cdd0131982c3e785baa93909b98f
-    };
-
-    /**
-     * Renders all customers with or without existing chat data
-     */
-    const renderAllCustomers = (existingChats) => {
-        const newChats = [];
-        
-        Object.keys(usersData).forEach(userId => {
-            const userInfo = usersData[userId];
-            const chatData = existingChats[userId];
-            
-            newChats.push({
-                id: userId,
-                customerName: userInfo.name || 'Unknown Customer',
-                profilePic: userInfo.profilePic || './images/redicon.png',
-                lastMessage: chatData ? chatData.lastMessage : 'No messages yet',
-                timestamp: chatData && chatData.timestamp ? formatTimestamp(chatData.timestamp) : '',
-                isUnread: chatData ? chatData.isUnread : false,
-                isVerified: userInfo.isVerified || false,
-                phone: userInfo.phone || '',
-                hasConversation: !!chatData,
-                timestampValue: chatData && chatData.timestamp ? chatData.timestamp.toMillis() : 0,
-            });
-        });
-        
-        // Sort: conversations with messages first (by timestamp desc), then users without messages (alphabetically)
-        newChats.sort((a, b) => {
-            if (a.hasConversation && !b.hasConversation) return -1;
-            if (!a.hasConversation && b.hasConversation) return 1;
-            if (a.hasConversation && b.hasConversation) {
-                return b.timestampValue - a.timestampValue;
-            }
-            return a.customerName.localeCompare(b.customerName);
-        });
-        
-        chats = newChats;
-        renderConversationList(searchInput.value);
     };
 
     const formatTimestamp = (firestoreTimestamp) => {
@@ -578,7 +463,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
     };
 
-
+    /**
+     * SIMULATION: Simulates a customer on their device seeing all unread admin messages.
+     * In a real app, this would be triggered by an event from the customer's device.
+     */
+    const simulateCustomerSeesMessage = (conversationId) => {
+        // This is now handled by the mobile app, which would update the 'status' field of messages in Firestore.
+        // The web admin's onSnapshot listener will automatically pick up the change and re-render the UI.
+    };
 
     // --- Event Listeners ---
     searchInput?.addEventListener('input', () => {
@@ -625,24 +517,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (markAllReadBtn) {
         markAllReadBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            
-            // Use batch to mark all chats as read
-            const batch = db.batch();
-            chats.filter(chat => chat.isUnread).forEach(chat => {
-                const chatRef = db.collection('chats').doc(chat.id);
-                batch.update(chatRef, { isUnreadForAdmin: false });
-            });
-            
-            batch.commit()
-                .then(() => {
-                    console.log('Marked all chats as read');
-                    // The snapshot listener will automatically update the UI
-                })
-                .catch(error => {
-                    console.error('Error marking all as read:', error);
-                    alert('Failed to mark all as read. Please try again.');
-                });
-                
+            chats.forEach(chat => chat.isUnread = false);
+            renderConversationList(searchInput.value);
             chatListHeaderDropdown.classList.remove('show');
         });
     }
@@ -667,30 +543,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (confirm(`Are you sure you want to delete ${checkedBoxes.length} conversation(s)? This cannot be undone.`)) {
                 const idsToDelete = Array.from(checkedBoxes).map(cb => cb.dataset.id);
-                
-                // Use Firebase batch to delete multiple conversations
-                const batch = db.batch();
-                idsToDelete.forEach(id => {
-                    const chatRef = db.collection('chats').doc(id);
-                    batch.delete(chatRef);
-                });
-                
-                batch.commit()
-                    .then(() => {
-                        console.log(`Deleted ${idsToDelete.length} conversations`);
-                        
-                        if (idsToDelete.includes(currentConversationId)) {
-                            currentConversationId = null;
-                            messageViewContent.style.display = 'none';
-                            messageViewPlaceholder.style.display = 'flex';
-                        }
-                        toggleSelectionMode(true); // Force selection mode off
-                        // The snapshot listener will automatically update the UI
-                    })
-                    .catch(error => {
-                        console.error('Error deleting conversations:', error);
-                        alert('Failed to delete some conversations. Please try again.');
-                    });
+                chats = chats.filter(chat => !idsToDelete.includes(chat.id));
+
+                if (idsToDelete.includes(currentConversationId)) {
+                    currentConversationId = null;
+                    messageViewContent.style.display = 'none';
+                    messageViewPlaceholder.style.display = 'flex';
+                }
+                toggleSelectionMode(true); // Force selection mode off
+                renderConversationList(searchInput.value);
             }
         });
     }
@@ -734,15 +595,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 e.preventDefault();
                 e.stopPropagation();
 
-                // Update Firebase to mark as unread
-                db.collection('chats').doc(conversationId).update({ isUnreadForAdmin: true })
-                    .then(() => {
-                        console.log(`Marked chat as unread: ${conversationId}`);
-                        // The snapshot listener will automatically update the UI
-                    })
-                    .catch(error => {
-                        console.error('Error marking chat as unread:', error);
-                    });
+                const chat = chats.find(c => c.id === conversationId);
+                if (chat) {
+                    chat.isUnread = true;
+                    // Re-render the list to show the unread state and update the global count
+                    renderConversationList(searchInput.value);
+                }
 
                 // Manually close the dropdown since the list re-render will remove it anyway
                 const dropdown = conversationItem.querySelector('.conversation-item-dropdown');
@@ -753,18 +611,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (archiveBtn) {
                 e.preventDefault();
                 e.stopPropagation();
-                
-                // Archive the chat by adding an 'archived' field
-                db.collection('chats').doc(conversationId).update({ archived: true })
-                    .then(() => {
-                        console.log(`Archived chat: ${conversationId}`);
-                        // The snapshot listener will automatically update the UI
-                    })
-                    .catch(error => {
-                        console.error('Error archiving chat:', error);
-                        alert('Failed to archive conversation. Please try again.');
-                    });
-                    
+                console.log(`Archiving chat: ${conversationId}`);
+                alert('Archive functionality is a work in progress.');
                 conversationItem.querySelector('.conversation-item-dropdown').classList.remove('show');
                 return;
             }
@@ -773,24 +621,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 e.preventDefault();
                 e.stopPropagation();
                 if (confirm('Are you sure you want to delete this conversation? This cannot be undone.')) {
-                    // Delete the chat document from Firestore
-                    db.collection('chats').doc(conversationId).delete()
-                        .then(() => {
-                            console.log(`Deleted chat: ${conversationId}`);
-                            
-                            // If the deleted chat was the active one, reset the view
-                            if (currentConversationId === conversationId) {
-                                currentConversationId = null;
-                                messageViewContent.style.display = 'none';
-                                messageViewPlaceholder.style.display = 'flex';
-                            }
-                            
-                            // The snapshot listener will automatically update the UI
-                        })
-                        .catch(error => {
-                            console.error('Error deleting chat:', error);
-                            alert('Failed to delete conversation. Please try again.');
-                        });
+                    // 1. Find the index of the chat to delete
+                    const chatIndex = chats.findIndex(c => c.id === conversationId);
+
+                    if (chatIndex > -1) {
+                        // 2. Remove the chat from the data array
+                        chats.splice(chatIndex, 1);
+
+                        // 3. If the deleted chat was the active one, reset the view
+                        if (currentConversationId === conversationId) {
+                            currentConversationId = null;
+                            messageViewContent.style.display = 'none';
+                            messageViewPlaceholder.style.display = 'flex';
+                        }
+
+                        // 4. Re-render the conversation list (which also updates the unread count)
+                        renderConversationList(searchInput.value);
+
+                        // 5. Show a success message
+                        console.log(`Deleted chat: ${conversationId}`);
+                    }
                 }
                 // No need to manually close, the list re-renders on delete.
                 return;
@@ -800,351 +650,102 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    /**
+     * SIMULATION: Simulates a customer replying in the currently active chat.
+     */
+    const simulateReplyInCurrentChat = (conversationId) => {
+        const chat = chats.find(c => c.id === conversationId);
+        if (!chat) return;
 
+        const typingAvatar = typingIndicator.querySelector('img');
+        typingAvatar.src = chat.profilePic;
+        typingIndicator.style.display = 'flex';
+        messageListEl.scrollTop = messageListEl.scrollHeight;
+
+        // Wait a bit before "sending" the reply
+        setTimeout(() => {
+            typingIndicator.style.display = 'none';
+
+            const replies = [
+                "Okay, thank you!",
+                "Got it, thanks for the help.",
+                "Sounds good.",
+                "I understand, thank you for clarifying."
+            ];
+
+            const replyMessage = {
+                sender: 'customer',
+                text: replies[Math.floor(Math.random() * replies.length)],
+                time: new Date()
+            };
+
+            chat.messages.push(replyMessage);
+            chat.lastMessage = replyMessage.text;
+            chat.timestamp = 'Just now';
+
+            renderMessages(conversationId);
+        }, 2000 + Math.random() * 1500); // Simulate typing for 2-3.5 seconds
+    };
 
     attachmentBtn.addEventListener('click', () => {
         fileInput.click();
     });
 
-    fileInput.addEventListener('change', async (e) => {
+    fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file || !currentConversationId) return;
 
-        const adminId = auth.currentUser ? auth.currentUser.uid : 'admin';
-        const chatRef = db.collection('chats').doc(currentConversationId);
-        const messagesRef = chatRef.collection('messages');
+        const chat = chats.find(c => c.id === currentConversationId);
+        if (!chat) return;
 
-        try {
-            // Show uploading indicator
-            const uploadingMsg = document.createElement('div');
-            uploadingMsg.className = 'chat-message admin uploading';
-            uploadingMsg.innerHTML = '<p>Uploading file...</p>';
-            messageListEl.appendChild(uploadingMsg);
-            messageListEl.scrollTop = messageListEl.scrollHeight;
+        let newMessage;
+        let lastMessageText;
 
-            // Upload file to Firebase Storage
-            const storage = window.firebase.storage();
-            const timestamp = Date.now();
-            const storageRef = storage.ref(`chat-media/${currentConversationId}/${timestamp}_${file.name}`);
-            const uploadTask = await storageRef.put(file);
-            const downloadUrl = await uploadTask.ref.getDownloadURL();
+        // Use URL.createObjectURL to get a temporary URL for local preview
+        const localUrl = URL.createObjectURL(file);
 
-            // Remove uploading indicator
-            uploadingMsg.remove();
-
-            let newMessage;
-            let lastMessageText;
-
-            if (file.type.startsWith('image/')) {
-                newMessage = {
-                    senderId: adminId,
-                    senderName: currentAdminData?.name || 'Admin',
-                    senderEmail: currentAdminData?.email || '',
-                    senderProfilePic: currentAdminData?.profilePic || './images/redicon.png',
-                    type: 'image',
-                    mediaUrl: downloadUrl,
-                    timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'sent'
-                };
-                lastMessageText = 'You sent an image.';
-            } else if (file.type.startsWith('video/')) {
-                newMessage = {
-                    senderId: adminId,
-                    senderName: currentAdminData?.name || 'Admin',
-                    senderEmail: currentAdminData?.email || '',
-                    senderProfilePic: currentAdminData?.profilePic || './images/redicon.png',
-                    type: 'video',
-                    mediaUrl: downloadUrl,
-                    timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'sent'
-                };
-                lastMessageText = 'You sent a video.';
-            } else {
-                newMessage = {
-                    senderId: adminId,
-                    senderName: currentAdminData?.name || 'Admin',
-                    senderEmail: currentAdminData?.email || '',
-                    senderProfilePic: currentAdminData?.profilePic || './images/redicon.png',
-                    type: 'file',
-                    fileName: file.name,
-                    fileSize: file.size,
-                    fileUrl: downloadUrl,
-                    timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'sent'
-                };
-                lastMessageText = `You sent a file: ${file.name}`;
-            }
-
-            // Add message to Firestore
-            await messagesRef.add(newMessage);
-            
-            // Update chat document
-            await chatRef.update({
-                lastMessage: lastMessageText,
-                timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
-                isUnreadForCustomer: true,
-                isUnreadForAdmin: false
-            });
-
-        } catch (error) {
-            console.error('Error uploading file:', error);
-            alert('Failed to upload file. Please try again.');
-        } finally {
-            // Reset the file input to allow selecting the same file again
-            e.target.value = '';
+        if (file.type.startsWith('image/')) {
+            newMessage = {
+                sender: 'admin',
+                type: 'image',
+                mediaUrl: localUrl, // Use the local URL for preview
+                time: new Date(),
+                status: 'sent'
+            };
+            lastMessageText = 'You sent an image.';
+        } else if (file.type.startsWith('video/')) {
+            newMessage = {
+                sender: 'admin',
+                type: 'video',
+                mediaUrl: localUrl,
+                time: new Date(),
+                status: 'sent'
+            };
+            lastMessageText = 'You sent a video.';
+        } else {
+            newMessage = {
+                sender: 'admin',
+                type: 'file',
+                fileName: file.name,
+                fileSize: file.size,
+                time: new Date(),
+                status: 'sent'
+            };
+            lastMessageText = `You sent a file: ${file.name}`;
         }
+
+        chat.messages.push(newMessage);
+        chat.lastMessage = lastMessageText;
+        chat.timestamp = 'Just now';
+
+        renderMessages(currentConversationId);
+        renderConversationList(searchInput.value);
+
+        // Reset the file input to allow selecting the same file again
+        e.target.value = '';
     });
 
     messageForm.addEventListener('submit', handleSendMessage);
-
-    // --- New Message Functionality ---
-
-    /**
-     * Fetches users from Firebase users collection for the new message modal
-     * Excludes users with admin role
-     */
-    const fetchUsersForNewMessage = async () => {
-        try {
-            userListContainer.innerHTML = `
-                <div class="loading-state">
-                    <div class="spinner"></div>
-                    <p>Loading users...</p>
-                </div>
-            `;
-
-            const usersSnapshot = await db.collection('users').get();
-            const allUsers = [];
-            
-            usersSnapshot.forEach(doc => {
-                const userData = doc.data();
-                
-                // Exclude users with admin role
-                const userRole = (userData.role || '').toLowerCase();
-                const isAdmin = userRole === 'admin' || 
-                                userRole === 'administrator' || 
-                                userData.isAdmin === true ||
-                                userData.admin === true;
-                
-                if (!isAdmin) {
-                    allUsers.push({
-                        uid: doc.id,
-                        name: userData.name || userData.customerName || 'Unknown User',
-                        email: userData.email || '',
-                        phone: userData.phone || '',
-                        profilePic: userData.profilePic || userData.customerProfilePic || './images/redicon.png',
-                        isVerified: userData.isVerified || false,
-                        createdAt: userData.createdAt || userData.registrationDate || null,
-                    });
-                }
-            });
-
-            // Store in usersData if not already there
-            allUsers.forEach(user => {
-                if (!usersData[user.uid]) {
-                    usersData[user.uid] = user;
-                }
-            });
-
-            console.log(`Loaded ${allUsers.length} non-admin users for messaging`);
-            return allUsers;
-        } catch (error) {
-            console.error("Error fetching users for new message:", error);
-            userListContainer.innerHTML = `
-                <div class="empty-state">
-                    <span class="material-symbols-outlined">error</span>
-                    <p>Error loading users. Please try again.</p>
-                </div>
-            `;
-            return [];
-        }
-    };
-
-    /**
-     * Renders the list of users in the new message modal
-     */
-    const renderUserList = (allUsers, filter = '') => {
-        const lowercasedFilter = filter.toLowerCase();
-        
-        // Filter users based on search term
-        const filteredUsers = allUsers.filter(user => {
-            const searchText = `${user.name} ${user.email} ${user.phone}`.toLowerCase();
-            return searchText.includes(lowercasedFilter);
-        });
-
-        // Sort users by name
-        filteredUsers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-        // Update user count badge
-        const userCountBadge = document.getElementById('user-count-badge');
-        if (userCountBadge) {
-            const count = filteredUsers.length;
-            userCountBadge.textContent = `${count} ${count === 1 ? 'user' : 'users'}`;
-        }
-
-        userListContainer.innerHTML = '';
-
-        if (filteredUsers.length === 0) {
-            userListContainer.innerHTML = `
-                <div class="empty-state">
-                    <span class="material-symbols-outlined">person_off</span>
-                    <p>No users found</p>
-                    <small class="text-muted">Try adjusting your search</small>
-                </div>
-            `;
-            return;
-        }
-
-        const fragment = document.createDocumentFragment();
-        filteredUsers.forEach(user => {
-            const userItem = document.createElement('div');
-            userItem.className = 'user-list-item';
-            userItem.dataset.userId = user.uid;
-            
-            // Check if there's an existing conversation
-            const hasExistingChat = chats.some(chat => chat.id === user.uid);
-            
-            const verificationBadge = user.isVerified 
-                ? '<span class="status-badge verified small">✓ Verified</span>' 
-                : '<span class="status-badge not-verified small">Unverified</span>';
-
-            const chatIndicator = hasExistingChat 
-                ? '<span class="chat-exists-badge" title="Existing conversation"><span class="material-symbols-outlined">chat_bubble</span></span>' 
-                : '';
-
-            userItem.innerHTML = `
-                <div class="user-item-left">
-                    <div class="profile-photo">
-                        <img src="${user.profilePic}" alt="${user.name}" onerror="this.src='./images/redicon.png'" />
-                    </div>
-                    <div class="user-item-details">
-                        <div class="user-item-header">
-                            <strong>${user.name}</strong>
-                            ${verificationBadge}
-                            ${chatIndicator}
-                        </div>
-                        <small class="text-muted user-email">${user.email}</small>
-                        ${user.phone ? `<small class="text-muted user-phone"><span class="material-symbols-outlined">phone</span>${user.phone}</small>` : ''}
-                    </div>
-                </div>
-                <button class="message-user-btn" data-user-id="${user.uid}" title="Send message to ${user.name}">
-                    <span class="material-symbols-outlined">send</span>
-                    <span>Message</span>
-                </button>
-            `;
-            fragment.appendChild(userItem);
-        });
-        userListContainer.appendChild(fragment);
-    };
-
-    /**
-     * Opens a chat with a specific user, creating a new conversation if needed
-     */
-    const openChatWithUser = async (userId) => {
-        try {
-            const user = usersData[userId];
-            if (!user) {
-                alert('User not found.');
-                return;
-            }
-
-            // Check if a conversation already exists
-            const existingChat = chats.find(chat => chat.id === userId);
-            
-            if (existingChat) {
-                // Conversation exists, just open it
-                renderMessages(userId);
-                newMessageModal.style.display = 'none';
-                return;
-            }
-
-            // Create a new conversation document
-            const chatRef = db.collection('chats').doc(userId);
-            await chatRef.set({
-                customerName: user.name,
-                customerProfilePic: user.profilePic,
-                phone: user.phone || '',
-                email: user.email || '',
-                isVerified: user.isVerified || false,
-                lastMessage: 'Start a conversation...',
-                timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
-                isUnreadForAdmin: false,
-                isUnreadForCustomer: false,
-                archived: false,
-                createdBy: 'admin',
-                createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            // The snapshot listener will automatically pick up the new chat and render it
-            // Then open the conversation
-            currentConversationId = userId;
-            renderMessages(userId);
-            
-            // Close the modal
-            newMessageModal.style.display = 'none';
-            
-        } catch (error) {
-            console.error('Error opening chat with user:', error);
-            alert('Failed to start conversation. Please try again.');
-        }
-    };
-
-    // Event listeners for new message modal
-    let cachedUsers = []; // Cache users to avoid refetching on search
-
-    if (newMessageBtn) {
-        newMessageBtn.addEventListener('click', async () => {
-            newMessageModal.style.display = 'flex';
-            userSearchInput.value = '';
-            
-            // Fetch and render users
-            cachedUsers = await fetchUsersForNewMessage();
-            renderUserList(cachedUsers);
-            
-            // Focus search input after a brief delay to ensure modal is visible
-            setTimeout(() => userSearchInput.focus(), 100);
-        });
-    }
-
-    if (closeNewMessageModal) {
-        closeNewMessageModal.addEventListener('click', () => {
-            newMessageModal.style.display = 'none';
-            userSearchInput.value = '';
-        });
-    }
-
-    // Close modal when clicking outside
-    if (newMessageModal) {
-        newMessageModal.addEventListener('click', (e) => {
-            if (e.target === newMessageModal) {
-                newMessageModal.style.display = 'none';
-                userSearchInput.value = '';
-            }
-        });
-    }
-
-    // Search users with debounce for better performance
-    let searchTimeout;
-    if (userSearchInput) {
-        userSearchInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                renderUserList(cachedUsers, userSearchInput.value);
-            }, 300); // 300ms debounce
-        });
-    }
-
-    // Handle user selection from list
-    if (userListContainer) {
-        userListContainer.addEventListener('click', (e) => {
-            const messageBtn = e.target.closest('.message-user-btn');
-            if (messageBtn) {
-                const userId = messageBtn.dataset.userId;
-                messageBtn.disabled = true;
-                messageBtn.innerHTML = '<div class="spinner small"></div><span>Opening...</span>';
-                openChatWithUser(userId);
-            }
-        });
-    }
 
     // --- Initialization ---
     const init = async () => {
@@ -1161,4 +762,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     init();
+
+    // --- DEMO: Simulate receiving a message from a customer ---
+    const simulateCustomerReply = () => {
+        if (chats.length < 2) return; // Need at least 2 chats to ensure one isn't open
+
+        // Pick a random chat that is not the currently open one
+        const availableChats = chats.filter(c => c.id !== currentConversationId);
+        if (availableChats.length === 0) return;
+
+        const randomChat = availableChats[Math.floor(Math.random() * availableChats.length)];
+        const replies = [
+            "Okay, thank you for the update!",
+            "Got it, thanks!",
+            "Can I ask another question?",
+            "Perfect, see you then."
+        ];
+        const mediaItems = (window.appData.media || []).filter(m => m.type === 'image');
+
+        let replyMessage;
+        // 25% chance of sending an image instead of text
+        if (mediaItems.length > 0 && Math.random() < 0.25) {
+            const randomMedia = mediaItems[Math.floor(Math.random() * mediaItems.length)];
+            replyMessage = {
+                sender: 'customer',
+                type: 'image',
+                mediaUrl: randomMedia.url,
+                time: new Date()
+            };
+        } else {
+            replyMessage = {
+                sender: 'customer',
+                type: 'text',
+                text: replies[Math.floor(Math.random() * replies.length)],
+                time: new Date()
+            };
+        }
+        
+        randomChat.messages.push(replyMessage);
+        randomChat.lastMessage = replyMessage.type === 'image' ? 'Sent an image' : replyMessage.text;
+        randomChat.timestamp = 'Just now';
+        randomChat.isUnread = true;
+        renderConversationList(searchInput.value); // Re-render to show the unread indicator and update count
+    };
+    // Simulate a reply every 15-25 seconds for a more dynamic demo
+    setInterval(simulateCustomerReply, 15000 + Math.random() * 10000);
 });

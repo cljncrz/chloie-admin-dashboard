@@ -1,7 +1,4 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  // Wait for Firebase to initialize
-  await window.firebaseInitPromise;
-
+document.addEventListener('DOMContentLoaded', () => {
   const salesTbody = document.getElementById('sales-tbody');
   const searchInput = document.getElementById('sales-search');
   const startDateInput = document.getElementById('sales-start-date');
@@ -24,169 +21,65 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (!salesTbody) return;
 
-  // Global array to hold all sales data
-  let allSales = [];
+  // --- Data Preparation ---
 
-  // --- Fetch Data from Firebase ---
-  const fetchSalesData = async () => {
-    try {
-      const db = window.firebase.firestore();
-      
-      // Fetch bookings, walkins, and services simultaneously
-      const [bookingsSnapshot, walkinsSnapshot, servicesSnapshot] = await Promise.all([
-        db.collection('bookings').get(),
-        db.collection('walkins').get(),
-        db.collection('services').get()
-      ]);
+  // 1. Get all paid appointments and walk-ins
+  const paidAppointments = (window.appData.appointments || []).filter(
+    (appt) => appt.paymentStatus === 'Paid'
+  );
+  const paidWalkins = (window.appData.walkins || []).filter(
+    (walkin) => walkin.paymentStatus === 'Paid'
+  );
 
-      // Store services data globally
-      window.appData.services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  // 2. Helper function to estimate price based on service and car type
+  const getPriceForService = (serviceName, carType) => {
+    const serviceData = (window.appData.services || []).find(
+      (s) => s.service === serviceName
+    );
+    if (!serviceData) return 250 + Math.floor(Math.random() * 1000); // Fallback random price
 
-      // Helper function to parse Firestore dates
-      const parseFirestoreDate = (val) => {
-        if (!val && val !== 0) return null;
-        try {
-          if (val && typeof val.toDate === 'function') return val.toDate();
-          if (val && typeof val.seconds === 'number') {
-            const nanos = val.nanoseconds ?? val.nanosecond ?? val.nanos ?? 0;
-            return new Date(val.seconds * 1000 + Math.floor(nanos / 1e6));
-          }
-          if (val instanceof Date) return val;
-          if (typeof val === 'number') {
-            if (val < 1e12) return new Date(val * 1000);
-            return new Date(val);
-          }
-          if (typeof val === 'string') {
-            const parsed = new Date(val);
-            if (!isNaN(parsed)) return parsed;
-          }
-        } catch (e) {
-          console.debug('parseFirestoreDate error', e);
-        }
-        return null;
-      };
+    // Map car types to price categories
+    const carTypeLower = carType.toLowerCase();
+    let priceCategory = 'medium'; // Default
+    if (['sedan', 'hatchback'].includes(carTypeLower)) priceCategory = 'small';
+    if (['suv', 'pickup'].includes(carTypeLower)) priceCategory = 'large';
+    if (['van', 'truck'].includes(carTypeLower)) priceCategory = 'xLarge';
 
-      // Helper function to get price based on service and car type
-      const getPriceForService = (serviceName, carType, amountField) => {
-        // If amount is directly provided, use it
-        if (amountField && typeof amountField === 'number' && amountField > 0) {
-          return amountField;
-        }
-
-        const serviceData = (window.appData.services || []).find(
-          (s) => s.service === serviceName || s.name === serviceName
-        );
-        
-        if (!serviceData) return 500; // Default fallback
-
-        const carTypeLower = (carType || 'medium').toLowerCase();
-        let priceCategory = 'medium';
-        
-        if (['sedan', 'hatchback', 'small'].includes(carTypeLower)) priceCategory = 'small';
-        if (['suv', 'pickup', 'large'].includes(carTypeLower)) priceCategory = 'large';
-        if (['van', 'truck', 'xlarge', 'x-large'].includes(carTypeLower)) priceCategory = 'xLarge';
-
-        return (
-          serviceData[priceCategory] ||
-          serviceData.medium ||
-          serviceData.small ||
-          serviceData.large ||
-          serviceData.xLarge ||
-          serviceData.price ||
-          500
-        );
-      };
-
-      // Process bookings (only paid ones)
-      const bookingsData = bookingsSnapshot.docs
-        .map(doc => {
-          const data = doc.data() || {};
-          
-          // Only include paid transactions
-          if (data.paymentStatus !== 'Paid') return null;
-
-          // Try to find a date field
-          const possibleDateFields = ['time', 'scheduleDate', 'dateTime', 'datetime', 'date', 'scheduledAt', 'appointmentDate', 'timestamp', 'bookingDate', 'createdAt'];
-          let dateObj = null;
-          
-          for (const field of possibleDateFields) {
-            if (data[field]) {
-              dateObj = parseFirestoreDate(data[field]);
-              if (dateObj) break;
-            }
-          }
-
-          if (!dateObj) {
-            dateObj = new Date(); // Fallback to current date
-          }
-
-          return {
-            transactionId: data.serviceId || data.bookingId || doc.id,
-            date: dateObj,
-            customer: data.customer || data.customerName || data.name || 'Unknown Customer',
-            service: data.service || data.serviceName || 'Unknown Service',
-            amount: getPriceForService(data.service || data.serviceName, data.carType || data.vehicleType, data.amount || data.price || data.totalAmount),
-            payment: data.paymentStatus || 'Paid',
-            technician: data.technician || data.assignedTechnician || 'Unassigned',
-            carType: data.carType || data.vehicleType || 'Unknown',
-            category: data.category || 'Service'
-          };
-        })
-        .filter(item => item !== null);
-
-      // Process walkins (only paid ones)
-      const walkinsData = walkinsSnapshot.docs
-        .map(doc => {
-          const data = doc.data() || {};
-          
-          // Only include paid transactions
-          if (data.paymentStatus !== 'Paid') return null;
-
-          const possibleDateFields = ['time', 'scheduleDate', 'dateTime', 'datetime', 'date', 'scheduledAt', 'appointmentDate', 'timestamp', 'createdAt'];
-          let dateObj = null;
-          
-          for (const field of possibleDateFields) {
-            if (data[field]) {
-              dateObj = parseFirestoreDate(data[field]);
-              if (dateObj) break;
-            }
-          }
-
-          if (!dateObj) {
-            dateObj = new Date();
-          }
-
-          return {
-            transactionId: `WLK-${doc.id}`,
-            date: dateObj,
-            customer: data.customer || data.customerName || 'Walk-in Customer',
-            service: data.service || data.serviceName || 'Unknown Service',
-            amount: getPriceForService(data.service || data.serviceName, data.carType || data.vehicleType, data.amount || data.price || data.totalAmount),
-            payment: data.paymentStatus || 'Paid',
-            technician: data.technician || data.assignedTechnician || 'Unassigned',
-            carType: data.carType || data.vehicleType || 'Unknown',
-            category: data.category || 'Service'
-          };
-        })
-        .filter(item => item !== null);
-
-      // Combine and sort all sales
-      allSales = [...bookingsData, ...walkinsData];
-      allSales.sort((a, b) => b.date - a.date);
-
-      // Store in global appData for other scripts
-      window.appData.appointments = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      window.appData.walkins = walkinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      console.log(`Loaded ${allSales.length} sales transactions (${bookingsData.length} bookings + ${walkinsData.length} walkins)`);
-      
-      return allSales;
-    } catch (error) {
-      console.error('Error fetching sales data:', error);
-      showToast('Error loading sales data', 'error');
-      return [];
-    }
+    // Find the most relevant price
+    return (
+      serviceData[priceCategory] ||
+      serviceData.medium ||
+      serviceData.small ||
+      serviceData.large ||
+      serviceData.xLarge ||
+      250 + Math.floor(Math.random() * 1000)
+    ); // Final fallback
   };
+
+  // 3. Combine into a single sales transaction list
+  const allSales = [
+    ...paidAppointments.map((appt, index) => ({
+      transactionId: appt.serviceId || `APP-${1001 + index}`,
+      date: new Date(appt.datetime.split(' - ')[0]), // Use the date part of the string
+      customer: appt.customer,
+      service: appt.service,
+      amount: getPriceForService(appt.service, appt.carType),
+      payment: appt.paymentStatus,
+      technician: appt.technician,
+    })),
+    ...paidWalkins.map((walkin, index) => ({
+      transactionId: `WLK-${1001 + index}`,
+      date: new Date(Date.now() - index * 24 * 60 * 60 * 1000), // Simulate recent dates
+      customer: 'Walk-in Customer',
+      service: walkin.service,
+      amount: getPriceForService(walkin.service, walkin.carType),
+      payment: walkin.paymentStatus,
+      technician: walkin.technician,
+    })),
+  ];
+
+  // Sort all sales by date, most recent first
+  allSales.sort((a, b) => b.date - a.date);
 
   // --- Populate Sales Table ---
   const populateSalesTable = (sales) => {
@@ -738,44 +631,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (saleData) openTransactionModal(saleData);
   });
 
-  // Helper function to show toast messages
-  const showToast = (message, type = 'success') => {
-    const toast = document.getElementById('success-toast');
-    if (toast) {
-      const icon = toast.querySelector('.material-symbols-outlined');
-      const text = toast.querySelector('p');
-      
-      if (type === 'error') {
-        icon.textContent = 'error';
-        toast.style.background = 'var(--color-danger)';
-      } else {
-        icon.textContent = 'check_circle';
-        toast.style.background = 'var(--color-success)';
-      }
-      
-      text.textContent = message;
-      toast.classList.add('show');
-      
-      setTimeout(() => {
-        toast.classList.remove('show');
-      }, 3000);
-    }
-  };
-
   // --- Initial Load ---
-  const initializeSalesPage = async () => {
-    // Show loading state
-    if (salesTbody) {
-      salesTbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;"><div class="loader"></div><p>Loading sales data...</p></td></tr>';
-    }
-
-    // Fetch data from Firebase
-    await fetchSalesData();
-
-    // Set default to 30 days and trigger display update
-    document.querySelector('.quick-select-btn[data-range="30d"]')?.click();
-  };
-
-  // Start initialization
-  initializeSalesPage();
+  document.querySelector('.quick-select-btn[data-range="30d"]')?.click(); // Default to 30 days
 });
