@@ -31,7 +31,7 @@ function getFirebaseConfig() {
       authDomain: "kingsleycarwashapp.firebaseapp.com",
       databaseURL: "https://kingsleycarwashapp-default-rtdb.firebaseio.com",
       projectId: "kingsleycarwashapp",
-      storageBucket: "kingsleycarwashapp.appspot.com",
+      storageBucket: "kingsleycarwashapp.firebasestorage.app",
       messagingSenderId: "508373593061",
       appId: "1:508373593061:web:86a490e83f1016e5dc1d0c"
     };

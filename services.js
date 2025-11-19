@@ -2,8 +2,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Wait for Firebase to be initialized
     await window.firebaseInitPromise;
     
+    // Add a small delay to ensure Firestore connection is established
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     const db = window.firebase.firestore();
     let servicesData = window.appData.services || [];
+    
+    console.log('Services page loaded. Firebase initialized:', !!window.firebase);
+    console.log('Firestore available:', !!db);
 
     const appointmentsData = window.appData.appointments || [];
     const walkinsData = window.appData.walkins || [];
@@ -17,7 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Fetch Services from Firestore ---
     const fetchServicesFromFirestore = async () => {
         try {
+            console.log('Fetching services from Firestore...');
             const snapshot = await db.collection('services').get();
+            
+            console.log('Firestore query completed. Snapshot:', {
+                empty: snapshot.empty,
+                size: snapshot.docs ? snapshot.docs.length : 0
+            });
             
             if (snapshot.empty) {
                 console.log('No services found in Firestore.');
@@ -29,18 +41,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     
                     // Extract pricing values from the dynamic pricing object
                     const pricingObj = data.pricing || {};
-                    const pricingEntries = Object.entries(pricingObj);
-                    const pricingValues = pricingEntries.filter(([key, v]) => v !== null && v !== undefined && !isNaN(v));
                     
-                    // Map the pricing values to small, medium, large, xLarge
-                    const small = pricingValues[0]?.[1] ?? null;
-                    const medium = pricingValues[1]?.[1] ?? null;
-                    const large = pricingValues[2]?.[1] ?? null;
-                    const xLarge = pricingValues[3]?.[1] ?? null;
+                    // Get all pricing entries (filter out non-numeric values)
+                    const pricingEntries = Object.entries(pricingObj).filter(([key, v]) => {
+                        return v !== null && v !== undefined && !isNaN(v) && typeof v === 'number';
+                    });
+                    
+                    // Extract prices from the pricing object (they're stored with labels as keys)
+                    const priceValues = pricingEntries.map(([key, value]) => value);
+                    
+                    // Map to small, medium, large, xLarge for compatibility
+                    let small = data.small ?? priceValues[0] ?? null;
+                    let medium = data.medium ?? priceValues[1] ?? null;
+                    let large = data.large ?? priceValues[2] ?? null;
+                    let xLarge = data.xLarge ?? priceValues[3] ?? null;
                     
                     // Extract pricing labels for display
-                    const pricingLabel1 = pricingValues[0]?.[0] ?? null;
-                    const pricingLabel2 = pricingValues[1]?.[0] ?? null;
+                    const pricingLabel1 = pricingEntries[0]?.[0] ?? null;
+                    const pricingLabel2 = pricingEntries[1]?.[0] ?? null;
                     
                     console.log('Service data from Firestore:', doc.id, {
                         service: data.service || data.serviceName,
@@ -70,32 +88,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log('Services loaded from Firestore:', servicesData);
             }
             
-            // After fetching from Firestore, check for newly created or updated services from sessionStorage
-            const newlyCreatedServiceJSON = sessionStorage.getItem('newlyCreatedService');
-            if (newlyCreatedServiceJSON) {
-                const newService = JSON.parse(newlyCreatedServiceJSON);
-                // Add the new service to the top of the data array
-                servicesData.unshift(newService);
-                // Clean up sessionStorage
-                sessionStorage.removeItem('newlyCreatedService');
-            }
-
-            // Check for an updated service from service-profile.html
-            const updatedServiceJSON = sessionStorage.getItem('updatedServiceData');
-            if (updatedServiceJSON) {
-                const updatedService = JSON.parse(updatedServiceJSON);
-                const index = servicesData.findIndex(s => s.serviceId === updatedService.serviceId);
-                if (index !== -1) {
-                    servicesData[index] = updatedService; // Replace the old data
-                }
-                // Clean up sessionStorage
-                sessionStorage.removeItem('updatedServiceData');
-            }
-
             // Render the table after data is loaded
             renderTable();
         } catch (error) {
             console.error('Error fetching services from Firestore:', error);
+            console.error('Error details:', {
+                code: error.code,
+                message: error.message,
+                name: error.name
+            });
+            
+            // Show user-friendly error message
+            if (error.code === 'unavailable') {
+                console.warn('Firestore is offline. Check your internet connection.');
+                alert('Unable to connect to the database. Please check your internet connection and try refreshing the page.');
+            } else if (error.code === 'permission-denied') {
+                console.error('Permission denied. Check Firestore security rules.');
+                alert('Permission denied. Please contact the administrator.');
+            }
+            
             // Fallback to window.appData.services if Firestore fetch fails
             servicesData = window.appData.services || [];
             renderTable();
@@ -172,10 +183,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const priceContent = getPriceRange(service);
         const hasSpecificPrices = !priceContent.includes('text-muted');
         
+        const availability = service.availability || 'Available';
         const statusDropdown = `
-            <select class="technician-select status-select ${service.availability.toLowerCase()}">
-                <option value="Available" ${service.availability === 'Available' ? 'selected' : ''}>Available</option>
-                <option value="Unavailable" ${service.availability === 'Unavailable' ? 'selected' : ''}>Unavailable</option>
+            <select class="technician-select status-select ${availability.toLowerCase()}">
+                <option value="Available" ${availability === 'Available' ? 'selected' : ''}>Available</option>
+                <option value="Unavailable" ${availability === 'Unavailable' ? 'selected' : ''}>Unavailable</option>
             </select>`;
 
         row.innerHTML = `
@@ -193,8 +205,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             </td>
             <td>
                 <div class="service-name-cell">
-                    <strong>${service.service}</strong>                    
-                    ${(service.pricingScheme === 'No Specific Prices' && service.notes) || (!hasSpecificPrices && service.notes && service.pricingScheme !== 'No Specific Prices') ? `<small class="text-muted">${service.notes}</small>` : ''}
+                    <strong>${service.service}</strong>
+                    ${service.notes ? `<br/><small class="text-muted">${service.notes}</small>` : ''}
                 </div>
             </td>
             <td>
@@ -211,8 +223,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const renderTable = () => {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedCategory = categoryFilter.value;
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+        const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
         
         servicesTbody.innerHTML = ''; // Clear table
         const fragment = document.createDocumentFragment();
@@ -228,12 +240,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        const noResultsRow = servicesTbody.nextElementSibling; // Assuming it's immediately after
-        if (noResultsRow && noResultsRow.classList.contains('no-results-row')) {
-             noResultsRow.style.display = hasResults ? 'none' : 'table-row';
+        // Add no results row if needed
+        if (!hasResults) {
+            const noResultsRow = document.createElement('tr');
+            noResultsRow.className = 'no-results-row';
+            noResultsRow.innerHTML = `
+                <td colspan="8" class="text-center text-muted" style="padding: 2rem;">
+                    No services found.
+                </td>
+            `;
+            fragment.appendChild(noResultsRow);
         }
 
         servicesTbody.appendChild(fragment);
+        
+        // Update delete button state after render
+        updateDeleteButtonState();
     };
 
     // --- Event Listeners ---
@@ -245,6 +267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const updateDeleteButtonState = () => {
+        if (!deleteSelectedBtn) return;
         const checkedBoxes = servicesTbody.querySelectorAll('.service-checkbox:checked');
         deleteSelectedBtn.disabled = checkedBoxes.length === 0;
     };
@@ -319,48 +342,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    deleteSelectedBtn.addEventListener('click', async () => {
-        const checkedBoxes = servicesTbody.querySelectorAll('.service-checkbox:checked');
-        const count = checkedBoxes.length;
-        if (count > 0) {
-            const idsToDelete = Array.from(checkedBoxes).map(cb => cb.closest('tr').dataset.serviceId);
-            
-            // Delete directly without confirmation
-            try {
-                // Delete from Firestore
-                const deletePromises = idsToDelete.map(id => 
-                    db.collection('services').doc(id).delete()
-                );
-                await Promise.all(deletePromises);
+    if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', async () => {
+            const checkedBoxes = servicesTbody.querySelectorAll('.service-checkbox:checked');
+            const count = checkedBoxes.length;
+            if (count > 0) {
+                const idsToDelete = Array.from(checkedBoxes).map(cb => cb.closest('tr').dataset.serviceId);
                 
-                // Remove from local data
-                servicesData = servicesData.filter(s => !idsToDelete.includes(s.serviceId));
-                
-                // Re-render the table
-                renderTable();
-                
-                // Uncheck "Select All" checkbox
-                const selectAllCheckbox = document.getElementById('select-all-services');
-                if (selectAllCheckbox) {
-                    selectAllCheckbox.checked = false;
+                // Delete directly without confirmation
+                try {
+                    // Delete from Firestore
+                    const deletePromises = idsToDelete.map(id => 
+                        db.collection('services').doc(id).delete()
+                    );
+                    await Promise.all(deletePromises);
+                    
+                    // Remove from local data
+                    servicesData = servicesData.filter(s => !idsToDelete.includes(s.serviceId));
+                    
+                    // Re-render the table
+                    renderTable();
+                    
+                    // Uncheck "Select All" checkbox
+                    const selectAllCheckbox = document.getElementById('select-all-services');
+                    if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = false;
+                    }
+                    
+                    // Update delete button state
+                    updateDeleteButtonState();
+                    
+                    // Show success message
+                    const message = count === 1 
+                        ? 'Service deleted successfully.' 
+                        : `${count} services deleted successfully.`;
+                    showSuccessToast(message);
+                    
+                    console.log(`Deleted ${count} service(s) from Firestore`);
+                } catch (error) {
+                    console.error('Error deleting services:', error);
+                    alert('Error deleting services. Please try again.');
                 }
-                
-                // Update delete button state
-                updateDeleteButtonState();
-                
-                // Show success message
-                const message = count === 1 
-                    ? 'Service deleted successfully.' 
-                    : `${count} services deleted successfully.`;
-                showSuccessToast(message);
-                
-                console.log(`Deleted ${count} service(s) from Firestore`);
-            } catch (error) {
-                console.error('Error deleting services:', error);
-                alert('Error deleting services. Please try again.');
             }
-        }
-    });
+        });
+    }
 
     // --- Success Toast Notification ---
     const showSuccessToast = (message) => {

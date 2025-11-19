@@ -36,15 +36,18 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
-  onSnapshot
+  onSnapshot,
+  enableIndexedDbPersistence
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 import {
   getStorage,
   ref as storageRef,
   uploadBytes,
+  uploadBytesResumable,
   getDownloadURL,
   deleteObject,
-  listAll
+  listAll,
+  connectStorageEmulator
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js";
 
 // Firebase config - copied from existing firebase-config.js
@@ -53,7 +56,7 @@ const firebaseConfig = {
   authDomain: "kingsleycarwashapp.firebaseapp.com",
   databaseURL: "https://kingsleycarwashapp-default-rtdb.firebaseio.com",
   projectId: "kingsleycarwashapp",
-  storageBucket: "kingsleycarwashapp.appspot.com",
+  storageBucket: "kingsleycarwashapp.firebasestorage.app",
   messagingSenderId: "508373593061",
   appId: "1:508373593061:web:86a490e83f1016e5dc1d0c"
 };
@@ -61,8 +64,38 @@ const firebaseConfig = {
 // Initialize app and services
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+// Initialize Firestore with settings optimized for web
+// Note: Using getFirestore instead of initializeFirestore for simpler setup
 const db = getFirestore(app);
+
+// Initialize Storage with explicit bucket configuration
 const storage = getStorage(app);
+console.log('Firebase Storage initialized:', {
+  bucket: storage.app.options.storageBucket,
+  app: storage.app.name
+});
+
+// Set auth persistence to LOCAL so users stay logged in after page refresh
+setPersistence(auth, browserLocalPersistence).catch(error => {
+  console.error('Error setting auth persistence:', error);
+});
+
+// Try to enable offline persistence, but don't fail if it doesn't work
+// This is optional and the app will work without it
+try {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Firestore persistence: Multiple tabs open, using memory cache');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Firestore persistence: Not supported in this browser');
+    } else {
+      console.warn('Firestore persistence error:', err.message);
+    }
+  });
+} catch (e) {
+  console.warn('Could not enable Firestore persistence:', e.message);
+}
 
 // Minimal compat-like wrappers so existing code that calls `window.firebase.auth()`
 // or `window.firebase.firestore()` continues to work.
@@ -175,25 +208,194 @@ window.firebase = {
   },
 
   storage: () => ({
-    ref: (path) => ({
-      child: (childPath) => {
-        const r = storageRef(storage, `${path}/${childPath}`);
-        return {
-          put: (blob) => uploadBytes(r, blob).then(res => res),
-          getDownloadURL: () => getDownloadURL(r)
-        };
-      },
-      listAll: () => listAll(storageRef(storage, path)),
-      getDownloadURL: () => getDownloadURL(storageRef(storage, path))
-    }),
+    ref: (path) => {
+      // Don't create the ref here if path is undefined/empty
+      const createRef = (p) => p ? storageRef(storage, p) : storageRef(storage);
+      const r = createRef(path);
+      
+      return {
+        put: async (blob, metadata) => {
+          try {
+            console.log('Storage wrapper: uploading to path:', path);
+            // Use uploadBytesResumable for better compatibility
+            const uploadTask = uploadBytesResumable(r, blob, metadata);
+            
+            // Wait for upload to complete
+            const snapshot = await new Promise((resolve, reject) => {
+              uploadTask.on('state_changed',
+                (snapshot) => {
+                  const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                  console.log('Upload progress:', progress.toFixed(2) + '%');
+                },
+                (error) => {
+                  console.error('Upload error:', error);
+                  reject(error);
+                },
+                () => {
+                  console.log('Upload complete');
+                  resolve(uploadTask.snapshot);
+                }
+              );
+            });
+            
+            return {
+              ref: {
+                getDownloadURL: () => getDownloadURL(snapshot.ref)
+              },
+              snapshot,
+              state: 'success'
+            };
+          } catch (error) {
+            console.error('Storage upload error:', error);
+            throw error;
+          }
+        },
+        child: (childPath) => {
+          const fullPath = path ? `${path}/${childPath}` : childPath;
+          const childRef = storageRef(storage, fullPath);
+          return {
+            put: async (blob, metadata) => {
+              try {
+                console.log('Storage wrapper (child): uploading to path:', fullPath);
+                const uploadTask = uploadBytesResumable(childRef, blob, metadata);
+                
+                const snapshot = await new Promise((resolve, reject) => {
+                  uploadTask.on('state_changed',
+                    (snapshot) => {
+                      const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                      console.log('Upload progress:', progress.toFixed(2) + '%');
+                    },
+                    (error) => {
+                      console.error('Upload error:', error);
+                      reject(error);
+                    },
+                    () => {
+                      console.log('Upload complete');
+                      resolve(uploadTask.snapshot);
+                    }
+                  );
+                });
+                
+                return {
+                  ref: {
+                    getDownloadURL: () => getDownloadURL(snapshot.ref)
+                  },
+                  snapshot,
+                  state: 'success'
+                };
+              } catch (error) {
+                console.error('Storage upload error:', error);
+                throw error;
+              }
+            },
+            getDownloadURL: () => getDownloadURL(childRef)
+          };
+        },
+        listAll: () => listAll(r),
+        getDownloadURL: () => getDownloadURL(r),
+        delete: () => deleteObject(r)
+      };
+    }
   })
 };
 
 // Export named services to support module imports elsewhere
 export { auth, db, storage };
 
+// Expose native storage functions for direct use
+console.log('Creating Firebase Storage API wrapper...');
+console.log('Storage instance:', storage);
+console.log('Storage bucket:', firebaseConfig.storageBucket);
+console.log('Storage _location:', storage._location);
+
+window._firebaseStorageAPI = {
+  // Direct access to storage instance
+  storage: storage,
+  
+  // Create reference
+  ref: (path) => {
+    console.log('Creating storage ref for path:', path);
+    const ref = storageRef(storage, path);
+    console.log('Storage ref created:', {
+      fullPath: ref.fullPath,
+      bucket: ref.bucket,
+      toString: ref.toString()
+    });
+    return ref;
+  },
+  
+  // Upload bytes with detailed logging
+  uploadBytes: async (ref, file) => {
+    console.log('uploadBytes called');
+    console.log('  Ref details:', {
+      fullPath: ref.fullPath,
+      bucket: ref.bucket,
+      name: ref.name,
+      root: ref.root,
+      parent: ref.parent
+    });
+    console.log('  File details:', {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
+    
+    try {
+      console.log('Calling uploadBytes from Firebase SDK...');
+      const result = await uploadBytes(ref, file);
+      console.log('✓ uploadBytes succeeded:', {
+        bytesTransferred: result.metadata.size,
+        contentType: result.metadata.contentType,
+        fullPath: result.metadata.fullPath
+      });
+      return result;
+    } catch (error) {
+      console.error('✗ uploadBytes error:', {
+        code: error.code,
+        message: error.message,
+        serverResponse: error.serverResponse,
+        name: error.name
+      });
+      throw error;
+    }
+  },
+  
+  // Upload with progress
+  uploadBytesResumable: (ref, file) => {
+    console.log('uploadBytesResumable called:', { path: ref.fullPath, fileSize: file.size });
+    return uploadBytesResumable(ref, file);
+  },
+  
+  // Get download URL
+  getDownloadURL: async (ref) => {
+    console.log('getDownloadURL called for:', ref.fullPath);
+    try {
+      const url = await getDownloadURL(ref);
+      console.log('✓ Download URL obtained:', url);
+      return url;
+    } catch (error) {
+      console.error('✗ getDownloadURL error:', error);
+      throw error;
+    }
+  },
+  
+  deleteObject: deleteObject,
+  listAll: listAll
+};
+
+console.log('✓ Firebase Storage API created successfully');
+console.log('Available methods:', Object.keys(window._firebaseStorageAPI));
+
 // Promise for legacy scripts to await initialization
-window.firebaseInitPromise = Promise.resolve();
+// This ensures Firestore is fully ready before other scripts use it
+window.firebaseInitPromise = new Promise((resolve) => {
+  // Give Firestore a moment to initialize and connect
+  setTimeout(() => {
+    console.log('Firebase services initialized');
+    console.log('Native storage API available:', !!window._firebaseStorageAPI);
+    resolve();
+  }, 100);
+});
 
 // Provide a convenience global for module-based code that expects these names
 window._firebaseServices = { auth, db, storage };
