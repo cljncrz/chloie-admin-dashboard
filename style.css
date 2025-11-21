@@ -303,18 +303,20 @@ html {
     background-color: var(--scrollbar-thumb-hover-color);
 }
 
-body {
-    width: 100vw;
+aside {
+    background: var(--color-white);
+    min-width: 180px;
+    max-width: 350px;
+    width: 250px;
     height: 100vh;
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.88rem;
-    background: var(--color-background);
-    user-select: none;
-    overflow-x: hidden;
-    color: var(--color-dark);
-}
-
-body.modal-open {
+    box-shadow: var(--box-shadow);
+    border-radius: var(--card-border-radius);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 10;
+    transition: width 0.2s cubic-bezier(0.4,0,0.2,1);
+    resize: horizontal;
     overflow: hidden;
 }
 
@@ -416,12 +418,41 @@ aside h3 {
     font-weight: 500;
 }
 
-aside .sidebar-menu a {
+aside .sidebar-menu {
     display: flex;
-    color: var(--color-info-dark);
-    margin-left: 2rem;
-    gap: 1rem;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 2rem;
+    overflow-y: auto;
+    max-height: calc(100vh - 120px);
+    padding-right: 4px;
+    scrollbar-width: thin;
+}
+
+/* Custom scrollbar for sidebar */
+aside .sidebar-menu::-webkit-scrollbar {
+    width: 7px;
+    background: transparent;
+}
+aside .sidebar-menu::-webkit-scrollbar-thumb {
+    background: var(--color-light);
+    border-radius: 6px;
+}
+    /* Sidebar resizer handle */
+    .sidebar-resizer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 7px;
+        height: 100%;
+        cursor: ew-resize;
+        background: transparent;
+        z-index: 20;
+        transition: background 0.2s;
+    }
+    .sidebar-resizer:hover {
+        background: var(--color-light);
+    }
     position: relative;
     height: 3.7rem;
     transition: all 300ms ease;
