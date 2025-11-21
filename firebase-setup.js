@@ -2,6 +2,12 @@
 // Single-module Firebase initializer. Exposes a compat-like `window.firebase` shim
 // and `window.firebaseInitPromise` for legacy scripts that await it.
 
+// Create the init promise immediately so scripts can await it
+let firebaseInitResolve;
+window.firebaseInitPromise = new Promise((resolve) => {
+  firebaseInitResolve = resolve;
+});
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import {
   getAuth,
@@ -15,7 +21,9 @@ import {
   getIdToken
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 import {
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   collectionGroup,
   doc as fsDoc,
@@ -36,8 +44,7 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
-  onSnapshot,
-  enableIndexedDbPersistence
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 import {
   getStorage,
@@ -65,9 +72,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Initialize Firestore with settings optimized for web
-// Note: Using getFirestore instead of initializeFirestore for simpler setup
-const db = getFirestore(app);
+// Initialize Firestore with modern cache settings
+// Using persistentLocalCache instead of deprecated enableIndexedDbPersistence
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
+console.log('Firestore initialized with persistent local cache');
 
 // Initialize Storage with explicit bucket configuration
 const storage = getStorage(app);
@@ -80,22 +93,6 @@ console.log('Firebase Storage initialized:', {
 setPersistence(auth, browserLocalPersistence).catch(error => {
   console.error('Error setting auth persistence:', error);
 });
-
-// Try to enable offline persistence, but don't fail if it doesn't work
-// This is optional and the app will work without it
-try {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Firestore persistence: Multiple tabs open, using memory cache');
-    } else if (err.code === 'unimplemented') {
-      console.warn('Firestore persistence: Not supported in this browser');
-    } else {
-      console.warn('Firestore persistence error:', err.message);
-    }
-  });
-} catch (e) {
-  console.warn('Could not enable Firestore persistence:', e.message);
-}
 
 // Minimal compat-like wrappers so existing code that calls `window.firebase.auth()`
 // or `window.firebase.firestore()` continues to work.
@@ -152,6 +149,21 @@ window.firebase = {
         set: (data) => setDoc(fsDoc(db, collectionName, id), data),
         update: (data) => updateDoc(fsDoc(db, collectionName, id), data),
         delete: () => deleteDoc(fsDoc(db, collectionName, id)),
+        onSnapshot(observerOrNext, error, complete) {
+          const ref = fsDoc(db, collectionName, id);
+          const observer = typeof observerOrNext === 'object' 
+            ? observerOrNext 
+            : { next: observerOrNext, error, complete };
+          
+          return onSnapshot(ref, (dsnap) => {
+            const wrappedDoc = {
+              exists: dsnap.exists(),
+              data: () => dsnap.data(),
+              id: dsnap.id
+            };
+            observer.next(wrappedDoc);
+          }, observer.error, observer.complete);
+        },
         collection: (subCollectionName) => createCollectionRef(`${collectionName}/${id}/${subCollectionName}`)
       }),
       where: (field, operator, value) => {
@@ -429,18 +441,17 @@ window._firebaseStorageAPI = {
 console.log('✓ Firebase Storage API created successfully');
 console.log('Available methods:', Object.keys(window._firebaseStorageAPI));
 
-// Promise for legacy scripts to await initialization
-// This ensures Firestore is fully ready before other scripts use it
-window.firebaseInitPromise = new Promise((resolve) => {
-  // Give Firestore a moment to initialize and connect
-  setTimeout(() => {
-    console.log('Firebase services initialized');
-    console.log('Native storage API available:', !!window._firebaseStorageAPI);
-    resolve();
-  }, 100);
-});
-
 // Provide a convenience global for module-based code that expects these names
 window._firebaseServices = { auth, db, storage };
+
+// Resolve the init promise that was created at the top of this file
+// Give Firestore a moment to initialize and connect
+setTimeout(() => {
+  console.log('Firebase services initialized');
+  console.log('Native storage API available:', !!window._firebaseStorageAPI);
+  if (firebaseInitResolve) {
+    firebaseInitResolve();
+  }
+}, 100);
 
 // Done

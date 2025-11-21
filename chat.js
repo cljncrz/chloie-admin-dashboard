@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * 
      * HOW IT WORKS:
      * 1. Customer opens chat in mobile app and sends first message
-     * 2. Chat document is created in Firestore: chats/{customerId}
+     * 2. Chat document is created in Firestore: chat_rooms/{chatRoomId}
      * 3. Admin dashboard automatically shows the new conversation
      * 4. Admin can respond to customer messages
      * 
@@ -58,49 +58,9 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Listens for real-time updates to the conversations list from Firestore.
      */
     const listenForConversations = () => {
-        // Get the chats collection
-        const chatsRef = db.collection('chats');
-        
-        // Set up real-time listener with error handling
-        try {
-            const unsubscribe = chatsRef.onSnapshot(snapshot => {
-                const newChats = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    
-                    newChats.push({
-                        id: doc.id, // The document ID is the chatId (e.g., customer's UID)
-                        customerName: data.customerName || 'Unknown Customer',
-                        profilePic: data.customerProfilePic || './images/redicon.png',
-                        lastMessage: data.lastMessage || '...',
-                        // Convert Firestore timestamp to a readable string
-                        timestamp: data.timestamp ? formatTimestamp(data.timestamp) : '',
-                        timestampValue: data.timestamp || null, // Store raw timestamp for sorting
-                        isUnread: data.isUnreadForAdmin || false,
-                        isVerified: data.isVerified || false,
-                        phone: data.phone || '',
-                        email: data.email || '',
-                        // Messages will be fetched separately
-                    });
-                });
-                
-                // Sort by timestamp in JavaScript (most recent first)
-                newChats.sort((a, b) => {
-                    if (!a.timestampValue) return 1;
-                    if (!b.timestampValue) return -1;
-                    return b.timestampValue.toMillis() - a.timestampValue.toMillis();
-                });
-                
-                chats = newChats;
-                renderConversationList(searchInput.value);
-            }, error => {
-                console.error("Error accessing chats collection:", error);
-                conversationListEl.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">Unable to access chats. Please check Firestore permissions and ensure you are logged in as an admin.</p>';
-            });
-        } catch (error) {
-            console.error("Error setting up chat listener:", error);
-            conversationListEl.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">Error initializing chat system. Please refresh the page.</p>';
-        }
+        // Chat rooms collection listener removed
+        chats = [];
+        renderConversationList(searchInput.value);
     };
 
     const formatTimestamp = (firestoreTimestamp) => {
@@ -199,16 +159,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             unsubscribeMessages();
         }
 
-        const chat = chats.find(c => c.id === conversationId); // conversationId is the customer's UID
+        const chat = chats.find(c => c.id === conversationId); // conversationId is the chat room ID
         if (!chat) return;
 
         currentConversationId = conversationId;
 
-        // Mark conversation as read when opened
+        // Mark conversation as read functionality removed
         if (chat.isUnread) {
-            db.collection('chats').doc(conversationId).update({ isUnreadForAdmin: false })
-              .catch(err => console.error("Error marking chat as read:", err));
-            // The UI will update automatically due to the `listenForConversations` snapshot listener.
+            console.log('Mark as read functionality for chat_rooms collection has been disabled');
         }
 
         // Get customer verification status from chat data
@@ -250,60 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
 
         // Update message list
-        messageListEl.innerHTML = '';
-
-        // Listen for new messages in this conversation's subcollection
-        const messagesRef = db.collection('chats').doc(conversationId).collection('messages');
-        const messagesQuery = messagesRef.orderBy('timestamp', 'asc');
-        
-        unsubscribeMessages = messagesQuery.onSnapshot(snapshot => {
-            messageListEl.innerHTML = ''; // Clear and re-render on every update
-            const fragment = document.createDocumentFragment();
-            snapshot.forEach(doc => {
-                const msg = doc.data();
-                const msgEl = document.createElement('div');
-                let messageContentHTML = `<p>${msg.text || ''}</p>`; // Default to text
-
-                // Determine sender class ('admin' or 'customer')
-                const senderClass = msg.senderId === 'admin' ? 'admin' : 'customer';
-
-                if (msg.type === 'image') {
-                    messageContentHTML = `<a href="${msg.mediaUrl}" target="_blank" title="View full image"><img src="${msg.mediaUrl}" alt="Customer image" class="chat-media-image"></a>`;
-                } else if (msg.type === 'video') {
-                    messageContentHTML = `<video src="${msg.mediaUrl}" controls class="chat-media-video"></video>`;
-                }
-
-                let statusIndicator = '';
-                if (senderClass === 'admin' && msg.status) {
-                    statusIndicator = `<small class="message-status">${msg.status}</small>`;
-                }
-
-                // Add admin name and email if message is from admin
-                let senderInfoHTML = '';
-                if (senderClass === 'admin' && msg.senderName) {
-                    senderInfoHTML = `
-                        <div class="admin-sender-info">
-                            <strong>${msg.senderName}</strong>
-                            ${msg.senderEmail ? `<small class="admin-email">${msg.senderEmail}</small>` : ''}
-                        </div>`;
-                }
-
-                msgEl.className = `chat-message ${senderClass}`;
-                msgEl.innerHTML = `
-                    ${senderInfoHTML}
-                    ${messageContentHTML}
-                    <div class="message-meta">
-                        <small class="message-timestamp">${formatTimestamp(msg.timestamp)}</small>${statusIndicator}
-                    </div>`;
-                fragment.appendChild(msgEl);
-            });
-            messageListEl.appendChild(fragment);
-            // Scroll to the bottom on new message
-            messageListEl.scrollTop = messageListEl.scrollHeight;
-        }, error => {
-            console.error("Error fetching messages:", error);
-            messageListEl.innerHTML = '<p class="text-muted" style="text-align:center;">Could not load messages.</p>';
-        });
+        messageListEl.innerHTML = '<p class="text-muted" style="text-align:center;">Messages collection listener removed.</p>';
 
         // Scroll to the bottom
         messageListEl.scrollTop = messageListEl.scrollHeight;
@@ -334,8 +239,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const chat = chats.find(c => c.id === currentConversationId);
             if (chat) {
-                // Fetch customer data from users collection
-                db.collection('users').doc(currentConversationId).get()
+                // Fetch customer data from users collection using userId (matches Firestore rules)
+                const customerIdToFetch = chat.userId || currentConversationId;
+                db.collection('users').doc(customerIdToFetch).get()
                     .then(doc => {
                         if (doc.exists) {
                             const customerData = {
@@ -425,42 +331,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.preventDefault();
         const text = messageInput.value.trim();
         if (!text || !currentConversationId) return;
-        const adminId = window.firebase.auth().currentUser ? window.firebase.auth().currentUser.uid : 'admin';
+        
+        // Get current admin's UID - MUST match request.auth.uid in Firestore rules
+        const adminId = auth.currentUser ? auth.currentUser.uid : null;
+        if (!adminId) {
+            alert('You must be logged in to send messages.');
+            return;
+        }
 
         const newMessage = {
-            senderId: adminId, // Identify sender as admin
+            senderId: adminId, // MUST match request.auth.uid for Firestore rules
             senderName: currentAdminData?.name || 'Admin',
             senderEmail: currentAdminData?.email || '',
             senderProfilePic: currentAdminData?.profilePic || './images/redicon.png',
             type: 'text',
             text: text,
-            timestamp: window.firebase.firestore().FieldValue.serverTimestamp(),
-            status: 'sent' // Initial status is 'sent'
+            timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'sent', // Initial status is 'sent'
+            isAdmin: true // Flag to identify admin messages
         };
 
-        const chatRef = db.collection('chats').doc(currentConversationId);
-        const messagesRef = chatRef.collection('messages');
-
-        // Add the new message to the subcollection
-        messagesRef.add(newMessage)
-            .then(() => {
-                // After sending, update the parent chat document for the list view
-                return chatRef.update({
-                    lastMessage: text.startsWith('You:') ? text : `You: ${text}`,
-                    timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
-                    isUnreadForCustomer: true, // Mark as unread for the customer
-                    isUnreadForAdmin: false // Admin just sent it, so it's read for them
-                });
-            })
-            .then(() => {
-                messageInput.value = '';
-                // The UI will update automatically thanks to the onSnapshot listeners.
-                // No need to call render functions manually.
-            })
-            .catch(error => {
-                console.error("Error sending message: ", error);
-                alert("Could not send message. Please try again.");
-            });
+        // Message sending functionality removed
+        messageInput.value = '';
+        console.log('Message sending to chat_rooms collection has been disabled');
     };
 
     /**
@@ -691,61 +584,196 @@ document.addEventListener('DOMContentLoaded', async () => {
         fileInput.click();
     });
 
-    fileInput.addEventListener('change', (e) => {
+    fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file || !currentConversationId) return;
 
-        const chat = chats.find(c => c.id === currentConversationId);
-        if (!chat) return;
-
-        let newMessage;
-        let lastMessageText;
-
-        // Use URL.createObjectURL to get a temporary URL for local preview
-        const localUrl = URL.createObjectURL(file);
-
-        if (file.type.startsWith('image/')) {
-            newMessage = {
-                sender: 'admin',
-                type: 'image',
-                mediaUrl: localUrl, // Use the local URL for preview
-                time: new Date(),
-                status: 'sent'
-            };
-            lastMessageText = 'You sent an image.';
-        } else if (file.type.startsWith('video/')) {
-            newMessage = {
-                sender: 'admin',
-                type: 'video',
-                mediaUrl: localUrl,
-                time: new Date(),
-                status: 'sent'
-            };
-            lastMessageText = 'You sent a video.';
-        } else {
-            newMessage = {
-                sender: 'admin',
-                type: 'file',
-                fileName: file.name,
-                fileSize: file.size,
-                time: new Date(),
-                status: 'sent'
-            };
-            lastMessageText = `You sent a file: ${file.name}`;
+        const adminId = auth.currentUser ? auth.currentUser.uid : null;
+        if (!adminId) {
+            alert('You must be logged in to send files.');
+            e.target.value = '';
+            return;
         }
 
-        chat.messages.push(newMessage);
-        chat.lastMessage = lastMessageText;
-        chat.timestamp = 'Just now';
+        try {
+            // TODO: Upload file to Firebase Storage and get the permanent URL
+            // For now, using local URL (this won't work for the mobile app to see)
+            const localUrl = URL.createObjectURL(file);
 
-        renderMessages(currentConversationId);
-        renderConversationList(searchInput.value);
+            let newMessage;
+            let lastMessageText;
 
-        // Reset the file input to allow selecting the same file again
-        e.target.value = '';
+            if (file.type.startsWith('image/')) {
+                newMessage = {
+                    senderId: adminId,
+                    senderName: currentAdminData?.name || 'Admin',
+                    senderEmail: currentAdminData?.email || '',
+                    type: 'image',
+                    mediaUrl: localUrl, // TODO: Replace with Firebase Storage URL
+                    timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'sent',
+                    isAdmin: true
+                };
+                lastMessageText = 'You: Sent an image';
+            } else if (file.type.startsWith('video/')) {
+                newMessage = {
+                    senderId: adminId,
+                    senderName: currentAdminData?.name || 'Admin',
+                    senderEmail: currentAdminData?.email || '',
+                    type: 'video',
+                    mediaUrl: localUrl, // TODO: Replace with Firebase Storage URL
+                    timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'sent',
+                    isAdmin: true
+                };
+                lastMessageText = 'You: Sent a video';
+            } else {
+                newMessage = {
+                    senderId: adminId,
+                    senderName: currentAdminData?.name || 'Admin',
+                    senderEmail: currentAdminData?.email || '',
+                    type: 'file',
+                    fileName: file.name,
+                    fileSize: file.size,
+                    mediaUrl: localUrl, // TODO: Replace with Firebase Storage URL
+                    timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'sent',
+                    isAdmin: true
+                };
+                lastMessageText = `You: Sent ${file.name}`;
+            }
+
+            // File sending functionality removed
+            console.log('File sending to chat_rooms collection has been disabled');
+            
+            // Reset the file input
+            e.target.value = '';
+        } catch (error) {
+            console.error('Error sending file:', error);
+            alert('Failed to send file. Please try again.');
+            e.target.value = '';
+        }
     });
 
     messageForm.addEventListener('submit', handleSendMessage);
+
+    /**
+     * Sets up real-time notifications for new messages from customers.
+     * Monitors all chat rooms and sends notifications when customers send messages.
+     */
+    const setupMessageNotifications = () => {
+        // Message notifications listener removed
+        console.log('Message notifications from chat_rooms collection have been disabled');
+    };
+
+    /**
+     * Sends a browser notification and plays a sound for new chat messages.
+     * @param {Object} chatData - The chat room data
+     * @param {string} chatId - The chat room ID
+     */
+    const sendChatNotification = (chatData, chatId) => {
+        const customerName = chatData.customerName || 'A customer';
+        const lastMessage = chatData.lastMessage || 'New message';
+        const title = `New message from ${customerName}`;
+        const body = lastMessage.length > 100 ? lastMessage.substring(0, 100) + '...' : lastMessage;
+
+        // Check if browser notifications are supported
+        if ('Notification' in window) {
+            // Request permission if not already granted
+            if (Notification.permission === 'granted') {
+                createNotification(title, body, chatData.customerProfilePic, chatId);
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        createNotification(title, body, chatData.customerProfilePic, chatId);
+                    }
+                });
+            }
+        }
+
+        // Play notification sound
+        playNotificationSound();
+
+        // Show in-app notification if notification service is available
+        if (window.notificationService && window.notificationService.showNotification) {
+            window.notificationService.showNotification(
+                title,
+                body,
+                'info',
+                () => {
+                    // When clicked, open the chat
+                    renderMessages(chatId);
+                }
+            );
+        }
+    };
+
+    /**
+     * Creates a browser notification.
+     * @param {string} title - Notification title
+     * @param {string} body - Notification body
+     * @param {string} icon - Notification icon URL
+     * @param {string} chatId - Chat room ID to open when clicked
+     */
+    const createNotification = (title, body, icon, chatId) => {
+        const notification = new Notification(title, {
+            body: body,
+            icon: icon || './images/redicon.png',
+            badge: './images/redicon.png',
+            tag: `chat-${chatId}`,
+            requireInteraction: false,
+            silent: false
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            // Navigate to chats page if not already there
+            if (!window.location.pathname.includes('chats.html')) {
+                window.location.href = 'chats.html';
+            }
+            // Open the specific chat
+            renderMessages(chatId);
+            notification.close();
+        };
+    };
+
+    /**
+     * Plays a notification sound for new messages.
+     */
+    const playNotificationSound = () => {
+        try {
+            // Create a simple notification sound using Web Audio API
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.5);
+        } catch (error) {
+            console.log('Could not play notification sound:', error);
+        }
+    };
+
+    /**
+     * Request notification permission on page load if not already decided.
+     */
+    if ('Notification' in window && Notification.permission === 'default') {
+        // Show a friendly prompt to enable notifications
+        setTimeout(() => {
+            if (confirm('Enable desktop notifications for new chat messages?')) {
+                Notification.requestPermission();
+            }
+        }, 2000);
+    }
 
     // --- Initialization ---
     const init = async () => {
@@ -756,6 +784,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Listen for conversations initiated by mobile app users
             listenForConversations();
+            
+            // Set up notification listener for new messages
+            setupMessageNotifications();
         } catch (error) {
             console.error("Error initializing chat:", error);
         }

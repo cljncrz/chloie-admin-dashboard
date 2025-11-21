@@ -8,20 +8,64 @@ document.addEventListener('DOMContentLoaded', async () => {
   const db = window.firebase.firestore();
   const auth = window.firebase.auth();
 
-  // Retrieve the damage report from sessionStorage
+  // Retrieve the damage report from sessionStorage or URL parameter
   const damageReportJSON = sessionStorage.getItem('selectedDamageReport');
+  const urlParams = new URLSearchParams(window.location.search);
+  const reportId = urlParams.get('reportId');
   
-  if (!damageReportJSON) {
-    console.warn('No damage report data found in sessionStorage');
+  let report;
+  
+  // Try to fetch from Firestore if reportId is in URL
+  if (reportId) {
+    try {
+      console.log('Fetching damage report from Firestore:', reportId);
+      const reportDoc = await db.collection('damage_reports').doc(reportId).get();
+      
+      if (!reportDoc.exists) {
+        console.warn('Damage report not found in Firestore');
+        document.getElementById('damage-customer-name').textContent = 'Report Not Found';
+        document.getElementById('damage-full-report').textContent = 'The requested report does not exist.';
+        return;
+      }
+      
+      report = {
+        reportId: reportDoc.id,
+        ...reportDoc.data()
+      };
+      console.log('Loaded damage report from Firestore:', report);
+      
+      // Store in sessionStorage for future use
+      sessionStorage.setItem('selectedDamageReport', JSON.stringify(report));
+      
+    } catch (error) {
+      console.error('Error fetching damage report from Firestore:', error);
+      document.getElementById('damage-customer-name').textContent = 'Error';
+      document.getElementById('damage-full-report').textContent = 'Failed to load report from database';
+      return;
+    }
+  } 
+  // Fallback to sessionStorage
+  else if (damageReportJSON) {
+    try {
+      report = JSON.parse(damageReportJSON);
+      console.log('Loaded damage report from sessionStorage:', report);
+    } catch (error) {
+      console.error('Error parsing damage report data:', error);
+      document.getElementById('damage-customer-name').textContent = 'Error';
+      document.getElementById('damage-full-report').textContent = 'Failed to parse report data';
+      return;
+    }
+  } 
+  // No data available
+  else {
+    console.warn('No damage report data found in sessionStorage or URL');
     document.getElementById('damage-customer-name').textContent = 'No Data';
-    document.getElementById('damage-full-report').textContent = 'Report not loaded';
+    document.getElementById('damage-full-report').textContent = 'Report not loaded. Please select a report from the damage reports list.';
     return;
   }
 
-  let report;
   try {
-    report = JSON.parse(damageReportJSON);
-    console.log('Loaded damage report:', report);
+    console.log('Processing damage report:', report);
 
     // Populate the page with report data
     document.getElementById('damage-customer-name').textContent = report.customer || 'Unknown Customer';
@@ -235,21 +279,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Add image lightbox functionality
-    const mediaContainer = document.querySelector('.media-container');
-    if (mediaContainer) {
-      mediaContainer.addEventListener('click', (e) => {
+    const mediaContainerForLightbox = document.querySelector('.media-container');
+    if (mediaContainerForLightbox) {
+      mediaContainerForLightbox.addEventListener('click', (e) => {
         const img = e.target.closest('.damage-media-image');
         if (img) {
           showImageLightbox(img.src);
         }
       });
     }
-
-    // Setup notification sending
-    setupNotificationSending(report);
-
-    // Load notification history
-    loadNotificationHistory(report.reportId);
 
   } catch (error) {
     console.error('Error parsing damage report data:', error);
@@ -258,375 +296,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // --- Helper Functions ---
-
-  // Setup notification sending
-  function setupNotificationSending(report) {
-    const form = document.getElementById('send-notification-form');
-    if (!form) return;
-
-    const messageInput = document.getElementById('notification-message');
-    const charCount = document.getElementById('char-count');
-
-    // Character counter and preview
-    const messagePreview = document.getElementById('message-preview');
-    const previewText = document.getElementById('preview-text');
-    let previewTimeout = null;
-    
-    if (messageInput && charCount) {
-      messageInput.addEventListener('input', () => {
-        const length = messageInput.value.length;
-        const message = messageInput.value.trim();
-        charCount.textContent = `${length}/500`;
-        
-        // Update color based on length
-        if (length > 450) {
-          charCount.style.background = '#fef3c7';
-          charCount.style.color = '#92400e';
-        } else if (length > 0) {
-          charCount.style.background = '#dbeafe';
-          charCount.style.color = '#1e40af';
-        } else {
-          charCount.style.background = 'var(--color-white)';
-          charCount.style.color = 'var(--color-info-dark)';
-        }
-
-        // Show/hide preview with debounce
-        clearTimeout(previewTimeout);
-        
-        if (message.length > 15 && messagePreview && previewText) {
-          // Debounce preview update for better performance
-          previewTimeout = setTimeout(() => {
-            previewText.textContent = message;
-            
-            if (messagePreview.style.display === 'none') {
-              messagePreview.style.display = 'block';
-              messagePreview.style.animation = 'slideDown 0.3s ease-out';
-            }
-          }, 300);
-        } else if (messagePreview) {
-          messagePreview.style.display = 'none';
-        }
-      });
-
-      // Focus effect
-      messageInput.addEventListener('focus', () => {
-        messageInput.style.borderColor = 'var(--color-primary)';
-        messageInput.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)';
-      });
-      messageInput.addEventListener('blur', () => {
-        messageInput.style.borderColor = 'var(--color-info-light)';
-        messageInput.style.boxShadow = 'none';
-      });
-    }
-
-    // Template buttons
-    const templateBtns = document.querySelectorAll('.template-btn');
-    templateBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const template = btn.getAttribute('data-template');
-        messageInput.value = template;
-        messageInput.dispatchEvent(new Event('input'));
-        messageInput.focus();
-        
-        // Animate button
-        btn.style.transform = 'scale(0.95)';
-        btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        setTimeout(() => {
-          btn.style.transform = 'scale(1)';
-          btn.style.boxShadow = 'none';
-        }, 150);
-      });
-
-      // Hover effect
-      btn.addEventListener('mouseenter', () => {
-        btn.style.transform = 'translateY(-3px) scale(1.02)';
-        btn.style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)';
-      });
-      btn.addEventListener('mouseleave', () => {
-        btn.style.transform = 'translateY(0) scale(1)';
-        btn.style.boxShadow = 'none';
-      });
-    });
-
-    // Refresh history button
-    const refreshBtn = document.getElementById('refresh-history-btn');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', async () => {
-        refreshBtn.style.transform = 'rotate(360deg)';
-        refreshBtn.style.transition = 'transform 0.6s ease';
-        await loadNotificationHistory(report.reportId);
-        setTimeout(() => {
-          refreshBtn.style.transform = 'rotate(0deg)';
-        }, 600);
-      });
-
-      refreshBtn.addEventListener('mouseenter', () => {
-        refreshBtn.style.background = 'var(--color-light)';
-      });
-      refreshBtn.addEventListener('mouseleave', () => {
-        refreshBtn.style.background = 'transparent';
-      });
-    }
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const messageInput = document.getElementById('notification-message');
-      const message = messageInput.value.trim();
-
-      if (!message) {
-        alert('Please enter a message');
-        return;
-      }
-
-      if (!report.userId) {
-        alert('Cannot send notification: User ID not found for this report');
-        return;
-      }
-
-      // Disable form
-      const submitBtn = form.querySelector('button[type="submit"]');
-      const originalBtnHTML = submitBtn.innerHTML;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Sending...';
-      messageInput.disabled = true;
-
-      try {
-        const currentUser = auth.currentUser;
-        const notificationData = {
-          userId: report.userId,
-          title: 'Damage Report Update',
-          message: message,
-          category: 'damage_report',
-          imageUrl: report.imageUrls && report.imageUrls.length > 0 ? report.imageUrls[0] : null,
-          data: {
-            type: 'damage_report',
-            reportId: report.reportId,
-            status: report.status
-          },
-          createdAt: new Date().toISOString(),
-          sentBy: currentUser?.email || 'admin',
-          read: false
-        };
-
-        console.log('📤 Sending notification to user:', report.userId);
-
-        // Create batch for atomic write
-        const batch = db.batch();
-
-        // Add to user's notifications subcollection
-        const userNotificationRef = db.collection('users').doc(report.userId).collection('notifications').doc();
-        batch.set(userNotificationRef, notificationData);
-
-        // Add to admin_notifications collection for tracking
-        const adminNotificationRef = db.collection('admin_notifications').doc(userNotificationRef.id);
-        batch.set(adminNotificationRef, {
-          ...notificationData,
-          notificationId: userNotificationRef.id
-        });
-
-        // Commit batch
-        await batch.commit();
-
-        console.log('✅ Notification saved to Firestore');
-
-        // Try to send push notification
-        try {
-          // Check if user has FCM token
-          const userDoc = await db.collection('users').doc(report.userId).get();
-          const fcmToken = userDoc.exists ? userDoc.data().fcmToken : null;
-
-          if (fcmToken) {
-            console.log('📱 Sending push notification via Cloud Function...');
-            
-            const cloudFunctionUrl = 'https://us-central1-kingsleycarwashapp.cloudfunctions.net/sendNotificationToUser';
-            const response = await fetch(cloudFunctionUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                userId: report.userId,
-                title: notificationData.title,
-                body: notificationData.message,
-                imageUrl: notificationData.imageUrl,
-                data: notificationData.data
-              })
-            });
-
-            if (response.ok) {
-              console.log('✅ Push notification sent successfully');
-            } else {
-              console.warn('⚠️ Push notification failed, but notification saved in database');
-            }
-          } else {
-            console.log('ℹ️ User has no FCM token, notification saved in database only');
-          }
-        } catch (pushError) {
-          console.warn('⚠️ Push notification error:', pushError.message);
-        }
-
-        // Show success message
-        showNotificationSuccessToast();
-
-        // Clear form
-        messageInput.value = '';
-
-        // Reload notification history
-        await loadNotificationHistory(report.reportId);
-
-      } catch (error) {
-        console.error('❌ Error sending notification:', error);
-        alert('Failed to send notification: ' + error.message);
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnHTML;
-        messageInput.disabled = false;
-      }
-    });
-  }
-
-  // Load notification history
-  async function loadNotificationHistory(reportId) {
-    const historyList = document.getElementById('notification-history-list');
-    if (!historyList) return;
-
-    try {
-      // Query admin_notifications for this report
-      const snapshot = await db.collection('admin_notifications')
-        .where('data.reportId', '==', reportId)
-        .orderBy('createdAt', 'desc')
-        .limit(15)
-        .get();
-
-      if (snapshot.empty) {
-        historyList.innerHTML = `
-          <div style="text-align: center; padding: 2rem 1rem; color: var(--color-info-dark);">
-            <span class="material-symbols-outlined" style="font-size: 3rem; opacity: 0.3; display: block; margin-bottom: 0.5rem;">notifications_off</span>
-            <p style="margin: 0; font-size: 0.875rem;">No notifications sent yet</p>
-            <small style="opacity: 0.7;">Send your first notification above</small>
-          </div>
-        `;
-        return;
-      }
-
-      historyList.innerHTML = '';
-      
-      snapshot.docs.forEach((doc, index) => {
-        const data = doc.data();
-        const date = new Date(data.createdAt);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-
-        let timeAgo;
-        if (diffMins < 1) timeAgo = 'Just now';
-        else if (diffMins < 60) timeAgo = `${diffMins}m ago`;
-        else if (diffHours < 24) timeAgo = `${diffHours}h ago`;
-        else if (diffDays < 7) timeAgo = `${diffDays}d ago`;
-        else timeAgo = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-        const item = document.createElement('div');
-        item.style.cssText = `
-          padding: 1rem;
-          background: ${index === 0 ? 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' : 'var(--color-white)'};
-          border: 1px solid ${index === 0 ? 'var(--color-primary)' : 'var(--color-info-light)'};
-          border-left: 4px solid var(--color-primary);
-          margin-bottom: 0.75rem;
-          border-radius: 8px;
-          transition: all 0.2s;
-          cursor: pointer;
-          position: relative;
-        `;
-        
-        if (index === 0) {
-          item.innerHTML = `
-            <div style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--color-primary); color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600;">
-              LATEST
-            </div>
-          `;
-        }
-
-        const contentDiv = document.createElement('div');
-        contentDiv.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <span class="material-symbols-outlined" style="font-size: 1.25rem; color: var(--color-primary);">notifications</span>
-              <strong style="font-size: 0.9rem; color: var(--color-dark);">${data.title}</strong>
-            </div>
-            <span style="font-size: 0.75rem; color: var(--color-info-dark); font-weight: 500;">${timeAgo}</span>
-          </div>
-          <p style="margin: 0.5rem 0 0.5rem 2rem; font-size: 0.875rem; color: var(--color-dark); line-height: 1.5;">${data.message}</p>
-          <div style="display: flex; align-items: center; gap: 1rem; margin-left: 2rem; margin-top: 0.5rem;">
-            <small style="font-size: 0.75rem; color: var(--color-info-dark); display: flex; align-items: center; gap: 0.25rem;">
-              <span class="material-symbols-outlined" style="font-size: 0.875rem;">person</span>
-              ${data.sentBy}
-            </small>
-            <small style="font-size: 0.75rem; color: var(--color-success); display: flex; align-items: center; gap: 0.25rem;">
-              <span class="material-symbols-outlined" style="font-size: 0.875rem;">check_circle</span>
-              Delivered
-            </small>
-          </div>
-        `;
-        
-        item.appendChild(contentDiv);
-
-        // Hover effect
-        item.addEventListener('mouseenter', () => {
-          item.style.transform = 'translateX(4px)';
-          item.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
-        });
-        item.addEventListener('mouseleave', () => {
-          item.style.transform = 'translateX(0)';
-          item.style.boxShadow = 'none';
-        });
-
-        historyList.appendChild(item);
-      });
-
-    } catch (error) {
-      console.error('❌ Error loading notification history:', error);
-      historyList.innerHTML = `
-        <p class="text-muted" style="text-align: center; padding: 1rem; color: #e74c3c;">
-          Error loading history
-        </p>
-      `;
-    }
-  }
-
-  // Show notification success toast
-  function showNotificationSuccessToast() {
-    const toast = document.createElement('div');
-    toast.style.cssText = `
-      position: fixed;
-      top: 80px;
-      right: 20px;
-      background: #10b981;
-      color: white;
-      padding: 1rem 1.5rem;
-      border-radius: 0.5rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 1000;
-      animation: slideIn 0.3s ease-out;
-    `;
-    toast.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <span class="material-symbols-outlined">check_circle</span>
-        <div>
-          <strong>Notification Sent!</strong>
-          <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;">Customer will receive your message</p>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-      toast.style.animation = 'slideOut 0.3s ease-in';
-      setTimeout(() => toast.remove(), 300);
-    }, 4000);
-  }
 
   // Show status update toast
   function showStatusUpdateToast(status) {

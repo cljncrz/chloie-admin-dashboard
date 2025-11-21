@@ -1,17 +1,41 @@
 // auth-guard.js
 // Ensures pages that include this script are only accessible to authenticated admin users.
-// Depends on firebase-config.js being loaded first.
+// Depends on firebase-setup.js being loaded first.
 
 (async () => {
-  // Wait for Firebase to initialize
-  if (window.firebaseInitPromise) {
-    await window.firebaseInitPromise;
-  }
-
   const onLoginPage = window.location.pathname.endsWith('login.html') || window.location.href.includes('login.html');
   
   // Don't run auth guard on login page
   if (onLoginPage) {
+    return;
+  }
+
+  // Wait for Firebase to initialize with a timeout
+  const waitForFirebase = async () => {
+    const maxWaitTime = 5000; // 5 seconds max
+    const startTime = Date.now();
+    
+    while (!window.firebase || !window.firebase.auth) {
+      if (Date.now() - startTime > maxWaitTime) {
+        console.error('auth-guard: Firebase initialization timeout');
+        return false;
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Also wait for the init promise if it exists
+    if (window.firebaseInitPromise) {
+      await window.firebaseInitPromise;
+    }
+    
+    return true;
+  };
+
+  const firebaseReady = await waitForFirebase();
+  
+  if (!firebaseReady) {
+    console.error('auth-guard: Firebase not initialized. Make sure firebase-setup.js is loaded before auth-guard.js');
+    window.location.href = 'login.html';
     return;
   }
 

@@ -119,13 +119,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         profile.addEventListener('click', (e) => {
             // Stop propagation to prevent the window click event from firing immediately
             e.stopPropagation();
-            profileDropdown.classList.toggle('show');
+            if (profileDropdown) {
+                profileDropdown.classList.toggle('show');
+            }
         });
 
         // Prevent dropdown from closing when clicking inside it
-        profileDropdown.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
+        if (profileDropdown) {
+            profileDropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
     }
 
     // Close profile dropdown when clicking anywhere else on the page

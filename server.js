@@ -50,15 +50,21 @@ try {
 // Initialize Firebase Admin SDK
 try {
   if (serviceAccount && !admin.apps.length) {
+    console.log('🔑 Using service account credentials...');
+    console.log(`📧 Service account email: ${serviceAccount.client_email}`);
+    console.log(`🆔 Project ID: ${serviceAccount.project_id}`);
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       storageBucket: 'kingsleycarwashapp.firebasestorage.app',
+      databaseURL: 'https://kingsleycarwashapp-default-rtdb.firebaseio.com'
     });
   } else if (!admin.apps.length) {
     // Try to use default credentials (for development)
+    console.log('⚠️  No service account found, using default credentials');
     admin.initializeApp({
       projectId: 'kingsleycarwashapp',
       storageBucket: 'kingsleycarwashapp.firebasestorage.app',
+      databaseURL: 'https://kingsleycarwashapp-default-rtdb.firebaseio.com'
     });
   }
   console.log('✅ Firebase Admin SDK initialized');

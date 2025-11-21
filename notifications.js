@@ -310,13 +310,24 @@ document.addEventListener('DOMContentLoaded', () => {
             .onSnapshot(snapshot => {
               const docs = snapshot.docs.map(doc => {
                 const d = doc.data() || {};
+                
+                // Determine the appropriate link based on notification type
+                let notificationLink = d.link || '#';
+                if (d.data) {
+                  if (d.data.action === 'view_appointment') {
+                    notificationLink = 'appointment.html';
+                  } else if (d.data.type === 'damage_report' && d.data.reportId) {
+                    notificationLink = `damage-reports-details.html?reportId=${d.data.reportId}`;
+                  }
+                }
+                
                 return {
                   id: doc.id,
                   title: d.title || d.type || 'Notification',
                   message: d.body || d.message || '',
                   timestamp: d.sentAt && d.sentAt.toDate ? d.sentAt.toDate().toLocaleString() : (d.sentAt || 'Just now'),
                   isUnread: d.read === false || d.read === undefined,
-                  link: d.data && d.data.action === 'view_appointment' ? 'appointment.html' : (d.link || '#')
+                  link: notificationLink
                 };
               });
 
