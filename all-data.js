@@ -1,8 +1,6 @@
 const sampleAppointments = [];
 
-const sampleTodos = [
-    { id: 'todo-1', text: 'Follow up with customer #CUST-JOH4567', completed: true, createdAt: '2023-10-27T10:00:00Z' }
-];
+const sampleTodos = [];
 
 const sampleWalkins = [];
 

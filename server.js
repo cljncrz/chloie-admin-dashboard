@@ -55,7 +55,7 @@ try {
     console.log(`🆔 Project ID: ${serviceAccount.project_id}`);
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      storageBucket: 'kingsleycarwashapp.firebasestorage.app',
+      storageBucket: 'kingsleycarwashapp.appspot.com',
       databaseURL: 'https://kingsleycarwashapp-default-rtdb.firebaseio.com'
     });
   } else if (!admin.apps.length) {
@@ -63,7 +63,7 @@ try {
     console.log('⚠️  No service account found, using default credentials');
     admin.initializeApp({
       projectId: 'kingsleycarwashapp',
-      storageBucket: 'kingsleycarwashapp.firebasestorage.app',
+      storageBucket: 'kingsleycarwashapp.appspot.com',
       databaseURL: 'https://kingsleycarwashapp-default-rtdb.firebaseio.com'
     });
   }

@@ -222,6 +222,10 @@
                     </button>
                   </div>
                   <div class="media-manager-actions">
+                    <label class="media-select-all-label">
+                      <input type="checkbox" id="select-all-media" />
+                      <span>Select All</span>
+                    </label>
                     <button
                       class="btn-danger"
                       id="delete-selected-media-btn"
@@ -253,6 +257,12 @@
                   <span class="material-symbols-outlined">upload</span>
                   <h3>Drop files to upload</h3>
                 </div>
+              </div>
+
+              <!-- Loader -->
+              <div class="media-gallery-loader" style="display: none; text-align: center; padding: 2rem;">
+                <div class="spinner"></div>
+                <p>Loading media...</p>
               </div>
 
               <div class="media-gallery" id="media-gallery">

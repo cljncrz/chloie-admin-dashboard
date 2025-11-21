@@ -210,96 +210,65 @@
         <!-- ========== Page Content ========== -->
         <div class="page-content">
           <section id="damage-reports-details-page" class="page active">
-            <div class="review-details-container">
-              <div class="review-details-main-column">
-                <!-- Damage Report Info Card -->
-                <div class="review-info-card widget-card">
-                  <div class="review-header">
-                    <div class="review-customer-info">
-                      <h3 id="damage-customer-name">Customer Name</h3>
-                    </div>
+            <div class="damage-details-redesign-container">
+              <!-- Summary Card -->
+              <div class="damage-summary-card widget-card">
+                <div class="summary-header">
+                  <div class="summary-customer">
+                    <span class="material-symbols-outlined">person</span>
+                    <h2 id="damage-customer-name">Customer Name</h2>
                   </div>
-                  <p class="review-comment" id="damage-full-report">
+                  <div class="summary-date-status">
+                    <span class="material-symbols-outlined">event</span>
+                    <span class="summary-date" id="damage-report-date">Reported on: Month Day, Year</span>
+                    <span class="status-badge" id="damage-status-badge">Pending</span>
+                  </div>
+                </div>
+                <div class="summary-details">
+                  <h3>Report Details</h3>
+                  <p class="damage-description" id="damage-full-report">
                     "Full damage report will be displayed here."
                   </p>
-                  <small class="review-date text-muted" id="damage-report-date"
-                    >Reported on: Month Day, Year</small
-                  >
                 </div>
+              </div>
 
-                <!-- Admin Response Section -->
-                <div class="admin-reply-card widget-card">
-                  <!-- This section shows an existing response -->
-                  <div
-                    id="existing-response-container"
-                    class="reply-container"
-                    style="display: none"
-                  >
-                    <div class="reply-header">
-                      <h3>Admin's Response</h3>
-                      <button class="btn-secondary" id="edit-response-btn">
-                        <span class="material-symbols-outlined">edit</span> Edit
-                      </button>
-                    </div>
-                    <div class="admin-reply-content">
-                      <p id="admin-response-text"></p>
-                    </div>
-                  </div>
-
-                  <!-- This form is for submitting a new response -->
-                  <form
-                    id="admin-response-form"
-                    class="modal-form"
-                    style="display: none"
-                  >
-                    <h3 id="response-form-title">Respond to Damage Report</h3>
-                    <div class="form-group">
-                      <textarea
-                        id="response-textarea"
-                        rows="5"
-                        placeholder="Write your response here..."
-                      ></textarea>
-                    </div>
-                    <div class="form-actions reply-actions">
-                      <button
-                        type="button"
-                        class="btn-secondary"
-                        id="cancel-response-btn"
-                      >
-                        Cancel
-                      </button>
-                      <button type="submit" class="btn-primary">
-                        Submit Response
-                      </button>
-                    </div>
-                  </form>
-
-                  <!-- This button shows when there is no response yet -->
-                  <button
-                    class="btn-primary"
-                    id="show-response-form-btn"
-                    style="display: none"
-                  >
-                    <span class="material-symbols-outlined">reply</span> Respond
-                    to Customer
-                  </button>
-                </div>
-
-                <!-- Customer Media Section -->
-                <div class="customer-media-card widget-card">
-                  <h3>Customer Media</h3>
-                  <div class="media-container">
-                    <div class="media-placeholder">
-                      <span class="material-symbols-outlined">image_not_supported</span>
-                      <p>No media submitted for this review.</p>
-                    </div>
+              <!-- Media Gallery Card -->
+              <div class="damage-media-gallery widget-card">
+                <h3>Submitted Media</h3>
+                <div class="media-gallery-container" id="damage-media-gallery">
+                  <!-- Images/videos will be injected here by JS -->
+                  <div class="media-placeholder">
+                    <span class="material-symbols-outlined">image_not_supported</span>
+                    <p>No media submitted for this report.</p>
                   </div>
                 </div>
               </div>
 
-              <!-- Right Column -->
-              <div class="review-details-right-column">
-                <!-- Right column content can be added here if needed -->
+              <!-- Admin Response Card -->
+              <div class="damage-admin-response widget-card">
+                <div class="admin-response-header">
+                  <h3>Admin Response</h3>
+                  <button class="btn-secondary" id="edit-response-btn" style="display:none;">
+                    <span class="material-symbols-outlined">edit</span> Edit
+                  </button>
+                </div>
+                <div id="existing-response-container" class="reply-container" style="display: none">
+                  <div class="admin-reply-content">
+                    <p id="admin-response-text"></p>
+                  </div>
+                </div>
+                <form id="admin-response-form" class="modal-form" style="display: none">
+                  <div class="form-group">
+                    <textarea id="response-textarea" rows="5" placeholder="Write your response here..."></textarea>
+                  </div>
+                  <div class="form-actions reply-actions">
+                    <button type="button" class="btn-secondary" id="cancel-response-btn">Cancel</button>
+                    <button type="submit" class="btn-primary">Submit Response</button>
+                  </div>
+                </form>
+                <button class="btn-primary" id="show-response-form-btn" style="display: none">
+                  <span class="material-symbols-outlined">reply</span> Respond to Customer
+                </button>
               </div>
             </div>
           </section>

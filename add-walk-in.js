@@ -128,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const vehicleType = vehicleTypeSelect.value;
             const carName = document.getElementById('walkin-car-name').value.trim();
             const carType = document.getElementById('walkin-car-type').value.trim();
+            const paymentMethod = document.getElementById('walkin-payment-method').value;
             const serviceSelects = servicesContainer.querySelectorAll('.walkin-service-select');
             const services = Array.from(serviceSelects)
                 .map(select => select.value)
@@ -137,9 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const date = dateInput.value;
             const time = timeInput.value;
 
-            if (!customerName || !carPlate || !customerPhone || !vehicleType || !carName || !carType || services.length === 0 || !date || !time) {
+            if (!customerName || !carPlate || !customerPhone || !vehicleType || !carName || !carType || !paymentMethod || services.length === 0 || !date || !time) {
                 alert('Please fill out all required fields and select at least one service.');
-                alert('Please fill out all required fields.');
                 return;
             }
 
@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dateTime, // Store as a Firestore timestamp
                 status: 'Pending',
                 paymentStatus: 'Unpaid',
-                paymentMethod: null, // Will be set when payment is processed
+                paymentMethod: paymentMethod, // Save the selected payment method
                 technician: 'Unassigned', // Default technician
                 isWalkin: true
             };

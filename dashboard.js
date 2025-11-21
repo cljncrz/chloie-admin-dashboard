@@ -506,6 +506,112 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
 
+    // --- Load and Display To-Do Items ---
+    const loadDashboardTodos = () => {
+        const todoContainer = document.getElementById('dashboard-todo-list');
+        if (!todoContainer) return;
+
+        const noResultsRow = todoContainer.querySelector('.no-results-row');
+
+        // Listen for real-time updates from Firestore
+        db.collection('todos')
+            .where('archived', '==', false)
+            .orderBy('createdAt', 'desc')
+            .limit(5)
+            .onSnapshot((snapshot) => {
+                const fragment = document.createDocumentFragment();
+                let todoCount = 0;
+
+                // Clear existing items except no-results message
+                todoContainer.querySelectorAll('.todo-item').forEach(item => item.remove());
+
+                snapshot.forEach((doc) => {
+                    const todo = doc.data();
+                    todoCount++;
+
+                    const todoItem = document.createElement('div');
+                    todoItem.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+                    todoItem.dataset.id = doc.id;
+
+                    // Format due date if available
+                    let dueDateText = '';
+                    if (todo.dueDate) {
+                        const dueDateTime = todo.dueTime ? `${todo.dueDate}T${todo.dueTime}` : todo.dueDate;
+                        const due = new Date(dueDateTime);
+                        const today = new Date();
+                        const tomorrow = new Date(today);
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+
+                        if (due.toDateString() === today.toDateString()) {
+                            dueDateText = 'Due: Today';
+                        } else if (due.toDateString() === tomorrow.toDateString()) {
+                            dueDateText = 'Due: Tomorrow';
+                        } else {
+                            dueDateText = `Due: ${due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                        }
+                    }
+
+                    // Create icon based on priority or completion status
+                    let iconName = 'check_circle';
+                    if (!todo.completed) {
+                        if (todo.priority === 'high') iconName = 'priority_high';
+                        else if (todo.priority === 'low') iconName = 'low_priority';
+                        else iconName = 'radio_button_unchecked';
+                    }
+
+                    todoItem.innerHTML = `
+                        <div class="icon" style="cursor: pointer;" title="${todo.completed ? 'Mark as incomplete' : 'Mark as complete'}">
+                            <span class="material-symbols-outlined">${iconName}</span>
+                        </div>
+                        <div class="details" style="flex: 1;">
+                            <h3>${todo.text}</h3>
+                            ${dueDateText ? `<small class="text-muted">${dueDateText}</small>` : ''}
+                        </div>
+                        <button class="delete-todo-btn" title="Delete task">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    `;
+
+                    // Add click handler for toggle completion
+                    const iconDiv = todoItem.querySelector('.icon');
+                    iconDiv.addEventListener('click', async () => {
+                        try {
+                            await db.collection('todos').doc(doc.id).update({
+                                completed: !todo.completed
+                            });
+                        } catch (error) {
+                            console.error('Error toggling todo:', error);
+                        }
+                    });
+
+                    // Add click handler for delete
+                    const deleteBtn = todoItem.querySelector('.delete-todo-btn');
+                    deleteBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        if (confirm('Delete this task?')) {
+                            try {
+                                await db.collection('todos').doc(doc.id).delete();
+                            } catch (error) {
+                                console.error('Error deleting todo:', error);
+                            }
+                        }
+                    });
+
+                    fragment.appendChild(todoItem);
+                });
+
+                // Update UI
+                if (todoCount === 0) {
+                    noResultsRow.style.display = 'block';
+                } else {
+                    noResultsRow.style.display = 'none';
+                    todoContainer.appendChild(fragment);
+                }
+            }, (error) => {
+                console.error('Error loading todos:', error);
+            });
+    };
+
     // --- Event Listener for Add To-Do Button ---
     const setupAddTodoButton = () => {
         const addTodoLink = document.querySelector('.add-item-link[href="add-to-do.html"]');
@@ -528,6 +634,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setupRowClickNavigation(); // Set up the click listener
         setupRealtimeUpdates(); // Set up real-time listeners
         setupAddTodoButton(); // Set up Add To-Do button listener
+        loadDashboardTodos(); // Load to-do items from Firebase
     };
 
     // --- Real-Time Updates for Dashboard Cards ---

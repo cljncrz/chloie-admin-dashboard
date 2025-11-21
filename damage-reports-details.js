@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Display images from imageUrls field
-    const mediaContainer = document.querySelector('.media-container');
+    const mediaContainer = document.getElementById('damage-media-gallery');
     if (report.imageUrls && Array.isArray(report.imageUrls) && report.imageUrls.length > 0) {
       // Clear the placeholder
       mediaContainer.innerHTML = '';
@@ -192,22 +192,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     const responseFormTitle = document.getElementById('response-form-title');
     const editResponseBtn = document.getElementById('edit-response-btn');
     const adminResponseText = document.getElementById('admin-response-text');
+    // New for responder info
+    let adminResponseTimestamp = null;
+    if (adminResponseText) {
+      adminResponseTimestamp = document.getElementById('admin-response-timestamp');
+      if (!adminResponseTimestamp) {
+        adminResponseTimestamp = document.createElement('small');
+        adminResponseTimestamp.id = 'admin-response-timestamp';
+        adminResponseTimestamp.className = 'text-muted';
+        adminResponseText.parentNode && adminResponseText.parentNode.appendChild(adminResponseTimestamp);
+      }
+    }
 
     // Check if admin notes exist
-    if (report.adminNotes) {
+    if (report.adminResponse) {
       // Show existing response
       existingResponseContainer.style.display = 'block';
-      adminResponseText.textContent = report.adminNotes;
+      if (adminResponseText) adminResponseText.textContent = report.adminResponse;
+      // Show responder info
+      let responder = report.adminResponseUpdatedBy || 'admin';
+      let respondedAt = report.adminResponseUpdatedAt ? new Date(report.adminResponseUpdatedAt).toLocaleString() : '';
+      if (adminResponseTimestamp) adminResponseTimestamp.textContent = respondedAt ? `Responded by ${responder} on ${respondedAt}` : '';
       showResponseFormBtn.style.display = 'none';
     } else {
       // Show "Respond" button
       showResponseFormBtn.style.display = 'block';
       existingResponseContainer.style.display = 'none';
+      if (adminResponseTimestamp) adminResponseTimestamp.textContent = '';
     }
 
     // Show form to add new note
     showResponseFormBtn.addEventListener('click', () => {
-      responseFormTitle.textContent = 'Add Admin Notes';
+      responseFormTitle.textContent = 'Respond to Customer';
       document.getElementById('response-textarea').value = '';
       showResponseFormBtn.style.display = 'none';
       adminResponseForm.style.display = 'block';
@@ -216,8 +232,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Show form to edit existing note
     if (editResponseBtn) {
       editResponseBtn.addEventListener('click', () => {
-        responseFormTitle.textContent = 'Edit Admin Notes';
-        document.getElementById('response-textarea').value = report.adminNotes || '';
+        responseFormTitle.textContent = 'Edit Response to Customer';
+        document.getElementById('response-textarea').value = report.adminResponse || '';
         existingResponseContainer.style.display = 'none';
         adminResponseForm.style.display = 'block';
       });
@@ -226,7 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Cancel editing
     cancelResponseBtn.addEventListener('click', () => {
       adminResponseForm.style.display = 'none';
-      if (report.adminNotes) {
+      if (report.adminResponse) {
         existingResponseContainer.style.display = 'block';
       } else {
         showResponseFormBtn.style.display = 'block';
@@ -237,41 +253,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     adminResponseForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const responseText = document.getElementById('response-textarea').value.trim();
-      
       if (!responseText) {
-        alert('Please enter admin notes before submitting.');
+        alert('Please enter a response before submitting.');
         return;
       }
-
       // Disable submit button
       const submitBtn = adminResponseForm.querySelector('button[type="submit"]');
       const originalText = submitBtn.textContent;
       submitBtn.disabled = true;
       submitBtn.textContent = 'Saving...';
-
       try {
         // Save to Firestore
+        const now = new Date();
+        const responder = auth.currentUser?.email || 'admin';
         await db.collection('damage_reports').doc(report.reportId).update({
-          adminNotes: responseText,
-          adminNotesUpdatedAt: new Date().toISOString(),
-          adminNotesUpdatedBy: auth.currentUser?.email || 'admin'
+          adminResponse: responseText,
+          adminResponseUpdatedAt: now.toISOString(),
+          adminResponseUpdatedBy: responder
         });
-
-        report.adminNotes = responseText;
-        console.log('✅ Admin notes saved successfully');
-
+        report.adminResponse = responseText;
+        report.adminResponseUpdatedAt = now.toISOString();
+        report.adminResponseUpdatedBy = responder;
+        console.log('✅ Admin response saved successfully');
         // Update display
         adminResponseText.textContent = responseText;
+        adminResponseTimestamp.textContent = `Responded by ${responder} on ${now.toLocaleString()}`;
         existingResponseContainer.style.display = 'block';
         adminResponseForm.style.display = 'none';
         adminResponseForm.reset();
-
         // Show success message
         showNotesUpdateToast();
-
       } catch (error) {
-        console.error('❌ Error saving admin notes:', error);
-        alert('Failed to save admin notes: ' + error.message);
+        console.error('❌ Error saving admin response:', error);
+        alert('Failed to save admin response: ' + error.message);
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;

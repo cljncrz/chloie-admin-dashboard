@@ -9,13 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const listContainer = document.getElementById('full-todo-list');
     const filterButtons = document.getElementById('todo-filter-buttons');
     const noResultsMessage = listContainer.querySelector('.no-results-row');
-    const addToDoForm = document.getElementById('add-todo-form');
     const archiveCompletedBtn = document.getElementById('archive-completed-btn');
 
     // --- State ---
-    let todos = window.appData.todos || [];
+    let todos = [];
     let currentFilter = 'all';
-    let todoIdToDelete = null; // To store the ID of the item to be deleted
+    let unsubscribe = null; // For Firestore listener cleanup
+
+    // --- Firebase Reference ---
+    const todosCollection = db.collection('todos');
 
     // --- Functions ---
 
@@ -126,25 +128,54 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Adds a new to-do item.
+     * Loads todos from Firestore with real-time updates
+     */
+    const loadTodos = () => {
+        // Set up real-time listener
+        unsubscribe = todosCollection.onSnapshot((snapshot) => {
+            todos = [];
+            snapshot.forEach((doc) => {
+                todos.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            renderTodos();
+        }, (error) => {
+            console.error('Error loading todos:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error loading to-do items', 'error');
+            }
+        });
+    };
+
+    /**
+     * Adds a new to-do item to Firestore.
      * @param {string} text - The text of the to-do item.
      * @param {string|null} dueDate - The optional due date.
      * @param {string|null} dueTime - The optional due time.
      * @param {string} priority - The priority of the task ('low', 'medium', 'high').
      */
-    window.addTodoItem = (text, dueDate, dueTime, priority) => {
-        const newTodo = {
-            id: `todo-${Date.now()}`,
-            text: text,
-            completed: false,
-            dueDate: dueDate || null,
-            dueTime: dueTime || null,
-            archived: false,
-            priority: priority || 'medium',
-            createdAt: new Date().toISOString(),
-        };
-        todos.unshift(newTodo); // Add to the beginning of the array
-        renderTodos();
+    window.addTodoItem = async (text, dueDate, dueTime, priority) => {
+        try {
+            const newTodo = {
+                text: text,
+                completed: false,
+                dueDate: dueDate || null,
+                dueTime: dueTime || null,
+                archived: false,
+                priority: priority || 'medium',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            };
+            await todosCollection.add(newTodo);
+            console.log('Todo added successfully');
+        } catch (error) {
+            console.error('Error adding todo:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error adding to-do item', 'error');
+            }
+            throw error;
+        }
     };
 
     /**
@@ -173,16 +204,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add a class to the parent to prevent other actions
         todoItemEl.classList.add('editing');
 
-        const saveChanges = () => {
+        const saveChanges = async () => {
             const newText = input.value.trim();
             if (newText && newText !== currentText) {
-                const todo = todos.find(t => t.id === todoId);
-                if (todo) {
-                    todo.text = newText;
+                try {
+                    await todosCollection.doc(todoId).update({
+                        text: newText
+                    });
+                } catch (error) {
+                    console.error('Error updating todo:', error);
+                    if (typeof showToast === 'function') {
+                        showToast('Error updating to-do item', 'error');
+                    }
                 }
             }
-            // Always re-render to exit edit mode and reflect changes
-            renderTodos();
+            // Remove editing class
+            todoItemEl.classList.remove('editing');
         };
 
         // Event listener for when the input loses focus
@@ -193,68 +230,112 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter') {
                 saveChanges();
             } else if (e.key === 'Escape') {
+                todoItemEl.classList.remove('editing');
                 renderTodos(); // Just re-render to cancel, no data change
             }
         });
     };
 
     /**
-     * Toggles the completed state of a to-do item.
+     * Toggles the completed state of a to-do item in Firestore.
      * @param {string} id - The ID of the to-do item.
      */
-    const toggleTodo = (id) => {
-        const todo = todos.find(t => t.id === id);
-        if (todo) {
-            todo.completed = !todo.completed;
-            renderTodos();
+    const toggleTodo = async (id) => {
+        try {
+            const todo = todos.find(t => t.id === id);
+            if (todo) {
+                await todosCollection.doc(id).update({
+                    completed: !todo.completed
+                });
+            }
+        } catch (error) {
+            console.error('Error toggling todo:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error updating to-do item', 'error');
+            }
         }
     };
 
     /**
-     * Deletes a to-do item.
+     * Deletes a to-do item from Firestore.
      * @param {string} id - The ID of the to-do item.
      */
-    const deleteTodo = (id) => {
-        todos = todos.filter(t => t.id !== id);
-        renderTodos();
+    const deleteTodo = async (id) => {
+        try {
+            await todosCollection.doc(id).delete();
+            if (typeof showToast === 'function') {
+                showToast('To-do item deleted', 'success');
+            }
+        } catch (error) {
+            console.error('Error deleting todo:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error deleting to-do item', 'error');
+            }
+        }
     };
 
     /**
-     * Changes the priority of a to-do item.
+     * Changes the priority of a to-do item in Firestore.
      * @param {string} id - The ID of the to-do item.
      * @param {string} newPriority - The new priority value ('high', 'medium', 'low').
      */
-    const changePriority = (id, newPriority) => {
-        const todo = todos.find(t => t.id === id);
-        if (todo) {
-            todo.priority = newPriority;
-            renderTodos(); // Re-render to show the change
+    const changePriority = async (id, newPriority) => {
+        try {
+            await todosCollection.doc(id).update({
+                priority: newPriority
+            });
+        } catch (error) {
+            console.error('Error changing priority:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error updating priority', 'error');
+            }
         }
     };
 
     /**
-     * Archives all completed (but not yet archived) tasks.
+     * Archives all completed (but not yet archived) tasks in Firestore.
      */
-    const archiveCompletedTodos = () => {
-        todos.forEach(todo => {
-            if (todo.completed && !todo.archived) {
-                todo.archived = true;
+    const archiveCompletedTodos = async () => {
+        try {
+            const batch = db.batch();
+            todos.forEach(todo => {
+                if (todo.completed && !todo.archived) {
+                    const todoRef = todosCollection.doc(todo.id);
+                    batch.update(todoRef, { archived: true });
+                }
+            });
+            await batch.commit();
+            if (typeof showToast === 'function') {
+                showToast('Completed tasks archived', 'success');
             }
-        });
-        renderTodos();
+        } catch (error) {
+            console.error('Error archiving todos:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error archiving tasks', 'error');
+            }
+        }
     };
 
     /**
-     * Unarchives a single task, setting it back to 'completed'.
+     * Unarchives a single task, setting it back to 'completed' in Firestore.
      * @param {string} id - The ID of the to-do item.
      */
-    const unarchiveTodo = (id) => {
-        const todo = todos.find(t => t.id === id);
-        if (todo && todo.archived) {
-            todo.archived = false;
-            renderTodos();
+    const unarchiveTodo = async (id) => {
+        try {
+            await todosCollection.doc(id).update({
+                archived: false
+            });
+            if (typeof showToast === 'function') {
+                showToast('Task unarchived', 'success');
+            }
+        } catch (error) {
+            console.error('Error unarchiving todo:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error unarchiving task', 'error');
+            }
         }
     };
+
     // --- Event Listeners ---
 
     // Filter button clicks
@@ -270,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // To-do item clicks (toggle complete or delete)
+    // To-do item clicks (toggle complete, delete, edit, etc.)
     if (listContainer) {
         listContainer.addEventListener('click', (e) => {
             const todoItem = e.target.closest('.todo-item');
@@ -287,9 +368,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.closest('.delete-todo-btn')) {
                 e.preventDefault();
                 deleteTodo(todoId);
-            } else if (e.target.closest('.icon-container')) { // Corrected to use the new class name for the checkbox area
+            } else if (e.target.closest('.unarchive-todo-btn')) {
+                e.preventDefault();
+                unarchiveTodo(todoId);
+            } else if (e.target.closest('.icon-container')) {
                 toggleTodo(todoId);
-            } else if (e.target.closest('h3')) { // Check if the text itself (or its container) was clicked
+            } else if (e.target.closest('h3')) {
                 editTodo(todoItem);
             } else if (e.target.closest('.priority-indicator')) {
                 // Toggle the priority menu for this specific item
@@ -303,13 +387,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
-
     // Archive button listener
     if (archiveCompletedBtn) {
         archiveCompletedBtn.addEventListener('click', archiveCompletedTodos);
     }
 
+    // --- Cleanup on page unload ---
+    window.addEventListener('beforeunload', () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    });
+
     // --- Initialization ---
-    renderTodos();
+    loadTodos();
 });

@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Load Settings from Firestore ---
     const loadSettings = async () => {
         try {
-            const settingsDoc = await db.collection('admin_settings').doc('geofencing').get();
+            const settingsDoc = await db.collection('adminSettings').doc('geofencing').get();
             if (settingsDoc.exists) {
                 geofencingSettings = { ...defaultSettings, ...settingsDoc.data() };
                 console.log('✅ Geofencing settings loaded from Firestore:', geofencingSettings);
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const batch = db.batch();
 
             // Update geofencing settings
-            const geofencingRef = db.collection('admin_settings').doc('geofencing');
+            const geofencingRef = db.collection('adminSettings').doc('geofencing');
             batch.set(geofencingRef, updatedSettings, { merge: true });
 
             // Update app settings for mobile app
@@ -261,17 +261,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 updatedAt: new Date().toISOString()
             });
 
-            const newLocation = {
-                id: locationRef.id,
-                name: name,
-                address: address,
-                latitude: latitude,
-                longitude: longitude,
-                radius: radius
-            };
-
-            geofencingLocations.push(newLocation);
-            console.log('✅ Location added to Firestore:', newLocation);
+            // After adding, reload locations from Firestore to avoid duplicates
+            console.log('✅ Location added to Firestore. Reloading locations...');
 
             // Clear form
             locationNameInput.value = '';
@@ -280,6 +271,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             locationLngInput.value = '';
             locationRadiusInput.value = '500';
 
+            // Reload locations from Firestore
+            const locationsSnapshot = await db.collection('geofencing_locations').get();
+            geofencingLocations = locationsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
             renderLocationsList();
             updateStats();
             showSuccessToast(`Location "${name}" added successfully!`);
@@ -405,18 +402,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const toggleGeofencing = async (isEnabled) => {
         try {
             console.log(`🔄 ${isEnabled ? 'Enabling' : 'Disabling'} geofencing system...`);
-            
             // Create batch write for atomic updates
             const batch = db.batch();
-            
             // Update geofencing settings
-            const geofencingRef = db.collection('admin_settings').doc('geofencing');
+            const geofencingRef = db.collection('adminSettings').doc('geofencing');
             batch.set(geofencingRef, {
                 ...geofencingSettings,
                 isEnabled: isEnabled,
                 updatedAt: new Date().toISOString()
             }, { merge: true });
-
             // Update app settings for mobile app to read
             const appSettingsRef = db.collection('app_settings').doc('features');
             batch.set(appSettingsRef, {
@@ -424,24 +418,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 lastUpdated: new Date().toISOString(),
                 updatedBy: firebase.auth().currentUser?.email || 'admin'
             }, { merge: true });
-
             // Commit batch
             await batch.commit();
-
-            // Update local state
-            geofencingSettings.isEnabled = isEnabled;
-            
-            // Update UI
+            // Reload settings from Firestore to ensure UI matches saved state
+            const settingsDoc = await db.collection('adminSettings').doc('geofencing').get();
+            if (settingsDoc.exists) {
+                geofencingSettings = { ...geofencingSettings, ...settingsDoc.data() };
+                enabledToggle.checked = geofencingSettings.isEnabled;
+            }
             updateStats();
-            
             const message = isEnabled 
                 ? '✅ Geofencing system enabled! Customers will receive notifications when near your locations.'
                 : '⚠️ Geofencing system disabled. No notifications will be sent to customers.';
-            
             showSuccessToast(message);
             console.log(`✅ Geofencing ${isEnabled ? 'enabled' : 'disabled'} successfully`);
             console.log(`📱 Mobile app will sync this setting on next refresh`);
-            
             // Show visual feedback on the page
             showSystemStatusMessage(isEnabled);
         } catch (error) {
@@ -497,10 +488,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- Event Listeners ---
-    geofencingForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        saveSettings();
-    });
+
+    // Save notification message instantly when changed
+    if (notificationMessageInput) {
+        notificationMessageInput.addEventListener('change', async (e) => {
+            const newMessage = e.target.value.trim();
+            if (!newMessage) return;
+            try {
+                await db.collection('adminSettings').doc('geofencing').set({
+                    notificationMessage: newMessage,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: firebase.auth().currentUser?.email || 'admin'
+                }, { merge: true });
+                geofencingSettings.notificationMessage = newMessage;
+                showSuccessToast('Notification message saved!');
+            } catch (error) {
+                console.error('❌ Error saving notification message:', error);
+                alert('Failed to save notification message: ' + error.message);
+            }
+        });
+    }
 
     if (addLocationBtn) {
         addLocationBtn.addEventListener('click', (e) => {
@@ -568,7 +575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const batch = db.batch();
                 
                 // Update admin_settings
-                const adminSettingsRef = db.collection('admin_settings').doc('geofencing');
+                const adminSettingsRef = db.collection('adminSettings').doc('geofencing');
                 batch.update(adminSettingsRef, {
                     operatingHours: operatingHours,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -604,7 +611,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Real-time Listener for Settings Changes ---
     const setupRealtimeListener = () => {
         // Listen for changes to geofencing settings
-        db.collection('admin_settings').doc('geofencing').onSnapshot((doc) => {
+        db.collection('adminSettings').doc('geofencing').onSnapshot((doc) => {
             if (doc.exists) {
                 const data = doc.data();
                 
