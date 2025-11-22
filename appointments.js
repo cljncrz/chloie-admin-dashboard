@@ -448,7 +448,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let paymentActionButton = '';
                 if (paymentStatus === 'Unpaid') {
                     paymentActionButton = `
-                        <button class="action-icon-btn mark-paid-btn" title="Mark as Paid">
+                        <button class="action-icon-btn mark-paid-btn" title="Approve Payment">
                             <span class="material-symbols-outlined">payments</span>
                         </button>`;
                 }
@@ -909,76 +909,51 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (markPaidButton) {
                     const appointments = window.appData.appointments || [];
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
-
-                    // Normalize current payment status (treat undefined/null as 'Unpaid')
                     const currentPaymentStatus = (appointment && appointment.paymentStatus) ? String(appointment.paymentStatus) : 'Unpaid';
-
                     if (appointment && currentPaymentStatus.toLowerCase() === 'unpaid') {
-                        // Show payment modal
-                        const modalOverlay = document.getElementById('modal-overlay');
-                        const modalTitle = document.getElementById('modal-title');
-                        const paymentModalContent = document.getElementById('payment-modal-content');
-                        const paymentAmountInput = document.getElementById('payment-amount');
-                        const paymentMethodInput = document.getElementById('payment-method');
-
-                        // Show payment modal and hide other content
-                        document.querySelectorAll('.modal-content').forEach(content => {
-                            content.style.display = 'none';
-                        });
-                        if (paymentModalContent) {
-                            paymentModalContent.style.display = 'block';
-                        }
-
-                        // Set the amount field
-                        const amount = appointment.price || 0;
-                        if (paymentAmountInput) {
-                            paymentAmountInput.value = amount.toFixed(2);
-                        }
-
-                        // Always fetch payment method from Firestore user profile
-                        if (paymentMethodInput) {
-                            paymentMethodInput.value = 'Loading...';
-                            let customerId = appointment.customerId || appointment.userId || appointment.customerUid;
-                            (async () => {
-                                try {
-                                    const db = window.firebase.firestore();
-                                    if (!customerId) {
-                                        // Try to find by fullName if no ID
-                                        const usersSnapshot = await db.collection('users').where('fullName', '==', appointment.customer).limit(1).get();
-                                        if (!usersSnapshot.empty) {
-                                            customerId = usersSnapshot.docs[0].id;
-                                        }
+                        // Instantly approve payment (no modal)
+                        const db = window.firebase.firestore();
+                        let customerId = appointment.customerId || appointment.userId || appointment.customerUid;
+                        (async () => {
+                            let paymentMethod = 'N/A';
+                            try {
+                                if (!customerId) {
+                                    const usersSnapshot = await db.collection('users').where('fullName', '==', appointment.customer).limit(1).get();
+                                    if (!usersSnapshot.empty) {
+                                        customerId = usersSnapshot.docs[0].id;
                                     }
-                                    if (customerId) {
-                                        const userDoc = await db.collection('users').doc(customerId).get();
-                                        if (userDoc.exists) {
-                                            const userData = userDoc.data();
-                                            paymentMethodInput.value = userData.paymentMethod || 'Not set';
-                                        } else {
-                                            paymentMethodInput.value = 'Not set';
-                                        }
-                                    } else {
-                                        paymentMethodInput.value = 'Not set';
-                                    }
-                                } catch (err) {
-                                    paymentMethodInput.value = 'Not set';
                                 }
-                            })();
-                        }
-
-                        // Update modal title
-                        if (modalTitle) {
-                            modalTitle.textContent = `Process Payment for ${appointment.customer}`;
-                        }
-
-                        // Show the modal overlay
-                        if (modalOverlay) {
-                            modalOverlay.style.display = 'flex';
-                        }
-
-                        // Store the appointment for later use in the form submission
-                        window.pendingPaymentAppointment = appointment;
-                        window.pendingPaymentRow = row;
+                                if (customerId) {
+                                    const userDoc = await db.collection('users').doc(customerId).get();
+                                    if (userDoc.exists) {
+                                        const userData = userDoc.data();
+                                        paymentMethod = userData.paymentMethod || 'Not set';
+                                    }
+                                }
+                            } catch (err) {
+                                paymentMethod = 'Not set';
+                            }
+                            try {
+                                await db.collection('bookings').doc(appointment.serviceId).update({
+                                    paymentStatus: 'Paid',
+                                    paymentMethod: paymentMethod,
+                                    paidAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                appointment.paymentStatus = 'Paid';
+                                appointment.paymentMethod = paymentMethod;
+                                appointment.paidAt = new Date();
+                                row.dataset.paymentStatus = 'Paid';
+                                // Update UI instantly
+                                const paymentCell = row.querySelector('td:nth-last-child(2)');
+                                if (paymentCell) {
+                                    paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+                                }
+                                markPaidButton.remove();
+                                if (typeof showSuccessToast === 'function') showSuccessToast('Payment approved and marked as Paid.');
+                            } catch (err) {
+                                if (typeof showSuccessToast === 'function') showSuccessToast('Failed to approve payment.', 'error');
+                            }
+                        })();
                     }
                     return;
                 }
