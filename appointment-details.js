@@ -81,14 +81,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const trackerContainer = document.createElement('div');
         trackerContainer.className = 'status-tracker-container widget-card';
 
-        const statuses = ['Pending', 'In Progress', 'Completed'];
-        const currentStatusIndex = statuses.indexOf(currentStatus);
+        const statuses = ['Pending', 'Approved', 'In Progress', 'Completed'];
+        // Normalize currentStatus for matching (case-insensitive, allow 'Approve' as 'Approved')
+        let normalizedStatus = (currentStatus || '').toLowerCase();
+        if (normalizedStatus === 'approve') normalizedStatus = 'approved';
+        const currentStatusIndex = statuses.findIndex(s => s.toLowerCase() === normalizedStatus);
 
         let stepsHTML = '';
         statuses.forEach((status, index) => {
             const isCompleted = index < currentStatusIndex;
             const isActive = index === currentStatusIndex;
-            const icon = status === 'Pending' ? 'pending_actions' : status === 'In Progress' ? 'autorenew' : 'check_circle';
+            let icon = 'pending_actions';
+            if (status === 'Approved') icon = 'check_circle';
+            else if (status === 'In Progress') icon = 'autorenew';
+            else if (status === 'Completed') icon = 'check_circle';
             stepsHTML += `
                <div class="status-step clickable ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}" data-status="${status}">
                     <div class="icon">
@@ -208,8 +214,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Set avatar image
             if (customerData.photoURL) {
                 avatarImg.src = customerData.photoURL;
+            } else if (customerData.photoUrl) {
+                avatarImg.src = customerData.photoUrl;
             } else {
-                // Fallback if user has no photoURL
+                // Fallback if user has no photoURL or photoUrl
                 avatarImg.src = './images/redicon.png';
             }
         } else {

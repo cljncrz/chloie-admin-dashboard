@@ -18,6 +18,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('profile-name').textContent = profileData.fullName || profileData.customer || profileData.name || 'Walk-in Customer';
     document.getElementById('profile-phone').textContent = profileData.phoneNumber || profileData.phone || 'N/A'; // Keep `phone` as a fallback
     document.getElementById('profile-email').textContent = profileData.email || 'N/A';
+
+    // Set customer profile image (support both photoURL and photoUrl)
+    const avatarImg = document.getElementById('profile-avatar-img');
+    if (avatarImg) {
+        if (profileData.photoURL) {
+            avatarImg.src = profileData.photoURL;
+        } else if (profileData.photoUrl) {
+            avatarImg.src = profileData.photoUrl;
+        } else {
+            avatarImg.src = './images/redicon.png';
+        }
+    }
     
     // Handle different date formats (Firestore timestamp vs. string)
     let registrationDateText = 'N/A';

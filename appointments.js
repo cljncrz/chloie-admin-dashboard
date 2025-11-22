@@ -368,10 +368,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const searchTerm = searchInput.value.toLowerCase();
             const selectedStatus = statusFilter ? statusFilter.value.toLowerCase() : 'all';
 
+            // Only allow these statuses
+            const allowedStatuses = ['pending', 'approved', 'in progress', 'completed'];
             let filteredAppointments = appointments.filter(appt => {
+                const status = (appt.status || '').toLowerCase();
+                if (!allowedStatuses.includes(status)) return false;
                 const matchesSearch = searchTerm === '' ||
                     Object.values(appt).some(val => String(val).toLowerCase().includes(searchTerm));
-                const matchesStatus = selectedStatus === 'all' || appt.status.toLowerCase() === selectedStatus;
+                const matchesStatus = selectedStatus === 'all' || status === selectedStatus;
                 return matchesSearch && matchesStatus;
             });
 
@@ -531,10 +535,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             // 1. Filter Data
             const searchTerm = searchInput.value.toLowerCase();
             const selectedStatus = statusFilter ? statusFilter.value.toLowerCase() : 'all';
+            // Only allow these statuses
+            const allowedStatuses = ['pending', 'approved', 'in progress', 'completed'];
             let filteredWalkins = walkins.filter(walkin => {
+                const status = (walkin.status || '').toLowerCase();
+                if (!allowedStatuses.includes(status)) return false;
                 const matchesSearch = searchTerm === '' ||
                     Object.values(walkin).some(val => String(val).toLowerCase().includes(searchTerm));
-                const matchesStatus = selectedStatus === 'all' || walkin.status.toLowerCase() === selectedStatus;
+                const matchesStatus = selectedStatus === 'all' || status === selectedStatus;
                 return matchesSearch && matchesStatus;
             });
 
@@ -914,6 +922,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const currentPaymentStatus = (appointment && appointment.paymentStatus) ? String(appointment.paymentStatus) : 'Unpaid';
 
                     if (appointment && currentPaymentStatus.toLowerCase() === 'unpaid') {
+                        // Require technician assignment before payment approval
+                        if (!appointment.technician || appointment.technician === 'Unassigned') {
+                            if (typeof showSuccessToast === 'function') {
+                                showSuccessToast('Please assign a technician before approving payment.', 'error');
+                            } else {
+                                alert('Please assign a technician before approving payment.');
+                            }
+                            return;
+                        }
                         // Approve payment directly, no modal
                         let paymentMethod = '';
                         let customerId = appointment.customerId || appointment.userId || appointment.customerUid;
@@ -1837,7 +1854,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderCancelledTable() {
         if (!cancelledTableBody) return;
 
-        const cancelled = (window.appData.appointments || []).filter(a => String(a.status || '').toLowerCase() === 'cancelled');
+        // Combine cancelled appointments and cancelled walk-ins
+        const cancelledAppointments = (window.appData.appointments || []).filter(a => String(a.status || '').toLowerCase() === 'cancelled' || String(a.status || '') === 'Cancelled');
+        const cancelledWalkins = (window.appData.walkins || []).filter(w => String(w.status || '').toLowerCase() === 'cancelled' || String(w.status || '') === 'Cancelled');
+        // Normalize walk-in fields to match appointment fields for table rendering
+        const normalizedWalkins = cancelledWalkins.map(w => ({
+            serviceId: w.id || w.serviceId || '',
+            customer: w.customer || w.carName || w.plate || 'Walk-in',
+            service: w.service || '',
+            datetime: w.datetime || '',
+            cancellationReason: w.cancellationReason || '',
+            cancellationNotes: w.cancellationNotes || '',
+            cancelledAt: w.cancelledAt || '',
+            // Add any other fields needed for rendering or actions
+        }));
+        const cancelled = [...cancelledAppointments, ...normalizedWalkins];
 
         // Apply search filter
         const filtered = cancelled.filter(a => {
