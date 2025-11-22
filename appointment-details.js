@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const serviceEl = document.getElementById('detail-service');
     const phoneEl = document.getElementById('detail-customer-phone');
     const emailEl = document.getElementById('detail-customer-email');
+        const paymentMethodEl = document.getElementById('detail-payment-method');
     const plateEl = document.getElementById('detail-plate');
     const carNameEl = document.getElementById('detail-car-name');
     const carTypeEl = document.getElementById('detail-car-type');
@@ -71,6 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
             existingTracker.remove();
         }
 
+        // Remove existing payment history to prevent duplicates
+        const existingPaymentHistory = profileHistorySection.querySelector('.payment-history-container');
+        if (existingPaymentHistory) {
+            existingPaymentHistory.remove();
+        }
+
         const trackerContainer = document.createElement('div');
         trackerContainer.className = 'status-tracker-container widget-card'; // Added widget-card for styling
 
@@ -103,6 +110,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         profileHistorySection.prepend(trackerContainer);
 
+        // --- Payment Method History Section ---
+        const paymentHistoryContainer = document.createElement('div');
+        paymentHistoryContainer.className = 'payment-history-container widget-card';
+        let paymentStatus = appointmentData && appointmentData.paymentStatus ? appointmentData.paymentStatus : 'N/A';
+        let paymentMethod = appointmentData && appointmentData.paymentMethod ? appointmentData.paymentMethod : 'N/A';
+        let paidAt = appointmentData && appointmentData.paidAt ? appointmentData.paidAt : null;
+        let paidAtStr = 'N/A';
+        if (paidAt && paidAt.seconds) {
+            // Firestore Timestamp
+            const date = new Date(paidAt.seconds * 1000);
+            paidAtStr = date.toLocaleString();
+        } else if (typeof paidAt === 'string' || typeof paidAt === 'number') {
+            paidAtStr = new Date(paidAt).toLocaleString();
+        }
+        paymentHistoryContainer.innerHTML = `
+            <div class="widget-header">
+                <h3>Payment Method History</h3>
+            </div>
+            <div class="payment-history-details">
+                <div><strong>Status:</strong> <span>${paymentStatus}</span></div>
+                <div><strong>Method:</strong> <span>${paymentMethod}</span></div>
+                <div><strong>Date Paid:</strong> <span>${paidAtStr}</span></div>
+            </div>
+        `;
+        profileHistorySection.insertBefore(paymentHistoryContainer, trackerContainer.nextSibling);
+
         // Add event listener for status updates
         trackerContainer.querySelector('.status-tracker').addEventListener('click', (e) => {
             const step = e.target.closest('.status-step');
@@ -131,7 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // 1. Populate with appointment-specific data that doesn't change
         appointmentIdEl.textContent = `ID: ${apptData.serviceId || 'N/A'}`;
         serviceEl.textContent = apptData.service || 'N/A';
-        plateEl.textContent = apptData.plate || 'N/A';
+        // Use plateNumber from Firestore if available, fallback to apptData
+        plateEl.textContent = apptData.plateNumber || apptData.plate || 'N/A';
         carNameEl.textContent = apptData.carName || 'N/A';
         carTypeEl.textContent = apptData.carType || 'N/A';
 
@@ -140,8 +174,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (customerData) {
             // Use data from the 'users' collection as the source of truth
             customerNameEl.textContent = customerData.fullName || apptData.customer || 'N/A';
-            phoneEl.textContent = customerData.phoneNumber || apptData.phone || 'N/A';
+            // Use phoneNumber from Firestore if available, fallback to apptData
+            phoneEl.textContent = customerData.phoneNumber || apptData.phoneNumber || apptData.phone || 'N/A';
             emailEl.textContent = customerData.email || 'N/A';
+
+            // Payment Method
+            if (paymentMethodEl) {
+                paymentMethodEl.textContent = customerData.paymentMethod || 'N/A';
+            }
 
             // Set avatar image
             if (customerData.photoURL) {
@@ -155,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
             customerNameEl.textContent = apptData.customer || 'N/A';
             phoneEl.textContent = apptData.phone || 'N/A';
             emailEl.textContent = 'N/A';
+            if (paymentMethodEl) paymentMethodEl.textContent = 'N/A';
             avatarImg.src = './images/redicon.png';
         }
 

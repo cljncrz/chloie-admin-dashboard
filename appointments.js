@@ -83,14 +83,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         ];
 
             const counts = allAppointments.reduce((acc, appt) => {
-                acc.total++;
-                const status = appt.status.toLowerCase();
-                if (status === 'pending') acc.pending++;
-                else if (status === 'in progress') acc.inProgress++;
-                else if (status === 'completed') acc.completed++;
-                else if (status === 'cancelled') acc.cancelled++;
-                return acc;
-             }, { total: 0, pending: 0, inProgress: 0, completed: 0, cancelled: 0 });
+                     acc.total++;
+                     const status = appt.status.toLowerCase();
+                     if (status === 'pending') acc.pending++;
+                     else if (status === 'in progress') acc.inProgress++;
+                     else if (status === 'completed') acc.completed++;
+                     else if (status === 'cancelled') acc.cancelled++;
+                     else if (status === 'approve') acc.approve = (acc.approve || 0) + 1;
+                     return acc;
+                 }, { total: 0, pending: 0, inProgress: 0, completed: 0, cancelled: 0, approve: 0 });
 
         // Set data-value for animation and update text content
         totalEl.dataset.value = counts.total;
@@ -423,6 +424,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let actionButtons = '';
                 if (appt.status === 'Pending') {
                     actionButtons = `
+                        <button class="action-icon-btn approve-btn" title="Approve Appointment">
+                            <span class="material-symbols-outlined">check_circle</span>
+                        </button>`;
+                } else if (appt.status === 'Approve') {
+                    actionButtons = `
                         <button class="action-icon-btn start-service-btn" title="Start Service">
                             <span class="material-symbols-outlined">play_arrow</span>
                         </button>`;
@@ -446,6 +452,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <span class="material-symbols-outlined">payments</span>
                         </button>`;
                 }
+                // Add note if status is Approve
+                let approveNote = '';
+                if (appt.status === 'Approve') {
+                    approveNote = '';
+                }
+                let statusDisplay = '';
+                if (appt.status === 'Approve') {
+                    statusDisplay = '<span class="completed">Approved</span>';
+                } else if (appt.status === 'Completed') {
+                    statusDisplay = '<span class="completed">Completed</span>';
+                } else {
+                    statusDisplay = `<span class="${statusClass}">${appt.status}</span>`;
+                }
                 row.innerHTML = `
                     <td>${appt.serviceId}</td>
                     <td>${appt.plate}</td>
@@ -455,7 +474,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td>${appt.datetime}</td>
                     <td>${appt.price}</td>
                     <td>${technicianDropdown}</td>
-                    <td class="text-center"><span class="${statusClass}">${appt.status}</span></td>
+                    <td class="text-center">${statusDisplay}</td>
                     <td class="text-center">${paymentBadge}</td>
                     <td class="text-center">
                         ${actionButtons}
@@ -639,7 +658,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // --- Populate Status Filters ---
         const populateStatusFilters = () => {
-            const statuses = ['All', 'Pending', 'In Progress', 'Completed', 'Cancelled'];
+            const statuses = ['All', 'Pending', 'In Progress', 'Completed', 'Cancelled', 'Approve'];
             document.querySelectorAll('.status-filter').forEach(filterSelect => {
                 filterSelect.innerHTML = statuses.map(status =>
                     `<option value="${status.toLowerCase()}">${status}</option>`
@@ -688,20 +707,58 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (appointmentTableBody) {
             appointmentTableBody.addEventListener('click', async (e) => {
                 const cancelButton = e.target.closest('.cancel-btn');
+                const approveButton = e.target.closest('.approve-btn');
                 const startServiceButton = e.target.closest('.start-service-btn');
                 const completeServiceButton = e.target.closest('.complete-service-btn');
                 const markPaidButton = e.target.closest('.mark-paid-btn');
                 const technicianSelect = e.target.closest('.technician-select');
-                const isActionButtonClick = startServiceButton || completeServiceButton || cancelButton || markPaidButton || technicianSelect;
+                const isActionButtonClick = approveButton || startServiceButton || completeServiceButton || cancelButton || markPaidButton || technicianSelect;
                 const row = e.target.closest('tr');
 
                 if (!row || row.classList.contains('no-results-row')) return;
+
+                if (approveButton) {
+                    const appointments = window.appData.appointments || [];
+                    const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
+                    if (appointment && appointment.status === 'Pending') {
+                        const db = window.firebase.firestore();
+                        try {
+                            await db.collection('bookings').doc(appointment.serviceId).update({
+                                status: 'Approve'
+                            });
+                        } catch (err) {
+                            console.error('Error updating booking to Approve:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to approve appointment (database error).', 'error');
+                            else alert('Failed to approve appointment (database error).');
+                            return;
+                        }
+                        appointment.status = 'Approve';
+                        row.dataset.status = 'Approve';
+                        const statusCell = row.querySelector('td:nth-last-child(3)');
+                        statusCell.innerHTML = `<span class="approve">Approve</span><div class=\"status-note\" style=\"color: #1976d2; font-size: 0.95em; margin-top: 4px;\">Ask customer to get their vehicle to kingsley site</div>`;
+                        if (typeof showSuccessToast === 'function') showSuccessToast(`Appointment for ${appointment.customer} has been approved.`);
+                        updateAppointmentPageStats();
+                        // --- Send notification to mobile app user ---
+                        if (typeof NotificationService !== 'undefined' && typeof NotificationService.notifyAppointmentApproved === 'function') {
+                            NotificationService.notifyAppointmentApproved(appointment.customerId || appointment.customer, appointment);
+                        }
+                        // Replace the approve button with a start button
+                        const actionsCell = approveButton.parentElement;
+                        approveButton.remove();
+                        actionsCell.insertAdjacentHTML('afterbegin', `
+                            <button class="action-icon-btn start-service-btn" title="Start Service">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>
+                        `);
+                    }
+                    return;
+                }
 
                 if (startServiceButton) {
                     const appointments = window.appData.appointments || [];
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
 
-                    if (appointment && appointment.status === 'Pending') {
+                    if (appointment && appointment.status === 'Approve') {
                         // Ensure we know who is logged in (name + role)
                         await fetchCurrentUserFullName();
 
@@ -881,10 +938,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (paymentAmountInput) {
                             paymentAmountInput.value = amount.toFixed(2);
                         }
-
-                        // Reset payment method
-                        if (paymentMethodSelect) {
-                            paymentMethodSelect.value = '';
+                        // Set payment method input to user's payment method
+                        const paymentMethodInput = document.getElementById('payment-method');
+                        if (paymentMethodInput) {
+                            paymentMethodInput.value = 'Loading...';
+                            // Fetch user's payment method from Firestore
+                            let customerId = appointment.customerId || appointment.customer || appointment.customerUid;
+                            (async () => {
+                                try {
+                                    const db = window.firebase.firestore();
+                                    if (!customerId) {
+                                        const usersSnapshot = await db.collection('users').where('fullName', '==', appointment.customer).limit(1).get();
+                                        if (!usersSnapshot.empty) {
+                                            customerId = usersSnapshot.docs[0].id;
+                                        }
+                                    }
+                                    if (customerId) {
+                                        const userDoc = await db.collection('users').doc(customerId).get();
+                                        if (userDoc.exists) {
+                                            const userData = userDoc.data();
+                                            paymentMethodInput.value = userData.paymentMethod || 'Not set';
+                                        } else {
+                                            paymentMethodInput.value = 'Not set';
+                                        }
+                                    } else {
+                                        paymentMethodInput.value = 'Not set';
+                                    }
+                                } catch (err) {
+                                    paymentMethodInput.value = 'Not set';
+                                }
+                            })();
                         }
 
                         // Update modal title
@@ -1526,15 +1609,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         paymentForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const paymentMethodSelect = document.getElementById('payment-method');
             const paymentAmountInput = document.getElementById('payment-amount');
-            const paymentMethod = paymentMethodSelect?.value;
+            const paymentMethodInput = document.getElementById('payment-method');
             const amount = parseFloat(paymentAmountInput?.value || 0);
-
-            if (!paymentMethod) {
-                alert('Please select a payment method.');
-                return;
-            }
 
             const appointment = window.pendingPaymentAppointment;
             const row = window.pendingPaymentRow;
@@ -1543,6 +1620,37 @@ document.addEventListener('DOMContentLoaded', async () => {
                 alert('Error: Could not find appointment data.');
                 return;
             }
+
+            // Fetch the user's payment method from Firestore
+            let paymentMethod = '';
+            try {
+                const db = window.firebase.firestore();
+                let customerId = appointment.customerId || appointment.customer || appointment.customerUid;
+                if (!customerId) {
+                    // Try to look up by name if needed
+                    const usersSnapshot = await db.collection('users').where('fullName', '==', appointment.customer).limit(1).get();
+                    if (!usersSnapshot.empty) {
+                        customerId = usersSnapshot.docs[0].id;
+                    }
+                }
+                if (customerId) {
+                    const userDoc = await db.collection('users').doc(customerId).get();
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        paymentMethod = userData.paymentMethod || '';
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching user payment method:', err);
+            }
+
+            if (!paymentMethod) {
+                alert('No payment method found for this user.');
+                return;
+            }
+
+            // Set the payment method in the modal (for display)
+            if (paymentMethodInput) paymentMethodInput.value = paymentMethod;
 
             const db = window.firebase.firestore();
             try {
