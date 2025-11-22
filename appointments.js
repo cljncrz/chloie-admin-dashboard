@@ -909,15 +909,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (markPaidButton) {
                     const appointments = window.appData.appointments || [];
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
+
+                    // Normalize current payment status (treat undefined/null as 'Unpaid')
                     const currentPaymentStatus = (appointment && appointment.paymentStatus) ? String(appointment.paymentStatus) : 'Unpaid';
+
                     if (appointment && currentPaymentStatus.toLowerCase() === 'unpaid') {
-                        // Instantly approve payment (no modal)
-                        const db = window.firebase.firestore();
+                        // Approve payment directly, no modal
+                        let paymentMethod = '';
                         let customerId = appointment.customerId || appointment.userId || appointment.customerUid;
                         (async () => {
-                            let paymentMethod = 'N/A';
                             try {
+                                const db = window.firebase.firestore();
                                 if (!customerId) {
+                                    // Try to find by fullName if no ID
                                     const usersSnapshot = await db.collection('users').where('fullName', '==', appointment.customer).limit(1).get();
                                     if (!usersSnapshot.empty) {
                                         customerId = usersSnapshot.docs[0].id;
@@ -933,7 +937,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             } catch (err) {
                                 paymentMethod = 'Not set';
                             }
+
+                            // Update payment status in Firestore
                             try {
+                                const db = window.firebase.firestore();
                                 await db.collection('bookings').doc(appointment.serviceId).update({
                                     paymentStatus: 'Paid',
                                     paymentMethod: paymentMethod,
@@ -941,17 +948,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 });
                                 appointment.paymentStatus = 'Paid';
                                 appointment.paymentMethod = paymentMethod;
-                                appointment.paidAt = new Date();
                                 row.dataset.paymentStatus = 'Paid';
-                                // Update UI instantly
                                 const paymentCell = row.querySelector('td:nth-last-child(2)');
-                                if (paymentCell) {
-                                    paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+                                if (paymentCell) paymentCell.innerHTML = `<span class="payment-status-badge paid">Paid</span>`;
+                                if (typeof showSuccessToast === 'function') {
+                                    showSuccessToast(`Appointment ${appointment.serviceId} marked as paid with ${paymentMethod}.`);
                                 }
-                                markPaidButton.remove();
-                                if (typeof showSuccessToast === 'function') showSuccessToast('Payment approved and marked as Paid.');
+                                // Remove the mark paid button
+                                const markPaidBtn = row.querySelector('.mark-paid-btn');
+                                if (markPaidBtn) markPaidBtn.remove();
+                                // Send notification to mobile app user
+                                if (typeof sendPaymentReceivedNotification === 'function') {
+                                    sendPaymentReceivedNotification(appointment);
+                                }
                             } catch (err) {
-                                if (typeof showSuccessToast === 'function') showSuccessToast('Failed to approve payment.', 'error');
+                                console.error('Error updating payment status:', err);
+                                if (typeof showSuccessToast === 'function') {
+                                    showSuccessToast('Failed to process payment (database error).', 'error');
+                                } else {
+                                    alert('Failed to process payment (database error).');
+                                }
                             }
                         })();
                     }
