@@ -936,11 +936,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 }
                             } catch (err) {
                                 paymentMethod = 'Not set';
+                                console.error('Error fetching user payment method:', err);
                             }
 
                             // Update payment status in Firestore
                             try {
                                 const db = window.firebase.firestore();
+                                if (!appointment.serviceId) {
+                                    console.error('No serviceId found for appointment:', appointment);
+                                }
                                 await db.collection('bookings').doc(appointment.serviceId).update({
                                     paymentStatus: 'Paid',
                                     paymentMethod: paymentMethod,
@@ -962,11 +966,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     sendPaymentReceivedNotification(appointment);
                                 }
                             } catch (err) {
-                                console.error('Error updating payment status:', err);
+                                console.error('Error updating payment status:', err, {
+                                    serviceId: appointment.serviceId,
+                                    paymentMethod,
+                                    appointment
+                                });
                                 if (typeof showSuccessToast === 'function') {
-                                    showSuccessToast('Failed to process payment (database error).', 'error');
+                                    showSuccessToast('Failed to process payment (database error). ' + (err && err.message ? err.message : ''), 'error');
                                 } else {
-                                    alert('Failed to process payment (database error).');
+                                    alert('Failed to process payment (database error). ' + (err && err.message ? err.message : ''));
                                 }
                             }
                         })();
