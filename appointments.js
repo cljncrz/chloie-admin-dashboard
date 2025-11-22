@@ -948,7 +948,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 await db.collection('bookings').doc(appointment.serviceId).update({
                                     paymentStatus: 'Paid',
                                     paymentMethod: paymentMethod,
-                                    paidAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                                    paidAt: window.firebase.firestore().FieldValue.serverTimestamp()
                                 });
                                 appointment.paymentStatus = 'Paid';
                                 appointment.paymentMethod = paymentMethod;
