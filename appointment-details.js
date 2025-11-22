@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const trackerContainer = document.createElement('div');
-        trackerContainer.className = 'status-tracker-container widget-card'; // Added widget-card for styling
+        trackerContainer.className = 'status-tracker-container widget-card';
 
         const statuses = ['Pending', 'In Progress', 'Completed'];
         const currentStatusIndex = statuses.indexOf(currentStatus);
@@ -114,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const paymentHistoryContainer = document.createElement('div');
         paymentHistoryContainer.className = 'payment-history-container widget-card';
         let paymentStatus = appointmentData && appointmentData.paymentStatus ? appointmentData.paymentStatus : 'N/A';
-        let paymentMethod = appointmentData && appointmentData.paymentMethod ? appointmentData.paymentMethod : 'N/A';
         let paidAt = appointmentData && appointmentData.paidAt ? appointmentData.paidAt : null;
         let paidAtStr = 'N/A';
         if (paidAt && paidAt.seconds) {
@@ -124,16 +123,41 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (typeof paidAt === 'string' || typeof paidAt === 'number') {
             paidAtStr = new Date(paidAt).toLocaleString();
         }
-        paymentHistoryContainer.innerHTML = `
-            <div class="widget-header">
-                <h3>Payment Method History</h3>
-            </div>
-            <div class="payment-history-details">
-                <div><strong>Status:</strong> <span>${paymentStatus}</span></div>
-                <div><strong>Method:</strong> <span>${paymentMethod}</span></div>
-                <div><strong>Date Paid:</strong> <span>${paidAtStr}</span></div>
-            </div>
-        `;
+
+        // Always fetch payment method from Firestore user profile for history
+        let paymentMethod = 'N/A';
+        (async () => {
+            let customerId = appointmentData.userId || appointmentData.customerId || appointmentData.customerUid;
+            try {
+                const db = window.firebase.firestore();
+                if (!customerId) {
+                    // Try to find by fullName if no ID
+                    const usersSnapshot = await db.collection('users').where('fullName', '==', appointmentData.customer).limit(1).get();
+                    if (!usersSnapshot.empty) {
+                        customerId = usersSnapshot.docs[0].id;
+                    }
+                }
+                if (customerId) {
+                    const userDoc = await db.collection('users').doc(customerId).get();
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        paymentMethod = userData.paymentMethod || 'Not set';
+                    }
+                }
+            } catch (err) {
+                paymentMethod = 'Not set';
+            }
+            paymentHistoryContainer.innerHTML = `
+                <div class="widget-header">
+                    <h3>Payment Method History</h3>
+                </div>
+                <div class="payment-history-details">
+                    <div><strong>Status:</strong> <span>${paymentStatus}</span></div>
+                    <div><strong>Method:</strong> <span>${paymentMethod}</span></div>
+                    <div><strong>Date Paid:</strong> <span>${paidAtStr}</span></div>
+                </div>
+            `;
+        })();
         profileHistorySection.insertBefore(paymentHistoryContainer, trackerContainer.nextSibling);
 
         // Add event listener for status updates
@@ -142,10 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!step || !step.dataset.status) return;
 
             const newStatus = step.dataset.status;
-            // In a real app, you would have a function here to update the status in Firestore.
-            // For now, we'll just update the local data and re-render the tracker.
             appointmentData.status = newStatus;
-            createStatusTracker(newStatus); // Re-render the tracker
+            createStatusTracker(newStatus);
             if (typeof showSuccessToast === 'function') showSuccessToast(`Status updated to "${newStatus}"`);
         });
     };

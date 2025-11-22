@@ -917,18 +917,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         // Show payment modal
                         const modalOverlay = document.getElementById('modal-overlay');
                         const modalTitle = document.getElementById('modal-title');
-                        const modalBody = document.getElementById('modal-body');
                         const paymentModalContent = document.getElementById('payment-modal-content');
                         const paymentAmountInput = document.getElementById('payment-amount');
-                        const paymentMethodSelect = document.getElementById('payment-method');
-                        const paymentForm = document.getElementById('payment-form');
-                        const paymentCancelBtn = document.getElementById('payment-cancel-btn');
+                        const paymentMethodInput = document.getElementById('payment-method');
 
                         // Show payment modal and hide other content
                         document.querySelectorAll('.modal-content').forEach(content => {
                             content.style.display = 'none';
                         });
-
                         if (paymentModalContent) {
                             paymentModalContent.style.display = 'block';
                         }
@@ -938,16 +934,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (paymentAmountInput) {
                             paymentAmountInput.value = amount.toFixed(2);
                         }
-                        // Set payment method input to user's payment method
-                        const paymentMethodInput = document.getElementById('payment-method');
+
+                        // Always fetch payment method from Firestore user profile
                         if (paymentMethodInput) {
                             paymentMethodInput.value = 'Loading...';
-                            // Fetch user's payment method from Firestore
-                            let customerId = appointment.customerId || appointment.customer || appointment.customerUid;
+                            let customerId = appointment.customerId || appointment.userId || appointment.customerUid;
                             (async () => {
                                 try {
                                     const db = window.firebase.firestore();
                                     if (!customerId) {
+                                        // Try to find by fullName if no ID
                                         const usersSnapshot = await db.collection('users').where('fullName', '==', appointment.customer).limit(1).get();
                                         if (!usersSnapshot.empty) {
                                             customerId = usersSnapshot.docs[0].id;
