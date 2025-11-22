@@ -357,6 +357,88 @@ document.addEventListener('DOMContentLoaded', () => {
 
     populateServiceHistory(profileData);
 
+    // --- Populate Payment History ---
+    const populatePaymentHistory = async (profile) => {
+        const paymentHistoryContainer = document.getElementById('profile-payment-history-list');
+        if (!paymentHistoryContainer) return;
+        paymentHistoryContainer.innerHTML = '';
+
+        try {
+            let userId = profile.customerId || null;
+            if (!userId && profile.fullName) {
+                const db = window.firebase.firestore();
+                try {
+                    const userSnapshot = await db.collection('users')
+                        .where('fullName', '==', profile.fullName)
+                        .limit(1)
+                        .get();
+                    if (!userSnapshot.empty) {
+                        userId = userSnapshot.docs[0].id;
+                    }
+                } catch (err) {
+                    console.warn('Could not fetch userId from Firestore:', err);
+                }
+            }
+            if (!userId) return;
+            const db = window.firebase.firestore();
+            const bookingsSnapshot = await db.collection('bookings')
+                .where('userId', '==', userId)
+                .where('paymentStatus', '==', 'Paid')
+                .get();
+            let paymentHistory = [];
+            if (!bookingsSnapshot.empty) {
+                paymentHistory = bookingsSnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    // Parse paidAt
+                    let paidAt = data.paidAt;
+                    let paidAtDate = null;
+                    if (paidAt && typeof paidAt.toDate === 'function') paidAtDate = paidAt.toDate();
+                    else if (paidAt && paidAt.seconds) paidAtDate = new Date(paidAt.seconds * 1000);
+                    else if (typeof paidAt === 'string' || typeof paidAt === 'number') paidAtDate = new Date(paidAt);
+                    return {
+                        paidAt: paidAtDate,
+                        paymentMethod: data.paymentMethod || 'N/A',
+                        paymentStatus: data.paymentStatus || 'N/A',
+                        price: data.price || 'N/A',
+                    };
+                });
+            }
+            if (paymentHistory.length === 0) {
+                paymentHistoryContainer.innerHTML = '<div class="payment-history-empty">No payment history found.</div>';
+                return;
+            }
+            // Sort by most recent
+            paymentHistory.sort((a, b) => (b.paidAt || 0) - (a.paidAt || 0));
+            let html = '';
+            paymentHistory.forEach(item => {
+                const paidAtStr = item.paidAt ? item.paidAt.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
+                html += `<div class="payment-history-card">
+                    <div class="payment-history-row">
+                        <span class="label">Date Paid</span>
+                        <span class="value">${paidAtStr}</span>
+                    </div>
+                    <div class="payment-history-row">
+                        <span class="label">Method</span>
+                        <span class="value">${item.paymentMethod}</span>
+                    </div>
+                    <div class="payment-history-row">
+                        <span class="label">Status</span>
+                        <span class="value">${item.paymentStatus}</span>
+                    </div>
+                    <div class="payment-history-row">
+                        <span class="label">Amount</span>
+                        <span class="value">${item.price}</span>
+                    </div>
+                </div>`;
+            });
+            paymentHistoryContainer.innerHTML = html;
+        } catch (err) {
+            paymentHistoryContainer.innerHTML = '<div class="payment-history-empty">Error loading payment history.</div>';
+        }
+    };
+
+    populatePaymentHistory(profileData);
+
     // --- Back Button Functionality ---
     const backBtn = document.getElementById('back-btn');
     if (backBtn) {
