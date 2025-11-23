@@ -58,9 +58,31 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Listens for real-time updates to the conversations list from Firestore.
      */
     const listenForConversations = () => {
-        // Chat rooms collection listener removed
-        chats = [];
-        renderConversationList(searchInput.value);
+        db.collection('chat_rooms')
+            .orderBy('timestamp', 'desc')
+            .onSnapshot(
+                (snapshot) => {
+                    chats = [];
+                    snapshot.docs.forEach((doc) => {
+                        const data = doc.data();
+                        chats.push({
+                            id: doc.id,
+                            customerName: data.customerName || 'Unknown',
+                            lastMessage: data.lastMessage || '',
+                            timestamp: formatTimestamp(data.timestamp),
+                            profilePic: data.profilePic || 'https://via.placeholder.com/40',
+                            isUnread: data.isUnread || false,
+                            isVerified: data.isVerified || false,
+                            email: data.email || '',
+                            userId: data.userId || doc.id
+                        });
+                    });
+                    renderConversationList(searchInput.value);
+                },
+                (error) => {
+                    console.error('Error listening to chat_rooms:', error);
+                }
+            );
     };
 
     const formatTimestamp = (firestoreTimestamp) => {
@@ -207,8 +229,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
         `;
 
-        // Update message list
-        messageListEl.innerHTML = '<p class="text-muted" style="text-align:center;">Messages collection listener removed.</p>';
+        // Listen to messages subcollection in real-time
+        unsubscribeMessages = db.collection('chat_rooms')
+            .doc(conversationId)
+            .collection('messages')
+            .orderBy('timestamp', 'asc')
+            .onSnapshot(
+                (snapshot) => {
+                    messageListEl.innerHTML = '';
+                    snapshot.docs.forEach((doc) => {
+                        const msg = doc.data();
+                        const isAdmin = msg.isAdmin || msg.senderRole === 'admin';
+                        const messageEl = document.createElement('div');
+                        messageEl.className = `chat-message ${isAdmin ? 'admin' : 'user'}`;
+                        messageEl.innerHTML = `
+                            <div class="message-content">
+                                <p>${msg.text || ''}</p>
+                                <small class="message-time">${formatTimestamp(msg.timestamp)}</small>
+                            </div>
+                        `;
+                        messageListEl.appendChild(messageEl);
+                    });
+                    // Scroll to the bottom
+                    messageListEl.scrollTop = messageListEl.scrollHeight;
+                },
+                (error) => {
+                    console.error('Error listening to messages:', error);
+                    messageListEl.innerHTML = '<p class="text-muted" style="text-align:center;">Error loading messages.</p>';
+                }
+            );
 
         // Scroll to the bottom
         messageListEl.scrollTop = messageListEl.scrollHeight;
