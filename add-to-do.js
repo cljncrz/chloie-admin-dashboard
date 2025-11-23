@@ -1,10 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Ensure db is defined using the compat Firestore API
+    const db = window.firebase && window.firebase.firestore ? window.firebase.firestore() : (typeof firebase !== 'undefined' && firebase.firestore ? firebase.firestore() : null);
     const addToDoForm = document.getElementById('add-todo-form');
 
-    if (addToDoForm) {
+    if (addToDoForm && db) {
         addToDoForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const todoTextInput = document.getElementById('todo-text');
             const todoDueDateInput = document.getElementById('todo-due-date');
             const todoDueTimeInput = document.getElementById('todo-due-time');
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Add the new to-do item to Firestore
+                // Add the new to-do item to Firestore using compat API
                 const newTodo = {
                     text: todoTextInput.value.trim(),
                     dueDate: todoDueDateInput.value || null,

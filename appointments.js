@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const apptRowsPerPage = 25;
     let walkinCurrentPage = 1;
     const walkinRowsPerPage = 25;
+    let archivedCurrentPage = 1;
+    const archivedRowsPerPage = 25;
     let currentSort = { column: 'datetime', direction: 'desc' }; // Default sort
 
 
@@ -60,6 +62,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn('Could not fetch current user full name', e);
         }
         return null;
+    };
+    // Helper: get a server timestamp if Firestore FieldValue is available, otherwise use JS Date
+    const getServerTimestamp = () => {
+        try {
+            if (window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue && typeof window.firebase.firestore.FieldValue.serverTimestamp === 'function') {
+                return window.firebase.firestore.FieldValue.serverTimestamp();
+            }
+            if (window.firebase && window.firebase.firestore && window.firebase.firestore.Timestamp && typeof window.firebase.firestore.Timestamp.now === 'function') {
+                return window.firebase.firestore.Timestamp.now();
+            }
+        } catch (e) {
+            // fall through
+        }
+        return new Date();
     };
     // --- New function to update the quick stats on the appointment page ---
     const updateAppointmentPageStats = () => {
@@ -338,8 +354,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 // Initial population of tables
+                // Fetch archived records from Firestore (authoritative source)
+                await fetchArchivedFromFirestore();
+
                 populateAppointmentsTable();
                 populateWalkinsTable(); // Assuming walk-ins might also come from bookings or a separate fetch
+                renderArchivedTable();
                 updateAppointmentPageStats(); // Update stats after fetching data
 
             } catch (error) {
@@ -368,8 +388,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const searchTerm = searchInput.value.toLowerCase();
             const selectedStatus = statusFilter ? statusFilter.value.toLowerCase() : 'all';
 
-            // Only allow these statuses
-            const allowedStatuses = ['pending', 'approved', 'in progress', 'completed'];
+            // Only allow these statuses (include both 'approved' and 'approve')
+            const allowedStatuses = ['pending', 'approved', 'approve', 'in progress', 'completed'];
             let filteredAppointments = appointments.filter(appt => {
                 const status = (appt.status || '').toLowerCase();
                 if (!allowedStatuses.includes(status)) return false;
@@ -412,7 +432,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             paginatedAppointments.forEach(appt => {
                 const row = document.createElement('tr');
                 const statusClass = appt.status.toLowerCase().replace(' ', '-');
-                // Add data attributes for modal functionality if needed later
                 row.dataset.serviceId = appt.serviceId;
                 row.dataset.plate = appt.plate;
                 row.dataset.carName = appt.carName;
@@ -424,13 +443,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                 row.dataset.status = appt.status;
                 row.dataset.paymentStatus = appt.paymentStatus;
 
-                // Conditionally add action buttons based on status
+                // Action buttons
                 let actionButtons = '';
                 if (appt.status === 'Pending') {
+                    const techAssigned = appt.technician && appt.technician !== 'Unassigned';
+                    let chooseTechIndication = '';
+                    if (!techAssigned) {
+                        chooseTechIndication = `
+                            <span class="choose-tech-indication" style="
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 0.3em;
+                                background: #fff3cd;
+                                color: #856404;
+                                border-radius: 12px;
+                                font-size: 0.92em;
+                                padding: 2px 10px 2px 7px;
+                                margin-top: 4px;
+                                margin-left: 0;
+                                border: 1px solid #ffeeba;
+                                font-weight: 500;">
+                                <span class="material-symbols-outlined" style="font-size:1.1em;vertical-align:middle;">info</span>
+                                Choose technician first
+                            </span>`;
+                    }
                     actionButtons = `
-                        <button class="action-icon-btn approve-btn" title="Approve Appointment">
+                        <button class="action-icon-btn approve-btn" title="${techAssigned ? 'Approve Appointment' : 'Choose technician first'}" ${techAssigned ? '' : 'disabled'} data-service-id="${appt.serviceId}">
                             <span class="material-symbols-outlined">check_circle</span>
-                        </button>`;
+                        </button>
+                        ${chooseTechIndication}`;
                 } else if (appt.status === 'Approve') {
                     actionButtons = `
                         <button class="action-icon-btn start-service-btn" title="Start Service">
@@ -444,11 +485,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 const technicianDropdown = window.appData.createTechnicianDropdown(appt.technician, appt.status !== 'Pending');
-
-                const paymentStatus = appt.paymentStatus || 'Unpaid'; // Default to 'Unpaid' if undefined
+                                // Add event listener to technician dropdown to enable/disable Approve button
+                                setTimeout(() => {
+                                    const rowEl = row;
+                                    const techSelect = rowEl.querySelector('.technician-select');
+                                    const approveBtn = rowEl.querySelector('.approve-btn');
+                                    if (techSelect && approveBtn) {
+                                        const updateApproveBtnState = () => {
+                                            const selectedTech = techSelect.value;
+                                            const enabled = selectedTech && selectedTech !== 'Unassigned';
+                                            approveBtn.disabled = !enabled;
+                                            approveBtn.title = enabled ? 'Approve Appointment' : 'Choose technician first';
+                                        };
+                                        techSelect.addEventListener('change', updateApproveBtnState);
+                                        updateApproveBtnState();
+                                    }
+                                }, 0);
+                const paymentStatus = appt.paymentStatus || 'Unpaid';
                 const paymentStatusClass = paymentStatus.toLowerCase();
                 const paymentBadge = `<span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span>`;
-
                 let paymentActionButton = '';
                 if (paymentStatus === 'Unpaid') {
                     paymentActionButton = `
@@ -456,19 +511,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <span class="material-symbols-outlined">payments</span>
                         </button>`;
                 }
-                // Add note if status is Approve
-                let approveNote = '';
-                if (appt.status === 'Approve') {
-                    approveNote = '';
-                }
+                // --- Status badge design (copied from walk-in, with Approved hover) ---
                 let statusDisplay = '';
                 if (appt.status === 'Approve') {
-                    statusDisplay = '<span class="completed">Approved</span>';
+                    statusDisplay = `<span class="status-badge approved" title="Technician is waiting for the vehicle">Approved!</span>`;
+                } else if (appt.status === 'Pending') {
+                    statusDisplay = `<span class="status-badge pending">Pending</span>`;
+                } else if (appt.status === 'In Progress') {
+                    statusDisplay = `<span class="status-badge in-progress">In Progress</span>`;
                 } else if (appt.status === 'Completed') {
-                    statusDisplay = '<span class="completed">Completed</span>';
+                    statusDisplay = `<span class="status-badge completed">Completed</span>`;
                 } else {
-                    statusDisplay = `<span class="${statusClass}">${appt.status}</span>`;
+                    statusDisplay = `<span class="status-badge ${statusClass}">${appt.status}</span>`;
                 }
+                const normalizedPaymentStatus = String(paymentStatus || 'Unpaid').toLowerCase();
+                const cancelDisabledAttr = (String(appt.status || '').toLowerCase() === 'completed' && normalizedPaymentStatus === 'paid') ? 'disabled title="Cannot cancel a completed and paid appointment"' : '';
+
                 row.innerHTML = `
                     <td>${appt.serviceId}</td>
                     <td>${appt.plate}</td>
@@ -483,7 +541,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="text-center">
                         ${actionButtons}
                         ${paymentActionButton}
-                        <button class="action-icon-btn cancel-btn" title="Cancel Appointment">
+                        <button class="action-icon-btn cancel-btn" title="Cancel Appointment" ${cancelDisabledAttr}>
                             <span class="material-symbols-outlined">cancel</span>
                         </button>
                     </td>
@@ -614,6 +672,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <span class="material-symbols-outlined">payments</span>
                         </button>`;
                 }
+                // Determine cancel disabled state for walk-ins (Completed + Paid)
+                const walkinPaymentStatus = String(walkin.paymentStatus || 'Unpaid').toLowerCase();
+                const walkinCancelDisabledAttr = (String(walkin.status || '').toLowerCase() === 'completed' && walkinPaymentStatus === 'paid') ? 'disabled title="Cannot cancel a completed and paid appointment"' : '';
+
                 row.innerHTML = `
                     <td>${walkin.plate}</td>
                     <td>${walkin.carName}</td>
@@ -627,7 +689,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="text-center">
                         ${actionButtons}
                         ${paymentActionButton}
-                        <button class="action-icon-btn cancel-btn" title="Cancel Appointment">
+                        <button class="action-icon-btn cancel-btn" title="Cancel Appointment" ${walkinCancelDisabledAttr}>
                             <span class="material-symbols-outlined">cancel</span>
                         </button>
                     </td>
@@ -729,10 +791,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const appointments = window.appData.appointments || [];
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
                     if (appointment && appointment.status === 'Pending') {
+                        // Require technician assignment before approving
+                        if (!appointment.technician || appointment.technician === 'Unassigned') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Please assign a technician before approving this appointment.', 'error');
+                            else alert('Please assign a technician before approving this appointment.');
+                            return;
+                        }
                         const db = window.firebase.firestore();
                         try {
                             await db.collection('bookings').doc(appointment.serviceId).update({
-                                status: 'Approve'
+                                status: 'Approve',
+                                technician: appointment.technician
                             });
                         } catch (err) {
                             console.error('Error updating booking to Approve:', err);
@@ -742,8 +811,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                         appointment.status = 'Approve';
                         row.dataset.status = 'Approve';
+                        // Persist selected technician to the row and disable technician select now that it's approved
+                        row.dataset.technician = appointment.technician;
+                        const techSelectElem = row.querySelector('.technician-select');
+                        if (techSelectElem) {
+                            try { techSelectElem.value = appointment.technician; techSelectElem.disabled = true; } catch (e) { /* ignore */ }
+                        }
                         const statusCell = row.querySelector('td:nth-last-child(3)');
-                        statusCell.innerHTML = `<span class="approve">Approve</span><div class=\"status-note\" style=\"color: #1976d2; font-size: 0.95em; margin-top: 4px;\">Ask customer to get their vehicle to kingsley site</div>`;
+                        statusCell.innerHTML = `<span class="approve">Approved — Waiting for customer's vehicle</span>`;
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Appointment for ${appointment.customer} has been approved.`);
                         updateAppointmentPageStats();
                         // --- Send notification to mobile app user ---
@@ -825,11 +900,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </button>
                         `);
 
-                        // Disable technician select and cancel button for this row to make status immutable
+                        // Disable technician select for this row to prevent reassignment once started
                         const techSelect = row.querySelector('.technician-select');
                         if (techSelect) techSelect.disabled = true;
-                        const cancelBtn = row.querySelector('.cancel-btn');
-                        if (cancelBtn) cancelBtn.disabled = true;
                     }
                     return;
                 }
@@ -871,6 +944,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                         // Decrease the technician's task count
                         decreaseTechnicianTaskCount(appointment.technician);
+                        // Only disable cancel button after completion if payment is Paid
+                        try {
+                            const cancelBtnRow = row.querySelector('.cancel-btn');
+                            const currentPayment = String(appointment.paymentStatus || appointment.payment || 'Unpaid').toLowerCase();
+                            if (cancelBtnRow && currentPayment === 'paid') {
+                                cancelBtnRow.disabled = true;
+                                cancelBtnRow.title = 'Cannot cancel a completed and paid appointment';
+                            }
+                        } catch (e) {
+                            console.debug('Could not disable cancel button after completion', e);
+                        }
 
                         // --- Send notification to mobile app user ---
                         sendServiceCompletedNotification(appointment);
@@ -886,30 +970,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (appointment) {
                         const originalStatus = appointment.status;
 
-                        // Prevent cancelling once service is In Progress
-                        if (originalStatus === 'In Progress') {
-                            if (typeof showSuccessToast === 'function') showSuccessToast('Cannot cancel service after it has started.', 'error');
-                            else alert('Cannot cancel service after it has started.');
+                        // Only block cancellation when the appointment is both Completed and Paid
+                        const currentPaymentStatus = String(appointment.paymentStatus || appointment.payment || 'Unpaid').toLowerCase();
+                        if (String(originalStatus).toLowerCase() === 'completed' && currentPaymentStatus === 'paid') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Cannot cancel a completed and paid appointment.', 'error');
+                            else alert('Cannot cancel a completed and paid appointment.');
                             return;
                         }
 
-                        // Instead of immediately cancelling, open the cancel modal to collect reason and notes
-                        openCancelModal(appointment, row, originalStatus);
-
-                        // UI update will be handled after the admin confirms cancel in the modal
-
-                        // If it was a pending or in-progress task, free up the technician
-                        if (originalStatus === 'Pending' || originalStatus === 'In Progress') {
-                            decreaseTechnicianTaskCount(appointment.technician);
+                        // Navigate to the dedicated cancel page so admin can provide reason/notes
+                        // Store the appointment and its original status in sessionStorage for the cancel page
+                        try {
+                            sessionStorage.setItem('appointmentToCancel', JSON.stringify({ appointment, originalStatus }));
+                            // Navigate to the cancel page
+                            window.location.href = 'cancel-appointment.html';
+                        } catch (err) {
+                            console.error('Error preparing cancel page:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Could not open cancel page.', 'error');
                         }
-
-                        // --- Send notification to mobile app user ---
-                        sendAppointmentCancelledNotification(appointment);
-
-                        // Re-render the table to reflect filter/sort changes if needed
-                        // Just re-render the table with current filters
-                        updateAppointmentPageStats(); // Refresh stats
-                        populateAppointmentsTable();
                     } 
                     return;
                 }
@@ -981,6 +1059,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 // Send notification to mobile app user
                                 if (typeof sendPaymentReceivedNotification === 'function') {
                                     sendPaymentReceivedNotification(appointment);
+                                }
+                                // If appointment is already completed, disable cancel button now that it's paid
+                                try {
+                                    const cancelBtnRow = row.querySelector('.cancel-btn');
+                                    if (cancelBtnRow && String(appointment.status || '').toLowerCase() === 'completed') {
+                                        cancelBtnRow.disabled = true;
+                                        cancelBtnRow.title = 'Cannot cancel a completed and paid appointment';
+                                    }
+                                } catch (e) {
+                                    console.debug('Could not disable cancel button after payment', e);
                                 }
                             } catch (err) {
                                 console.error('Error updating payment status:', err, {
@@ -1118,11 +1206,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </button>
                         `);
 
-                        // Disable technician select and cancel button for this row to make status immutable
+                        // Disable technician select for this row to prevent reassignment once started
                         const techSelect = row.querySelector('.technician-select');
                         if (techSelect) techSelect.disabled = true;
-                        const cancelBtn = row.querySelector('.cancel-btn');
-                        if (cancelBtn) cancelBtn.disabled = true;
                     }
                     return;
                 }
@@ -1175,10 +1261,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (walkin) {
                         const originalStatus = walkin.status;
 
-                        // Prevent cancelling once service is In Progress
-                        if (originalStatus === 'In Progress') {
-                            if (typeof showSuccessToast === 'function') showSuccessToast('Cannot cancel service after it has started.', 'error');
-                            else alert('Cannot cancel service after it has started.');
+                        // Only block cancellation when the walk-in is Completed and Paid
+                        const currentPaymentStatus = String(walkin.paymentStatus || walkin.payment || 'Unpaid').toLowerCase();
+                        if (String(originalStatus).toLowerCase() === 'completed' && currentPaymentStatus === 'paid') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Cannot cancel a completed and paid appointment.', 'error');
+                            else alert('Cannot cancel a completed and paid appointment.');
                             return;
                         }
 
@@ -1249,6 +1336,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                         
                         // Remove the button after it's clicked
                         markPaidButton.remove();
+                                // If walk-in is already completed, disable cancel button now that it's paid
+                                try {
+                                    const cancelBtnRow = row.querySelector('.cancel-btn');
+                                    if (cancelBtnRow && String(walkin.status || '').toLowerCase() === 'completed') {
+                                        cancelBtnRow.disabled = true;
+                                        cancelBtnRow.title = 'Cannot cancel a completed and paid appointment';
+                                    }
+                                } catch (e) {
+                                    console.debug('Could not disable cancel button on walkin after payment', e);
+                                }
                     }
                     return;
                 }
@@ -1324,6 +1421,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     row.dataset.technician = oldTechnicianName;
                     if (typeof showSuccessToast === 'function') showSuccessToast(`Error: Could not assign technician.`, 'error');
                 }
+                // Re-render the table so the Approve button updates its enabled/disabled state
+                populateAppointmentsTable();
             });
 
             // Walk-ins Table
@@ -1332,6 +1431,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             walkinContainer.querySelector('.status-filter')?.addEventListener('change', () => { walkinCurrentPage = 1; populateWalkinsTable(); });
             walkinContainer.querySelector('.table-pagination [data-action="prev"]').addEventListener('click', () => { if (walkinCurrentPage > 1) { walkinCurrentPage--; populateWalkinsTable(); } });
             walkinContainer.querySelector('.table-pagination [data-action="next"]').addEventListener('click', () => { walkinCurrentPage++; populateWalkinsTable(); });
+
+            // Archived Table: search + pagination
+            const archivedContainerEl = document.getElementById('archived-appointments-table');
+            if (archivedContainerEl) {
+                const archivedSearch = archivedContainerEl.querySelector('#archived-appointment-search');
+                if (archivedSearch) archivedSearch.addEventListener('input', () => { archivedCurrentPage = 1; archivedSearchTerm = archivedSearch.value || ''; renderArchivedTable(); });
+                const archivedPrev = archivedContainerEl.querySelector('.table-pagination [data-action="prev"]');
+                const archivedNext = archivedContainerEl.querySelector('.table-pagination [data-action="next"]');
+                if (archivedPrev) archivedPrev.addEventListener('click', () => { if (archivedCurrentPage > 1) { archivedCurrentPage--; renderArchivedTable(); } });
+                if (archivedNext) archivedNext.addEventListener('click', () => { archivedCurrentPage++; renderArchivedTable(); });
+            }
 
             // Handle Technician Re-assignment for Walk-ins
             walkinContainer.querySelector('tbody').addEventListener('change', async (e) => { // Make the event listener async
@@ -1407,11 +1517,143 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (mainAppointmentsContainer) { // Only run these on the main appointments page
             populateStatusFilters();
             setupTableInteractions();
+            // Add 'Clear Completed (Paid)' button to table controls
+            try {
+                const tableControls = document.querySelector('#main-appointments-table-container .table-controls');
+                if (tableControls && !document.getElementById('clear-completed-paid-btn')) {
+                    const clearBtn = document.createElement('button');
+                    clearBtn.id = 'clear-completed-paid-btn';
+                    clearBtn.className = 'btn-secondary';
+                    clearBtn.style.marginLeft = '8px';
+                    clearBtn.textContent = 'Clear Completed (Paid)';
+                    tableControls.appendChild(clearBtn);
+
+                    clearBtn.addEventListener('click', async () => {
+                        const appointments = window.appData.appointments || [];
+                        const walkins = window.appData.walkins || [];
+                        const toArchiveBookings = appointments.filter(a => String(a.status || '').toLowerCase() === 'completed' && String(a.paymentStatus || a.payment || '').toLowerCase() === 'paid');
+                        const toArchiveWalkins = walkins.filter(w => String(w.status || '').toLowerCase() === 'completed' && String(w.paymentStatus || w.payment || '').toLowerCase() === 'paid');
+                        const count = toArchiveBookings.length + toArchiveWalkins.length;
+                        if (count === 0) {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('No completed & paid appointments to archive.', 'info');
+                            else alert('No completed & paid appointments to archive.');
+                            return;
+                        }
+
+                        const confirmMsg = `Archive ${count} completed & paid appointment${count > 1 ? 's' : ''}? This will move them to the archive collections and remove the originals from active tables.`;
+                        if (!confirm(confirmMsg)) return;
+
+                        try {
+                            const db = window.firebase.firestore();
+                            const batch = db.batch();
+
+                            toArchiveBookings.forEach(b => {
+                                const id = b.serviceId || b.id;
+                                if (!id) return;
+                                const archiveRef = db.collection('archived_bookings').doc(id);
+                                const originalRef = db.collection('bookings').doc(id);
+                                const dataToWrite = { ...b, archivedAt: getServerTimestamp(), archivedFrom: 'bookings' };
+                                batch.set(archiveRef, dataToWrite);
+                                batch.delete(originalRef);
+                            });
+
+                            toArchiveWalkins.forEach(w => {
+                                const id = w.id || w.serviceId;
+                                if (!id) return;
+                                const archiveRef = db.collection('archived_walkins').doc(id);
+                                const originalRef = db.collection('walkins').doc(id);
+                                const dataToWrite = { ...w, archivedAt: getServerTimestamp(), archivedFrom: 'walkins' };
+                                batch.set(archiveRef, dataToWrite);
+                                batch.delete(originalRef);
+                            });
+
+                            await batch.commit();
+
+                            // Refresh archived lists from Firestore so UI matches persisted data
+                            await fetchArchivedFromFirestore();
+
+                            // Remove archived records from local model and re-render main tables
+                            window.appData.appointments = appointments.filter(a => !(String(a.status || '').toLowerCase() === 'completed' && String(a.paymentStatus || a.payment || '').toLowerCase() === 'paid'));
+                            window.appData.walkins = walkins.filter(w => !(String(w.status || '').toLowerCase() === 'completed' && String(w.paymentStatus || w.payment || '').toLowerCase() === 'paid'));
+                            populateAppointmentsTable();
+                            populateWalkinsTable();
+                            renderArchivedTable();
+                            updateAppointmentPageStats();
+                            if (typeof showSuccessToast === 'function') showSuccessToast(`${count} appointment${count > 1 ? 's' : ''} archived.`);
+                        } catch (err) {
+                            // Enhanced diagnostics for permission/network issues
+                            try {
+                                console.error('Error archiving records:', err);
+                                const auth = window.firebase && window.firebase.auth ? window.firebase.auth() : null;
+                                const currentUser = auth && auth.currentUser ? auth.currentUser : null;
+                                console.group('Archive diagnostic');
+                                console.log('Current user object:', currentUser);
+                                if (currentUser && typeof auth.getIdToken === 'function') {
+                                    try {
+                                        const token = await auth.getIdToken(true).catch(tErr => {
+                                            console.warn('Could not refresh/get ID token:', tErr);
+                                            return null;
+                                        });
+                                        if (token) {
+                                            console.log('ID token (first 80 chars):', String(token).slice(0,80) + '...');
+                                        } else {
+                                            console.log('No ID token available (user may be unauthenticated)');
+                                        }
+                                    } catch (tErr) {
+                                        console.warn('ID token retrieval error:', tErr);
+                                    }
+                                }
+
+                                if (err && err.code) {
+                                    console.log('Firestore error code:', err.code);
+                                }
+                                if (err && err.message) {
+                                    console.log('Firestore error message:', err.message);
+                                }
+                                console.groupEnd();
+                            } catch (diagErr) {
+                                console.error('Diagnostic logging failed:', diagErr);
+                            }
+
+                            // Friendly UI feedback
+                            const permMsg = err && (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission')));
+                            if (permMsg) {
+                                const userMsg = 'Archiving failed: Missing or insufficient permissions. Check Firestore security rules and that you are signed-in with an account that has admin rights.';
+                                if (typeof showSuccessToast === 'function') showSuccessToast(userMsg, 'error');
+                                else alert(userMsg);
+                            } else {
+                                if (typeof showSuccessToast === 'function') showSuccessToast('Failed to archive records. See console for details.', 'error');
+                                else alert('Failed to archive records. See console for details.');
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.debug('Could not insert Clear Completed button', e);
+            }
             fetchAndPopulateAppointments(); // Fetch data from Firestore on initial load
             updateAppointmentPageStats(); // Call the new function to update stats
             if (typeof window.initializeTableFunctionality === 'function') {
                 window.initializeTableFunctionality('#main-appointments-table');
                 window.initializeTableFunctionality('#walk-in-appointments-table');
+            }
+            // Collapse toggle for archived table
+            try {
+                // Archive table redesign: show/hide with a single button
+                const showArchivedBtn = document.getElementById('show-archived-btn');
+                const archivedContainer = document.getElementById('archived-appointments-table-container');
+                if (showArchivedBtn && archivedContainer) {
+                    let visible = false;
+                    showArchivedBtn.addEventListener('click', () => {
+                        visible = !visible;
+                        archivedContainer.style.display = visible ? '' : 'none';
+                        showArchivedBtn.innerHTML = visible
+                          ? '<span class="material-symbols-outlined">close</span> Hide Archived Services'
+                          : '<span class="material-symbols-outlined">history</span> Show Archived Services';
+                    });
+                }
+            } catch (e) {
+                console.debug('Could not hook archived collapse toggle', e);
             }
         }
 
@@ -1731,105 +1973,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- Cancel Appointment Modal & Handler ---
-    const cancelModalContent = document.getElementById('cancel-appointment-content');
-    const cancelForm = document.getElementById('cancel-appointment-form');
-    const cancelReasonSelect = document.getElementById('cancel-reason');
-    const cancelNotesInput = document.getElementById('cancel-notes');
-    const cancelCloseBtn = document.getElementById('cancel-cancel-btn');
-
-    // Hold selected appointment while the modal is open
-    let pendingCancelAppointment = null;
-
-    const openCancelModal = (appointment, row, originalStatus) => {
-    // Keep a copy of original status so the modal logic can decide about technician counting
-    if (appointment && originalStatus) appointment._originalStatus = originalStatus;
-        if (!appointment) return;
-        pendingCancelAppointment = { appointment, row };
-        // Show modal with cancel form
-        document.querySelectorAll('.modal-content').forEach(c => c.classList.remove('active'));
-        if (cancelModalContent) cancelModalContent.classList.add('active');
-        if (cancelReasonSelect) cancelReasonSelect.value = '';
-        if (cancelNotesInput) cancelNotesInput.value = '';
-        document.getElementById('modal-title').textContent = `Cancel Appointment: ${appointment.customer}`;
-        document.getElementById('modal-overlay').classList.add('show');
-        document.body.classList.add('modal-open');
-    };
-
-    const closeCancelModal = () => {
-        pendingCancelAppointment = null;
-        document.getElementById('modal-overlay').classList.remove('show');
-        document.body.classList.remove('modal-open');
-        if (cancelModalContent) cancelModalContent.classList.remove('active');
-    };
-
-    if (cancelCloseBtn) {
-        cancelCloseBtn.addEventListener('click', () => {
-            closeCancelModal();
-        });
-    }
-
-    if (cancelForm) {
-        cancelForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!pendingCancelAppointment) return closeCancelModal();
-
-            const { appointment, row } = pendingCancelAppointment;
-            const reason = cancelReasonSelect?.value || '';
-            const notes = cancelNotesInput?.value || '';
-
-            if (!reason) {
-                if (typeof showSuccessToast === 'function') showSuccessToast('Please select a cancellation reason', 'error');
-                else alert('Please select a cancellation reason');
-                return;
-            }
-
-            try {
-                const db = window.firebase.firestore();
-                await db.collection('bookings').doc(appointment.serviceId).update({
-                    status: 'Cancelled',
-                    cancelledAt: window.firebase.firestore().FieldValue.serverTimestamp(),
-                    cancellationReason: reason,
-                    cancellationNotes: notes,
-                    cancelledBy: currentUserFullName || null
-                });
-
-                // Update local model
-                appointment.status = 'Cancelled';
-                appointment.cancelledAt = new Date().toISOString();
-                appointment.cancellationReason = reason;
-                appointment.cancellationNotes = notes;
-                appointment.cancelledBy = currentUserFullName || null;
-
-                // Update UI row
-                row.dataset.status = 'Cancelled';
-                const statusCell = row.querySelector('td:nth-last-child(3)');
-                if (statusCell) statusCell.innerHTML = `<span class="cancelled">Cancelled</span>`;
-
-                // Decrease technician if needed
-                if (appointment.technician && (appointment._originalStatus === 'Pending' || appointment._originalStatus === 'In Progress')) {
-                    decreaseTechnicianTaskCount(appointment.technician);
-                }
-
-                // Render cancelled table
-                renderCancelledTable();
-
-                // Notifications
-                if (typeof sendAppointmentCancelledNotification === 'function') {
-                    sendAppointmentCancelledNotification(appointment);
-                }
-
-                // Close modal and refresh lists
-                closeCancelModal();
-                updateAppointmentPageStats();
-                populateAppointmentsTable();
-                if (typeof showSuccessToast === 'function') showSuccessToast('Appointment cancelled.');
-            } catch (err) {
-                console.error('Error cancelling appointment:', err);
-                if (typeof showSuccessToast === 'function') showSuccessToast('Failed to cancel appointment (database error).', 'error');
-            }
-        });
-    }
+    // Cancel flow has been moved to a dedicated page (`cancel-appointment.html`).
+    // The old modal-based cancel logic was removed. When a cancel button is clicked
+    // the code now navigates to the cancel page and stores the selected appointment
+    // in sessionStorage under the key `appointmentToCancel` for the cancel page to handle.
 
     // Close modal when clicking outside of it
     if (modalOverlay) {
@@ -1855,20 +2002,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!cancelledTableBody) return;
 
         // Combine cancelled appointments and cancelled walk-ins
-        const cancelledAppointments = (window.appData.appointments || []).filter(a => String(a.status || '').toLowerCase() === 'cancelled' || String(a.status || '') === 'Cancelled');
-        const cancelledWalkins = (window.appData.walkins || []).filter(w => String(w.status || '').toLowerCase() === 'cancelled' || String(w.status || '') === 'Cancelled');
-        // Normalize walk-in fields to match appointment fields for table rendering
-        const normalizedWalkins = cancelledWalkins.map(w => ({
-            serviceId: w.id || w.serviceId || '',
-            customer: w.customer || w.carName || w.plate || 'Walk-in',
-            service: w.service || '',
-            datetime: w.datetime || '',
-            cancellationReason: w.cancellationReason || '',
-            cancellationNotes: w.cancellationNotes || '',
-            cancelledAt: w.cancelledAt || '',
-            // Add any other fields needed for rendering or actions
-        }));
-        const cancelled = [...cancelledAppointments, ...normalizedWalkins];
+        const cancelledAppointments = (window.appData.appointments || [])
+            .filter(a => String(a.status || '').toLowerCase() === 'cancelled' || String(a.status || '') === 'Cancelled')
+            .map(a => ({
+                ...a,
+                customer: a.customer || a.customerName || a.fullName || a.carName || a.plate || 'N/A',
+                service: a.service || a.serviceNames || a.serviceName || '',
+                datetime: a.datetime || (a.datetimeRaw ? new Date(a.datetimeRaw).toLocaleString() : (a.cancelledAt ? new Date(a.cancelledAt.toDate ? a.cancelledAt.toDate() : a.cancelledAt).toLocaleString() : '')),
+                cancellationReason: a.cancellationReason || '',
+                cancellationNotes: a.cancellationNotes || '',
+                cancelledAt: a.cancelledAt || ''
+            }));
+
+        const cancelledWalkins = (window.appData.walkins || [])
+            .filter(w => String(w.status || '').toLowerCase() === 'cancelled' || String(w.status || '') === 'Cancelled')
+            .map(w => ({
+                serviceId: w.id || w.serviceId || '',
+                customer: w.customer || w.customerName || w.fullName || w.carName || w.plate || 'Walk-in',
+                service: w.service || w.serviceNames || '',
+                datetime: w.datetime || (w.datetimeRaw ? new Date(w.datetimeRaw).toLocaleString() : (w.cancelledAt ? new Date(w.cancelledAt.toDate ? w.cancelledAt.toDate() : w.cancelledAt).toLocaleString() : '')),
+                cancellationReason: w.cancellationReason || '',
+                cancellationNotes: w.cancellationNotes || '',
+                cancelledAt: w.cancelledAt || ''
+            }));
+
+        const cancelled = [...cancelledAppointments, ...cancelledWalkins];
 
         // Apply search filter
         const filtered = cancelled.filter(a => {
@@ -1952,6 +2110,149 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch (err) {
                     console.error('Error reinstating appointment:', err);
                     if (typeof showSuccessToast === 'function') showSuccessToast('Failed to reinstate appointment.', 'error');
+                }
+            }
+        });
+    }
+
+    // --- Archived Appointments Table ---
+    // Fetch archived documents from Firestore and populate window.appData
+    async function fetchArchivedFromFirestore() {
+        try {
+            const db = window.firebase.firestore();
+            // Order by archivedAt if available so newest appear first
+            const [archivedBookingsSnapshot, archivedWalkinsSnapshot] = await Promise.all([
+                db.collection('archived_bookings').orderBy('archivedAt', 'desc').get(),
+                db.collection('archived_walkins').orderBy('archivedAt', 'desc').get()
+            ]);
+
+            window.appData.archivedBookings = archivedBookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            window.appData.archivedWalkins = archivedWalkinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (err) {
+            console.debug('Could not fetch archived collections from Firestore:', err);
+            window.appData.archivedBookings = window.appData.archivedBookings || [];
+            window.appData.archivedWalkins = window.appData.archivedWalkins || [];
+        }
+    }
+    const archivedContainer = document.getElementById('archived-appointments-table');
+    const archivedTableBody = archivedContainer?.querySelector('tbody');
+    let archivedSearchTerm = '';
+
+    function renderArchivedTable() {
+        if (!archivedTableBody) return;
+
+        const archivedBookings = (window.appData.archivedBookings || []).map(b => ({
+            serviceId: b.id || b.serviceId || '',
+            customer: b.customer || b.customerName || b.fullName || b.carName || b.plate || '',
+            service: b.serviceNames || b.service || b.serviceName || '',
+            datetime: b.datetime || (b.datetimeRaw ? new Date(b.datetimeRaw).toLocaleString() : (b.archivedAt ? new Date(b.archivedAt.toDate ? b.archivedAt.toDate() : b.archivedAt).toLocaleString() : '')),
+            price: b.price || '',
+            archivedAt: b.archivedAt || b.paidAt || ''
+        }));
+
+        const archivedWalkins = (window.appData.archivedWalkins || []).map(w => ({
+            serviceId: w.id || w.serviceId || '',
+            customer: w.customer || w.carName || w.plate || 'Walk-in',
+            service: w.service || w.serviceNames || '',
+            datetime: w.datetime || (w.datetimeRaw ? new Date(w.datetimeRaw).toLocaleString() : ''),
+            price: w.price || '',
+            archivedAt: w.archivedAt || w.paidAt || ''
+        }));
+
+        const combined = [...archivedBookings, ...archivedWalkins];
+
+        const filtered = combined.filter(a => {
+            const term = archivedSearchTerm.toLowerCase();
+            if (!term) return true;
+            return (a.serviceId || '').toLowerCase().includes(term) ||
+                   (a.customer || '').toLowerCase().includes(term) ||
+                   (a.service || '').toLowerCase().includes(term) ||
+                   (String(a.price || '')).toLowerCase().includes(term);
+        });
+
+        // Pagination
+        const totalPages = Math.max(1, Math.ceil(filtered.length / archivedRowsPerPage));
+        archivedCurrentPage = Math.max(1, Math.min(archivedCurrentPage, totalPages));
+        const startIndex = (archivedCurrentPage - 1) * archivedRowsPerPage;
+        const endIndex = startIndex + archivedRowsPerPage;
+        const paginated = filtered.slice(startIndex, endIndex);
+
+        archivedTableBody.innerHTML = '';
+
+        if (paginated.length === 0) {
+            const tr = document.createElement('tr');
+            tr.classList.add('no-results-row');
+            tr.innerHTML = `<td colspan="7" class="text-center text-muted">No archived services found.</td>`;
+            archivedTableBody.appendChild(tr);
+        }
+
+        paginated.forEach(a => {
+            const row = document.createElement('tr');
+            const archivedAtStr = a.archivedAt ? (typeof a.archivedAt === 'string' ? a.archivedAt : (a.archivedAt.toDate ? a.archivedAt.toDate().toLocaleString() : new Date(a.archivedAt).toLocaleString())) : 'N/A';
+            row.innerHTML = `
+                <td>${a.serviceId}</td>
+                <td>${a.customer || 'N/A'}</td>
+                <td>${a.service || 'N/A'}</td>
+                <td>${a.datetime || 'N/A'}</td>
+                <td>${a.price || 'N/A'}</td>
+                <td>${archivedAtStr}</td>
+                <td class="text-center">
+                    <button class="action-icon-btn view-archive-btn" data-id="${a.serviceId}" title="View">
+                        <span class="material-symbols-outlined">visibility</span>
+                    </button>
+                    <button class="action-icon-btn leave-review-btn" data-id="${a.serviceId}" title="Leave Review">
+                        <span class="material-symbols-outlined">rate_review</span>
+                    </button>
+                </td>
+            `;
+            archivedTableBody.appendChild(row);
+        });
+
+        // Update pagination controls
+        const paginationContainer = document.querySelector('#archived-appointments-table .table-pagination');
+        if (paginationContainer) {
+            const pageInfo = paginationContainer.querySelector('.page-info');
+            const prevBtn = paginationContainer.querySelector('[data-action="prev"]');
+            const nextBtn = paginationContainer.querySelector('[data-action="next"]');
+            pageInfo.textContent = `Page ${archivedCurrentPage} of ${totalPages || 1}`;
+            if (prevBtn) prevBtn.disabled = archivedCurrentPage === 1;
+            if (nextBtn) nextBtn.disabled = archivedCurrentPage === totalPages;
+        }
+    }
+
+    const archivedSearchInput = document.getElementById('archived-appointment-search');
+    if (archivedSearchInput) {
+        archivedSearchInput.addEventListener('input', (e) => {
+            archivedSearchTerm = e.target.value || '';
+            renderArchivedTable();
+        });
+    }
+
+    const archivedTableEl = document.querySelector('#archived-appointments-table tbody');
+    if (archivedTableEl) {
+        archivedTableEl.addEventListener('click', (e) => {
+            const viewBtn = e.target.closest('.view-archive-btn');
+            const reviewBtn = e.target.closest('.leave-review-btn');
+            if (viewBtn) {
+                const id = viewBtn.dataset.id;
+                // Try to find in archived bookings first, then archived walkins
+                const appt = (window.appData.archivedBookings || []).find(a => (a.id || a.serviceId) === id) || (window.appData.archivedWalkins || []).find(w => (w.id || w.serviceId) === id);
+                if (appt) {
+                    sessionStorage.setItem('previousPage', window.location.href);
+                    sessionStorage.setItem('selectedAppointmentData', JSON.stringify(appt));
+                    // Use appointment details page for viewing archived items
+                    window.location.href = 'appointment-details.html';
+                }
+            }
+            if (reviewBtn) {
+                const id = reviewBtn.dataset.id;
+                // Try to find in archived bookings first, then archived walkins
+                const appt = (window.appData.archivedBookings || []).find(a => (a.id || a.serviceId) === id) || (window.appData.archivedWalkins || []).find(w => (w.id || w.serviceId) === id);
+                if (appt) {
+                    sessionStorage.setItem('previousPage', window.location.href);
+                    sessionStorage.setItem('selectedAppointmentData', JSON.stringify(appt));
+                    // Redirect to a review submission page (or open a modal if you have one)
+                    window.location.href = 'review-details.html?leaveReview=1';
                 }
             }
         });

@@ -140,32 +140,38 @@ window.firebase = {
         const ref = await addDoc(collection(db, collectionName), data);
         return { id: ref.id };
       },
-      doc: (id) => ({
-        async get() {
-          const ref = fsDoc(db, collectionName, id);
-          const dsnap = await getDoc(ref);
-          return { exists: dsnap.exists(), data: () => dsnap.data(), id: dsnap.id };
-        },
-        set: (data) => setDoc(fsDoc(db, collectionName, id), data),
-        update: (data) => updateDoc(fsDoc(db, collectionName, id), data),
-        delete: () => deleteDoc(fsDoc(db, collectionName, id)),
-        onSnapshot(observerOrNext, error, complete) {
-          const ref = fsDoc(db, collectionName, id);
-          const observer = typeof observerOrNext === 'object' 
-            ? observerOrNext 
-            : { next: observerOrNext, error, complete };
-          
-          return onSnapshot(ref, (dsnap) => {
-            const wrappedDoc = {
-              exists: dsnap.exists(),
-              data: () => dsnap.data(),
-              id: dsnap.id
-            };
-            observer.next(wrappedDoc);
-          }, observer.error, observer.complete);
-        },
-        collection: (subCollectionName) => createCollectionRef(`${collectionName}/${id}/${subCollectionName}`)
-      }),
+      doc: (id) => {
+        // Create a native DocumentReference; if `id` is omitted, generate an auto-id
+        const nativeRef = id ? fsDoc(db, collectionName, id) : fsDoc(collection(db, collectionName));
+        const nativePath = nativeRef && nativeRef.path ? nativeRef.path : (id ? `${collectionName}/${id}` : null);
+        return {
+          // Expose native ref for batch helpers and other internals
+          _nativeRef: nativeRef,
+          _path: nativePath,
+          id: nativeRef.id,
+          async get() {
+            const dsnap = await getDoc(nativeRef);
+            return { exists: dsnap.exists(), data: () => dsnap.data(), id: dsnap.id };
+          },
+          set: (data) => setDoc(nativeRef, data),
+          update: (data) => updateDoc(nativeRef, data),
+          delete: () => deleteDoc(nativeRef),
+          onSnapshot(observerOrNext, error, complete) {
+            const observer = typeof observerOrNext === 'object'
+              ? observerOrNext
+              : { next: observerOrNext, error, complete };
+            return onSnapshot(nativeRef, (dsnap) => {
+              const wrappedDoc = {
+                exists: dsnap.exists(),
+                data: () => dsnap.data(),
+                id: dsnap.id
+              };
+              observer.next(wrappedDoc);
+            }, observer.error, observer.complete);
+          },
+          collection: (subCollectionName) => createCollectionRef(`${collectionName}/${nativeRef.id}/${subCollectionName}`)
+        };
+      },
       where: (field, operator, value) => {
         // Return a new queryable object with the where constraint added
         return createCollectionRef(collectionName, [...queryConstraints, where(field, operator, value)]);
@@ -219,13 +225,20 @@ window.firebase = {
         const batchInstance = writeBatch(db);
         return {
           set: (docRef, data) => {
-            // docRef should be a document reference path object or a result from collection().doc()
+            // Accept string paths, our compat wrapper (with _nativeRef), or path strings on wrapper
             let ref;
             if (typeof docRef === 'string') {
-              ref = fsDoc(db, docRef);
-            } else if (docRef._path) {
-              // It's our compat wrapper
-              ref = fsDoc(db, docRef._path);
+              // If a full path like 'collection/doc' is provided, split into segments
+              if (docRef.includes('/')) {
+                ref = fsDoc(db, ...docRef.split('/'));
+              } else {
+                ref = fsDoc(db, docRef);
+              }
+            } else if (docRef && docRef._nativeRef) {
+              ref = docRef._nativeRef;
+            } else if (docRef && docRef._path) {
+              const parts = String(docRef._path).split('/').filter(Boolean);
+              ref = fsDoc(db, ...parts);
             } else {
               console.error('Invalid docRef for batch.set:', docRef);
               return;
@@ -235,9 +248,16 @@ window.firebase = {
           update: (docRef, data) => {
             let ref;
             if (typeof docRef === 'string') {
-              ref = fsDoc(db, docRef);
-            } else if (docRef._path) {
-              ref = fsDoc(db, docRef._path);
+              if (docRef.includes('/')) {
+                ref = fsDoc(db, ...docRef.split('/'));
+              } else {
+                ref = fsDoc(db, docRef);
+              }
+            } else if (docRef && docRef._nativeRef) {
+              ref = docRef._nativeRef;
+            } else if (docRef && docRef._path) {
+              const parts = String(docRef._path).split('/').filter(Boolean);
+              ref = fsDoc(db, ...parts);
             } else {
               console.error('Invalid docRef for batch.update:', docRef);
               return;
@@ -247,9 +267,16 @@ window.firebase = {
           delete: (docRef) => {
             let ref;
             if (typeof docRef === 'string') {
-              ref = fsDoc(db, docRef);
-            } else if (docRef._path) {
-              ref = fsDoc(db, docRef._path);
+              if (docRef.includes('/')) {
+                ref = fsDoc(db, ...docRef.split('/'));
+              } else {
+                ref = fsDoc(db, docRef);
+              }
+            } else if (docRef && docRef._nativeRef) {
+              ref = docRef._nativeRef;
+            } else if (docRef && docRef._path) {
+              const parts = String(docRef._path).split('/').filter(Boolean);
+              ref = fsDoc(db, ...parts);
             } else {
               console.error('Invalid docRef for batch.delete:', docRef);
               return;

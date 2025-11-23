@@ -1,3 +1,123 @@
+/* Approved status badge with custom hover tooltip */
+.status-badge.approved {
+    background: #22c55e;
+    color: #fff;
+    padding: 0.3rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    position: relative;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+.status-badge.approved:hover {
+    background: #16a34a;
+}
+.status-badge.approved[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 50%;
+    bottom: 120%;
+    transform: translateX(-50%);
+    background: #222;
+    color: #fff;
+    padding: 0.4em 1em;
+    border-radius: 0.7em;
+    font-size: 0.85em;
+    white-space: nowrap;
+    z-index: 10;
+    opacity: 1;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+/* Payment Status and Date Paid Badges */
+.payment-status-badge {
+    display: inline-block;
+    padding: 0.25em 0.9em;
+    border-radius: 1em;
+    font-size: 0.95em;
+    font-weight: 500;
+    background: #e0e7ff;
+    color: #222a;
+    border: 1px solid #b6b6e6;
+    margin-left: 0.3em;
+    margin-right: 0.3em;
+    vertical-align: middle;
+    transition: background 0.2s, color 0.2s;
+}
+.payment-status-badge.na {
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+}
+.payment-status-badge.pending {
+    background: #fef9c3;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+.payment-status-badge.paid {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #34d399;
+}
+.date-paid-badge {
+    display: inline-block;
+    padding: 0.2em 0.7em;
+    border-radius: 1em;
+    font-size: 0.93em;
+    font-weight: 500;
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+    margin-left: 0.3em;
+    margin-right: 0.3em;
+    vertical-align: middle;
+}
+.date-paid-badge.pending {
+    background: #fef9c3;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+/* Payment Method Badge Design */
+.payment-method-badge {
+    display: inline-block;
+    padding: 0.25em 0.9em;
+    border-radius: 1em;
+    font-size: 0.95em;
+    font-weight: 500;
+    background: #e0e7ff;
+    color: #222a;
+    border: 1px solid #b6b6e6;
+    margin-left: 0.3em;
+    margin-right: 0.3em;
+    vertical-align: middle;
+    transition: background 0.2s, color 0.2s;
+}
+.payment-method-badge.appointment {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #34d399;
+}
+.payment-method-badge.user {
+    background: #fef9c3;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+.status-badge.approved-badge {
+    background: #2563eb;
+    color: #fff;
+    padding: 0.3rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: background 0.2s;
+}
+.status-badge.approved-badge:hover {
+    background: #1d4ed8;
+}
 /* --- Payment History Redesign (Customer Profile) --- */
 .payment-history-list-redesign {
     display: flex;

@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <title>Appointments - Kingsley Carwash</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./images/minimalkingsley.png" />
 
     <!-- Google Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -459,6 +462,53 @@
                 </div>
               </div>
             </div>
+
+            <!-- Archived Services Button and Table (hidden by default) -->
+            <div style="margin: 2rem 0; text-align: center;">
+              <button id="show-archived-btn" class="btn-primary" style="min-width:220px;display:inline-flex;align-items:center;gap:8px;">
+                <span class="material-symbols-outlined">history</span> Show Archived Services
+              </button>
+            </div>
+            <div class="recent-appointments-container" id="archived-appointments-table-container" style="display:none;">
+              <div class="recent-appointments archived-section" id="archived-appointments-table" style="background:#fbfbfc;border-top:2px solid #e6e6e6;padding:12px 16px;">
+                  <div class="table-header">
+                    <h2>Archived Services (Completed & Paid)</h2>
+                  </div>
+                <div class="table-controls">
+                  <div class="table-search-container">
+                    <input type="search" id="archived-appointment-search" placeholder="Search archived services..." />
+                  </div>
+                </div>
+                <div class="table-responsive-wrapper">
+                  <div class="table-loader">
+                    <div class="spinner"></div>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr class="sortable-header">
+                        <th>ID</th>
+                        <th>Customer</th>
+                        <th>Service</th>
+                        <th>Date & Time</th>
+                        <th>Price</th>
+                        <th>Archived At</th>
+                        <th class="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="no-results-row">
+                        <td colspan="7" class="text-center text-muted">No archived services found.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="table-pagination">
+                  <button class="pagination-btn" data-action="prev">&laquo; Previous</button>
+                  <span class="page-info"></span>
+                  <button class="pagination-btn" data-action="next">Next &raquo;</button>
+                </div>
+              </div>
+            </div>
           </section>
         </div>
         <!-- ========== End of Page Content ========== -->
@@ -496,29 +546,7 @@
             <p>This is where the form or content for the action will go.</p>
           </div>
 
-          <!-- Cancel Appointment Modal Content -->
-          <div class="modal-content" id="cancel-appointment-content">
-            <form id="cancel-appointment-form" class="modal-form">
-              <div class="form-group">
-                <label for="cancel-reason">Cancellation Reason</label>
-                <select id="cancel-reason" required>
-                  <option value="">Select reason</option>
-                  <option value="Customer Request">Customer Request</option>
-                  <option value="No Show">No Show</option>
-                  <option value="Reschedule Denied">Reschedule Denied</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="cancel-notes">Description / Notes (optional)</label>
-                <textarea id="cancel-notes" rows="4" placeholder="Add notes about cancellation, e.g., reason details..."></textarea>
-              </div>
-              <div class="modal-actions">
-                <button type="button" class="btn-secondary" id="cancel-cancel-btn">Close</button>
-                <button type="submit" class="btn-primary">Confirm Cancel</button>
-              </div>
-            </form>
-          </div>
+          <!-- Cancel Appointment moved to a dedicated page: cancel-appointment.html -->
 
           <!-- Appointment Details Content -->
           <div class="modal-content" id="appointment-details-content">
