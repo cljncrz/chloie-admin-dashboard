@@ -1310,6 +1310,16 @@ main .insights::-webkit-scrollbar-thumb {
         color: #ffffff;
     }
 
+.archived-section {
+    background: var(--color-white);
+    border-top: 2px solid var(--color-light);
+}
+
+.dark-theme-variables .archived-section {
+    background: #23272b;
+    border-top: 2px solid #44474a;
+    color: var(--color-dark);
+}
 /* Table Pagination */
 .table-pagination {
     display: flex;
