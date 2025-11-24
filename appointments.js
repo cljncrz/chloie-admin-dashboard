@@ -787,6 +787,42 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (!row || row.classList.contains('no-results-row')) return;
 
+                // --- Walk-in Complete Service Button ---
+                if (completeServiceButton && row.closest('#walk-in-appointments-table')) {
+                    const walkins = window.appData.walkins || [];
+                    const walkin = walkins.find(w => w.id === row.dataset.serviceId);
+                    if (walkin && walkin.status === 'In Progress') {
+                        await fetchCurrentUserFullName && fetchCurrentUserFullName();
+                        if (currentUserFullName !== walkin.technician && window.currentUserRole !== 'admin') {
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Only the assigned technician can complete this service.', 'error');
+                            else alert('Only the assigned technician can complete this service.');
+                            return;
+                        }
+                        const db = window.firebase.firestore();
+                        try {
+                            await db.collection('walkins').doc(walkin.id).update({
+                                status: 'Completed',
+                                completedAt: window.firebase.firestore().FieldValue.serverTimestamp()
+                            });
+                        } catch (err) {
+                            console.error('Error updating walk-in to Completed:', err);
+                            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to complete service (database error).', 'error');
+                            else alert('Failed to complete service (database error).');
+                            return;
+                        }
+                        walkin.status = 'Completed';
+                        row.dataset.status = 'Completed';
+                        const statusCell = row.querySelector('td:nth-child(8)');
+                        if (statusCell) statusCell.innerHTML = `<span class="completed">Completed</span>`;
+                        if (typeof showSuccessToast === 'function') showSuccessToast(`Service for ${walkin.customer || walkin.plate} is complete.`);
+                        completeServiceButton.remove();
+                        // --- Send notification to mobile app user (if needed) ---
+                        if (typeof sendServiceCompletedNotification === 'function') sendServiceCompletedNotification(walkin);
+                    }
+                    return;
+                }
+
+                // --- Appointment Complete Service Button ---
                 if (approveButton) {
                     const appointments = window.appData.appointments || [];
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);

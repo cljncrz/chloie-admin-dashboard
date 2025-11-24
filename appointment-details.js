@@ -1,3 +1,41 @@
+    /**
+     * Populates the payment information table for the appointment.
+     * @param {object} apptData The appointment data object.
+     */
+    const populatePaymentInfo = (apptData) => {
+        const paymentTableBody = document.querySelector('#payment-info-table tbody');
+        const noPaymentMessage = document.querySelector('.profile-history .no-payment');
+        if (!paymentTableBody || !noPaymentMessage) return;
+
+        paymentTableBody.innerHTML = '';
+        // Only show payment info for this appointment
+        const paymentStatus = apptData.paymentStatus || 'Unpaid';
+        const paymentStatusClass = paymentStatus.toLowerCase();
+        const paymentMethod = apptData.paymentMethod || apptData.payment_method || apptData.paymentType || 'N/A';
+        const price = (apptData.price !== undefined && apptData.price !== null)
+            ? `\u20b1${parseFloat(apptData.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : 'N/A';
+        let dateTime = 'N/A';
+        if (apptData.datetime) {
+            dateTime = new Date(apptData.datetime).toLocaleString();
+        } else if (apptData.paidAt && apptData.paidAt.seconds) {
+            dateTime = new Date(apptData.paidAt.seconds * 1000).toLocaleString();
+        }
+
+        if (!apptData.price && !apptData.paymentStatus && !apptData.paymentMethod) {
+            noPaymentMessage.style.display = 'block';
+            return;
+        }
+        noPaymentMessage.style.display = 'none';
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="text-center">${dateTime}</td>
+            <td>${price}</td>
+            <td><span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span></td>
+            <td>${paymentMethod}</td>
+        `;
+        paymentTableBody.appendChild(row);
+    };
 document.addEventListener('DOMContentLoaded', () => {
     // Wait for the Firebase initialization promise (created in firebase-config.js)
     const ensureFirebaseReady = async () => {
@@ -72,12 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
             existingTracker.remove();
         }
 
-        // Remove existing payment history to prevent duplicates
-        const existingPaymentHistory = profileHistorySection.querySelector('.payment-history-container');
-        if (existingPaymentHistory) {
-            existingPaymentHistory.remove();
-        }
-
         const trackerContainer = document.createElement('div');
         trackerContainer.className = 'status-tracker-container widget-card';
 
@@ -116,80 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         profileHistorySection.prepend(trackerContainer);
 
-        // --- Payment Method History Section ---
-        const paymentHistoryContainer = document.createElement('div');
-        paymentHistoryContainer.className = 'payment-history-container widget-card';
-        let paymentStatus = appointmentData && appointmentData.paymentStatus ? appointmentData.paymentStatus : 'N/A';
-        let paidAt = appointmentData && appointmentData.paidAt ? appointmentData.paidAt : null;
-        let paidAtStr = '';
-        if (paymentStatus && paymentStatus.toLowerCase() === 'paid') {
-            if (paidAt && paidAt.seconds) {
-                // Firestore Timestamp
-                const date = new Date(paidAt.seconds * 1000);
-                paidAtStr = date.toLocaleString();
-            } else if (typeof paidAt === 'string' || typeof paidAt === 'number') {
-                paidAtStr = new Date(paidAt).toLocaleString();
-            } else {
-                paidAtStr = 'N/A';
-            }
-        } else {
-            paidAtStr = 'Pending';
-        }
-
-        // Always fetch payment method from Firestore user profile for history
-        let paymentMethod = 'N/A';
-        (async () => {
-            // Prefer payment method from appointment data
-            paymentMethod = appointmentData.paymentMethod || appointmentData.payment_method || appointmentData.paymentType || null;
-            let methodSource = 'appointment';
-            if (!paymentMethod) {
-                let customerId = appointmentData.userId || appointmentData.customerId || appointmentData.customerUid;
-                try {
-                    const db = window.firebase.firestore();
-                    if (!customerId) {
-                        // Try to find by fullName if no ID
-                        const usersSnapshot = await db.collection('users').where('fullName', '==', appointmentData.customer).limit(1).get();
-                        if (!usersSnapshot.empty) {
-                            customerId = usersSnapshot.docs[0].id;
-                        }
-                    }
-                    if (customerId) {
-                        const userDoc = await db.collection('users').doc(customerId).get();
-                        if (userDoc.exists) {
-                            const userData = userDoc.data();
-                            paymentMethod = userData.paymentMethod || 'Not set';
-                            methodSource = 'user';
-                        }
-                    }
-                } catch (err) {
-                    paymentMethod = 'Not set';
-                }
-            }
-            if (!paymentMethod) paymentMethod = 'N/A';
-            // Status badge logic
-            let statusBadge = '';
-            if (!paymentStatus || paymentStatus === 'N/A') {
-                statusBadge = '<span class="payment-status-badge na">N/A</span>';
-            } else if (paymentStatus.toLowerCase() === 'pending') {
-                statusBadge = '<span class="payment-status-badge pending">Pending</span>';
-            } else if (paymentStatus.toLowerCase() === 'paid') {
-                statusBadge = '<span class="payment-status-badge paid">Paid</span>';
-            } else {
-                statusBadge = `<span class="payment-status-badge">${paymentStatus}</span>`;
-            }
-            let paidAtDisplay = paidAtStr ? `<span class="date-paid-badge ${paidAtStr==='Pending'?'pending':''}">${paidAtStr}</span>` : '';
-            paymentHistoryContainer.innerHTML = `
-                <div class="widget-header">
-                    <h3>Payment Method History</h3>
-                </div>
-                <div class="payment-history-details">
-                    <div><strong>Status:</strong> ${statusBadge}</div>
-                    <div><strong>Method:</strong> <span class="payment-method-badge ${methodSource}">${paymentMethod}</span></div>
-                    <div><strong>Date Paid:</strong> ${paidAtDisplay}</div>
-                </div>
-            `;
-        })();
-        profileHistorySection.insertBefore(paymentHistoryContainer, trackerContainer.nextSibling);
 
         // Add event listener for status updates
         trackerContainer.querySelector('.status-tracker').addEventListener('click', (e) => {
@@ -270,6 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. Populate the service progress tracker
         createStatusTracker(apptData.status);
+
+        // 4. Populate the payment information for this appointment
+        populatePaymentInfo(apptData);
     };
 
     /**

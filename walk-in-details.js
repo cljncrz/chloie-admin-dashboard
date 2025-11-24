@@ -80,118 +80,39 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
+
     /**
-     * Finds and displays the service history for a given plate number.
-     * @param {string} plateNumber The plate number to search for.
+     * Populates the payment information table for the walk-in.
+     * @param {object} walkinData The walk-in data object.
      */
-    const populateServiceHistory = (plateNumber) => {
-        const historyTableBody = document.querySelector('#service-history-table tbody');
-        const noHistoryMessage = document.querySelector('.profile-history .no-history');
+    const populatePaymentInfo = (walkinData) => {
+        const paymentTableBody = document.querySelector('#payment-info-table tbody');
+        const noPaymentMessage = document.querySelector('.profile-history .no-payment');
+        if (!paymentTableBody || !noPaymentMessage) return;
 
-        if (!historyTableBody || !noHistoryMessage) return;
+        paymentTableBody.innerHTML = '';
+        // Only show payment info for this walk-in
+        const paymentStatus = walkinData.paymentStatus || 'Unpaid';
+        const paymentStatusClass = paymentStatus.toLowerCase();
+        const paymentMethod = walkinData.paymentMethod || 'N/A';
+        const price = (walkinData.price !== undefined && walkinData.price !== null)
+            ? `\u20b1${parseFloat(walkinData.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : 'N/A';
+        const dateTime = walkinData.datetime ? new Date(walkinData.datetime).toLocaleString() : 'N/A';
 
-        // Combine all appointments and walk-ins to create a full history
-        const allServices = [
-            ...(window.appData.appointments || []),
-            ...(window.appData.walkins || [])
-        ];
-
-        // Filter for services matching the plate number, excluding the current one being viewed
-        // and ensuring we only show completed services in the history.
-        const serviceHistory = allServices.filter(service =>
-            service.plate === plateNumber && service.status === 'Completed' && service.id !== walkinData.id
-        ).sort((a, b) => (parseDate(b.datetime) || 0) - (parseDate(a.datetime) || 0)); // Sort by most recent first
-
-        historyTableBody.innerHTML = ''; // Clear existing rows
-
-        if (serviceHistory.length === 0) {
-            noHistoryMessage.style.display = 'block';
+        if (!walkinData.price && !walkinData.paymentStatus && !walkinData.paymentMethod) {
+            noPaymentMessage.style.display = 'block';
             return;
         }
-
-        noHistoryMessage.style.display = 'none';
-        const fragment = document.createDocumentFragment();
-
-        serviceHistory.forEach((item, index) => {
-            const row = document.createElement('tr');
-            row.className = 'service-history-row';
-            row.dataset.index = index;
-            row.dataset.paymentStatus = item.paymentStatus || 'Unpaid';
-
-            const itemDate = parseDate(item.datetime);
-            const formattedDate = itemDate ? itemDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
-            const formattedTime = itemDate ? itemDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A';
-            const dateTimeDisplay = `${formattedDate} ${formattedTime}`;
-
-            const statusClass = (item.status || '').toLowerCase().replace(/\s+/g, '-');
-            const paymentStatus = item.paymentStatus || 'Unpaid';
-            const paymentStatusClass = paymentStatus.toLowerCase();
-
-            // Format price if available
-            const price = (item.price !== undefined && item.price !== null)
-                ? `₱${parseFloat(item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : 'N/A';
-
-            // Paid indicator
-            const paidIndicator = paymentStatus === 'Paid' ? '<span class="material-symbols-outlined" style="font-size:18px;color:#4CAF50;margin-left:6px;">verified</span>' : '';
-
-            row.innerHTML = `
-                <td class="text-center">${dateTimeDisplay}</td>
-                <td>${item.service || item.serviceNames || 'N/A'}</td>
-                <td>${price}</td>
-                <td>${item.technician || 'N/A'}</td>
-                <td class="text-center"><span class="${statusClass}">${item.status || 'N/A'}</span></td>
-                <td class="text-center">
-                    <span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span>
-                    ${paidIndicator}
-                </td>
-            `;
-
-            // store original item for potential use
-            row.dataset.item = JSON.stringify(item);
-            fragment.appendChild(row);
-
-            // If paid, add an expandable details row below
-            if (paymentStatus === 'Paid') {
-                const detailsRow = document.createElement('tr');
-                detailsRow.className = 'service-history-details-row';
-                detailsRow.style.display = 'none';
-                detailsRow.innerHTML = `
-                    <td colspan="6">
-                        <div class="payment-details-container">
-                            <div class="details-grid">
-                                <div class="detail-item">
-                                    <small class="text-muted">Transaction Status</small>
-                                    <p style="color:#4CAF50;font-weight:600;">✓ Payment Received</p>
-                                </div>
-                                <div class="detail-item">
-                                    <small class="text-muted">Total Amount Paid</small>
-                                    <p style="font-weight:600;font-size:16px;">${price}</p>
-                                </div>
-                                <div class="detail-item">
-                                    <small class="text-muted">Service Status</small>
-                                    <p>${item.status || 'N/A'}</p>
-                                </div>
-                                <div class="detail-item">
-                                    <small class="text-muted">Technician</small>
-                                    <p>${item.technician || 'N/A'}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </td>
-                `;
-                fragment.appendChild(detailsRow);
-
-                // toggle details when clicking the row
-                row.addEventListener('click', () => {
-                    const visible = detailsRow.style.display === 'table-row';
-                    detailsRow.style.display = visible ? 'none' : 'table-row';
-                    row.classList.toggle('expanded', !visible);
-                });
-            }
-        });
-
-        historyTableBody.appendChild(fragment);
+        noPaymentMessage.style.display = 'none';
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="text-center">${dateTime}</td>
+            <td>${price}</td>
+            <td><span class="payment-status-badge ${paymentStatusClass}">${paymentStatus}</span></td>
+            <td>${paymentMethod}</td>
+        `;
+        paymentTableBody.appendChild(row);
     };
 
 
@@ -219,8 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Populate the service progress tracker
         createStatusTracker(data.status);
 
-        // Populate the service history based on the plate number
-        if (data.plate) populateServiceHistory(data.plate);
+        // Populate the payment information for this walk-in
+        populatePaymentInfo(data);
     };
 
     /**

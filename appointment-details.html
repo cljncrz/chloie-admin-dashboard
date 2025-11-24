@@ -263,12 +263,35 @@
                 </div>
               </div>
 
-              <!-- Right Column: Status Tracker and Vehicle Info -->
-              <div class="profile-history">
+                <!-- Right Column: Status Tracker and Payment Info -->
+                <div class="profile-history">
                 <!-- Service Progress Tracker will be inserted here by JS -->
 
-                <!-- Customer Service History removed -->
-              </div>
+                <!-- Payment Information -->
+                <div class="widget-card" style="margin-top: 2rem;">
+                  <div class="widget-header">
+                    <h3>Payment Information</h3>
+                  </div>
+                  <div class="table-responsive-wrapper" id="payment-table-wrapper" style="max-height: 300px; padding: 0 1.5rem 1.5rem;">
+                    <table id="payment-info-table">
+                      <thead>
+                        <tr>
+                          <th class="text-center">Date & Time</th>
+                          <th>Amount Paid</th>
+                          <th>Payment Status</th>
+                          <th>Payment Method</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <!-- Payment info will be populated by JS -->
+                      </tbody>
+                    </table>
+                    <p class="text-muted no-payment" style="display: none; text-align: center; padding: 1rem;">
+                      No payment information found for this appointment.
+                    </p>
+                  </div>
+                </div>
+                </div>
             </div>
           </section>
         </div>
