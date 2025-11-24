@@ -67,13 +67,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const data = doc.data();
                         chats.push({
                             id: doc.id,
-                            customerName: data.customerName || 'Unknown',
+                            userName: data.userName || 'Unknown',
                             lastMessage: data.lastMessage || '',
-                            timestamp: formatTimestamp(data.timestamp),
-                            profilePic: data.profilePic || 'https://via.placeholder.com/40',
-                            isUnread: data.isUnread || false,
+                            lastMessageSenderId: data.lastMessageSenderId || '',
+                            lastMessageSenderRole: data.lastMessageSenderRole || '',
+                            lastMessageTime: data.lastMessageTime ? formatTimestamp(data.lastMessageTime) : '',
+                            createdAt: data.createdAt ? formatTimestamp(data.createdAt) : '',
+                            profilePic: data.profilePic || './images/redicon.png',
+                            unreadCount: data.unreadCount || 0,
                             isVerified: data.isVerified || false,
-                            email: data.email || '',
+                            userEmail: data.userEmail || '',
                             userId: data.userId || doc.id
                         });
                     });
@@ -118,57 +121,126 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     const renderConversationList = (filter = '') => {
         const lowercasedFilter = filter.toLowerCase();
+        // Show all users for admin to start a chat
+        const allUsers = (window.appData && window.appData.customers) ? window.appData.customers : [];
+        // Filter users by search
+        const filteredUsers = allUsers.filter(user =>
+            user.name && user.name.toLowerCase().includes(lowercasedFilter)
+        );
+        // Existing chats
         const filteredChats = chats.filter(chat =>
-            chat.customerName.toLowerCase().includes(lowercasedFilter)
+            chat.userName && chat.userName.toLowerCase().includes(lowercasedFilter)
         );
 
         conversationListEl.innerHTML = '';
-        if (filteredChats.length === 0) {
+        // Section: Start new chat with any user
+        if (filteredUsers.length > 0) {
+            const userHeader = document.createElement('div');
+            userHeader.className = 'conversation-list-section-header';
+            userHeader.textContent = 'Start Chat With User';
+            conversationListEl.appendChild(userHeader);
+            filteredUsers.forEach(user => {
+                // If a chat already exists with this user, skip (will show in chat list below)
+                if (chats.some(chat => chat.userEmail === user.email)) return;
+                const item = document.createElement('div');
+                item.className = 'chat-conversation-item start-chat';
+                item.dataset.userid = user.email || user.phone || user.name;
+                    const userPic = user.profilePic || user.photoURL || user.avatar || './images/redicon.png';
+                    item.innerHTML = `
+                        <div class="profile-photo">
+                            <img src="${userPic}" alt="${user.name}" />
+                        </div>
+                        <div class="conversation-details">
+                            <strong>${user.name}</strong>
+                            <small class="text-muted">${user.email || user.phone || ''}</small>
+                            <p style="color:#888;">Start new chat</p>
+                        </div>
+                    `;
+                item.addEventListener('click', () => {
+                    // Create a new chat room in Firestore if not exists
+                    const chatRoomData = {
+                        userName: user.name,
+                        userEmail: user.email || '',
+                        userId: user.id || user.email || user.phone || user.name,
+                        profilePic: user.profilePic || '',
+                        isVerified: user.isVerified || false,
+                        lastMessage: 'Chat started',
+                        lastMessageSenderId: (auth.currentUser && auth.currentUser.uid) || 'admin',
+                        lastMessageSenderRole: 'admin',
+                        lastMessageTime: new Date(),
+                        createdAt: new Date(),
+                        unreadCount: 0
+                    };
+                    // Check if chat already exists (should not, but double check)
+                    db.collection('chat_rooms').where('userEmail', '==', user.email).get().then(snapshot => {
+                        if (snapshot.empty) {
+                            db.collection('chat_rooms').add(chatRoomData).then(() => {
+                                // Will auto-refresh via listener
+                            });
+                        } else {
+                            // Already exists, select it
+                            const doc = snapshot.docs[0];
+                            currentConversationId = doc.id;
+                            renderMessages(currentConversationId);
+                        }
+                    });
+                });
+                conversationListEl.appendChild(item);
+            });
+        }
+
+        // Section: Existing conversations
+        if (filteredChats.length === 0 && filteredUsers.length === 0) {
             conversationListEl.innerHTML = '<p class="text-muted" style="padding: 1rem; text-align: center;">No conversations found.</p>';
             return;
         }
-
-        const fragment = document.createDocumentFragment();
-        filteredChats.forEach(chat => {
-            const item = document.createElement('div');
-            item.className = `chat-conversation-item ${chat.id === currentConversationId ? 'active' : ''} ${chat.isUnread ? 'unread' : ''}`;
-            item.dataset.id = chat.id;
-            item.innerHTML = `
-                <div class="conversation-checkbox">
-                    <input type="checkbox" data-id="${chat.id}" class="conversation-select-checkbox" />
-                </div>
-                <div class="profile-photo">
-                    <img src="${chat.profilePic}" alt="${chat.customerName}" />
-                </div>
-                <div class="conversation-details">
-                    <strong>${chat.customerName}</strong>
-                    <small class="text-muted" style="margin-left: 0.5rem;">${chat.timestamp}</small>
-                    <p>${chat.lastMessage}</p>
-                </div>
-                <div class="conversation-item-actions">
-                    <button class="action-icon-btn conversation-menu-btn" title="More options">
-                        <span class="material-symbols-outlined">more_vert</span>
-                    </button>
-                    <div class="conversation-item-dropdown">
-                        <a href="#" class="mark-unread-btn">
-                            <span class="material-symbols-outlined">mark_chat_unread</span>
-                            <span>Mark as Unread</span>
-                        </a>
-                        <a href="#" class="archive-chat-btn">
-                            <span class="material-symbols-outlined">archive</span>
-                            <span>Archive Chat</span>
-                        </a>
-                        <a href="#" class="delete-chat-btn danger">
-                            <span class="material-symbols-outlined">delete</span>
-                            <span>Delete Chat</span>
-                        </a>
+        if (filteredChats.length > 0) {
+            const chatHeader = document.createElement('div');
+            chatHeader.className = 'conversation-list-section-header';
+            chatHeader.textContent = 'Active Conversations';
+            conversationListEl.appendChild(chatHeader);
+            const fragment = document.createDocumentFragment();
+            filteredChats.forEach(chat => {
+                const item = document.createElement('div');
+                item.className = `chat-conversation-item ${chat.id === currentConversationId ? 'active' : ''} ${chat.unreadCount > 0 ? 'unread' : ''}`;
+                item.dataset.id = chat.id;
+                item.innerHTML = `
+                    <div class="conversation-checkbox">
+                        <input type="checkbox" data-id="${chat.id}" class="conversation-select-checkbox" />
                     </div>
-                </div>
-            `;
-            fragment.appendChild(item);
-        });
-        conversationListEl.appendChild(fragment);
-        updateUnreadCount(); // Update the count whenever the list is rendered
+                    <div class="profile-photo">
+                        <img src="${chat.profilePic}" alt="${chat.userName}" />
+                    </div>
+                    <div class="conversation-details">
+                        <strong>${chat.userName}</strong>
+                        <small class="text-muted" style="margin-left: 0.5rem;">${chat.lastMessageTime || chat.createdAt}</small>
+                        <p>${chat.lastMessage}</p>
+                    </div>
+                    <div class="conversation-item-actions">
+                        <button class="action-icon-btn conversation-menu-btn" title="More options">
+                            <span class="material-symbols-outlined">more_vert</span>
+                        </button>
+                        <div class="conversation-item-dropdown">
+                            <a href="#" class="mark-unread-btn">
+                                <span class="material-symbols-outlined">mark_chat_unread</span>
+                                <span>Mark as Unread</span>
+                            </a>
+                            <a href="#" class="archive-chat-btn">
+                                <span class="material-symbols-outlined">archive</span>
+                                <span>Archive Chat</span>
+                            </a>
+                            <a href="#" class="delete-chat-btn danger">
+                                <span class="material-symbols-outlined">delete</span>
+                                <span>Delete Chat</span>
+                            </a>
+                        </div>
+                    </div>
+                `;
+                fragment.appendChild(item);
+            });
+            conversationListEl.appendChild(fragment);
+        }
+        updateUnreadCount();
     };
 
     /**
@@ -395,7 +467,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             senderProfilePic: currentAdminData?.profilePic || './images/redicon.png',
             type: 'text',
             text: text,
-            timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
+            timestamp: (window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue && window.firebase.firestore.FieldValue.serverTimestamp) ? window.firebase.firestore.FieldValue.serverTimestamp() : (db.constructor.FieldValue ? db.constructor.FieldValue.serverTimestamp() : null),
             status: 'sent', // Initial status is 'sent'
             isAdmin: true // Flag to identify admin messages
         };
@@ -411,7 +483,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             .doc(currentConversationId)
                             .update({
                                 lastMessage: text,
-                                timestamp: window.firebase.firestore.FieldValue.serverTimestamp()
+                                timestamp: (window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue && window.firebase.firestore.FieldValue.serverTimestamp) ? window.firebase.firestore.FieldValue.serverTimestamp() : (db.constructor.FieldValue ? db.constructor.FieldValue.serverTimestamp() : null)
                             });
                     })
                     .catch((error) => {
@@ -895,10 +967,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
         }
         
-        randomChat.messages.push(replyMessage);
+        // Only update if messages array exists (for demo data); in real app, Firestore is the source of truth
+        if (Array.isArray(randomChat.messages)) {
+            randomChat.messages.push(replyMessage);
+        }
         randomChat.lastMessage = replyMessage.type === 'image' ? 'Sent an image' : replyMessage.text;
-        randomChat.timestamp = 'Just now';
-        randomChat.isUnread = true;
+        randomChat.lastMessageTime = 'Just now';
+        randomChat.unreadCount = (randomChat.unreadCount || 0) + 1;
         renderConversationList(searchInput.value); // Re-render to show the unread indicator and update count
     };
     // Simulate a reply every 15-25 seconds for a more dynamic demo
