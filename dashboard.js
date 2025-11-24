@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             row.innerHTML = `
                 <td class="customer-cell">
-                    <span>${appt.customer}</span>
+                    <span>${appt.serviceId}</span>
                 </td>
                 <td>${appt.plateNumber}</td>
                 <td>${appt.serviceNames}</td>

@@ -140,10 +140,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   createPromotionForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     console.log('📝 Form submission started');
-    
+    // Disable submit button to prevent duplicate submissions
+    const submitBtn = createPromotionForm.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
     const formData = getFormData();
     console.log('📊 Form data collected:', formData);
-    
+
     formData.status = "Active"; // Or determine based on publish date
 
     // Determine status based on publish date
@@ -162,13 +165,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!formData.title || !formData.promoId) {
       console.error('❌ Missing required fields:', { title: formData.title, promoId: formData.promoId });
       alert('Please fill in all required fields (Title, etc.)');
+      if (submitBtn) submitBtn.disabled = false;
       return;
     }
 
     // Save to Firebase
     try {
       console.log(`🔄 Saving promotion ${formData.promoId} to Firebase...`);
-      
       const docData = {
         title: formData.title,
         description: formData.description,
@@ -182,22 +185,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         status: formData.status,
         createdAt: new Date().toISOString()
       };
-      
       console.log('📄 Document data to save:', docData);
-      
       await db.collection('promotions').doc(formData.promoId).set(docData);
       console.log('✅ Promotion created in Firebase:', formData.promoId);
       console.log('💾 Saving to sessionStorage for display...');
-      
       sessionStorage.setItem("newlyCreatedPromotion", JSON.stringify(formData));
       console.log('✅ sessionStorage updated. Redirecting to promotions.html...');
-      
       window.location.href = "promotions.html";
     } catch (error) {
       console.error('❌ Error creating promotion in Firebase:', error);
       console.error('Error code:', error.code);
       console.error('Error message:', error.message);
       alert(`Failed to create promotion: ${error.message}`);
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 

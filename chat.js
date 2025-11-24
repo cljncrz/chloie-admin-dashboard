@@ -400,9 +400,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             isAdmin: true // Flag to identify admin messages
         };
 
-        // Message sending functionality removed
-        messageInput.value = '';
-        console.log('Message sending to chat_rooms collection has been disabled');
+                // Send message to Firestore
+                db.collection('chat_rooms')
+                    .doc(currentConversationId)
+                    .collection('messages')
+                    .add(newMessage)
+                    .then(() => {
+                        // Update lastMessage and timestamp in chat_rooms for conversation preview
+                        return db.collection('chat_rooms')
+                            .doc(currentConversationId)
+                            .update({
+                                lastMessage: text,
+                                timestamp: window.firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                    })
+                    .catch((error) => {
+                        console.error('Error sending message:', error);
+                        alert('Failed to send message. Please try again.');
+                    });
+                messageInput.value = '';
     };
 
     /**

@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!geofencingForm) return;
 
     // --- DOM Elements ---
-    const enabledToggle = document.getElementById('geofencing-enabled-toggle');
     const hoursGrid = document.getElementById('operating-hours-grid');
     const locationNameInput = document.getElementById('location-name');
     const locationAddressInput = document.getElementById('location-address');
@@ -25,7 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Default Settings ---
     const defaultSettings = {
-        isEnabled: false,
+        // isEnabled: false, // Always enabled, toggle removed
         operatingHours: {
             Sunday: { isOpen: false, start: '09:00', end: '17:00' },
             Monday: { isOpen: true, start: '08:00', end: '20:00' },
@@ -58,8 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }));
             console.log('✅ Geofencing locations loaded from Firestore:', geofencingLocations);
             
-            // Populate UI
-            enabledToggle.checked = geofencingSettings.isEnabled;
+            // Populate UI (toggle removed, always enabled)
             notificationMessageInput.value = geofencingSettings.notificationMessage || '';
             populateHoursGrid(geofencingSettings.operatingHours);
             renderLocationsList();
@@ -123,7 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Prepare settings object
             const updatedSettings = {
-                isEnabled: enabledToggle.checked,
+                isEnabled: true, // Always enabled
                 operatingHours: newOperatingHours,
                 notificationMessage: notificationMessage,
                 updatedAt: new Date().toISOString(),
@@ -142,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Update app settings for mobile app
             const appSettingsRef = db.collection('app_settings').doc('features');
             batch.set(appSettingsRef, {
-                geofencingEnabled: updatedSettings.isEnabled,
+                geofencingEnabled: true, // Always enabled
                 geofencingMessage: notificationMessage,
                 lastUpdated: new Date().toISOString()
             }, { merge: true });

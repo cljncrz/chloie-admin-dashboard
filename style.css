@@ -536,6 +536,46 @@ aside {
     height: 100vh;
     position: sticky;
     top: 0;
+    min-width: 180px;
+    max-width: 340px;
+    width: 240px;
+    background: var(--color-white, #fff);
+    resize: horizontal;
+    overflow: auto;
+    transition: width 0.2s;
+    box-sizing: border-box;
+    border-right: 1px solid #e5e7eb;
+    z-index: 10;
+}
+/* Sidebar resize handle (optional visual cue) */
+aside::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    background: linear-gradient(to right, transparent 0%, #e5e7eb 100%);
+    z-index: 11;
+}
+/* Responsive sidebar for small screens */
+@media (max-width: 900px) {
+    aside {
+        min-width: 60px;
+        width: 60px;
+        max-width: 100vw;
+        overflow-x: hidden;
+        transition: width 0.2s;
+    }
+    aside .sidebar-menu a span,
+    aside .sidebar-top p,
+    aside .logo p {
+        display: none;
+    }
+    aside .logo img {
+        max-width: 40px;
+    }
 }
 
 aside .sidebar-top {

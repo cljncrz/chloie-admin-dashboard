@@ -52,26 +52,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const auth = window.firebase.auth();
     const db = window.firebase.firestore();
 
-    // Check if user is already logged in
-    auth.onAuthStateChanged((user) => {
-      if (user) {
-        // User is logged in, check if they're an admin
-        db.collection('users').doc(user.uid).get()
-          .then((docSnapshot) => {
-            if (docSnapshot.exists && docSnapshot.data().role === 'admin') {
-              // Redirect to dashboard
-              console.log('User already logged in as admin, redirecting...');
-              window.location.href = 'index.html';
-            } else {
-              // Not an admin, sign them out
-              auth.signOut();
-            }
-          })
-          .catch((error) => {
-            console.error('Error checking user role:', error);
-          });
-      }
-    });
+    // Disabled automatic login redirect. Login will only occur on form submit.
+    // auth.onAuthStateChanged((user) => {
+    //   if (user) {
+    //     // User is logged in, check if they're an admin
+    //     db.collection('users').doc(user.uid).get()
+    //       .then((docSnapshot) => {
+    //         if (docSnapshot.exists && docSnapshot.data().role === 'admin') {
+    //           // Redirect to dashboard
+    //           console.log('User already logged in as admin, redirecting...');
+    //           window.location.href = 'index.html';
+    //         } else {
+    //           // Not an admin, sign them out
+    //           auth.signOut();
+    //         }
+    //       })
+    //       .catch((error) => {
+    //         console.error('Error checking user role:', error);
+    //       });
+    //   }
+    // });
 
     // --- Login Handler ---
     if (loginForm) {
