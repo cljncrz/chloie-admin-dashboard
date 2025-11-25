@@ -1,4 +1,142 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    // Show Archived Services Button Toggle
+    const showArchivedBtn = document.getElementById('show-archived-btn');
+    const archivedContainer = document.getElementById('archived-appointments-table-container');
+    if (showArchivedBtn && archivedContainer) {
+        showArchivedBtn.addEventListener('click', () => {
+            const isVisible = archivedContainer.style.display !== 'none';
+            if (isVisible) {
+                archivedContainer.style.display = 'none';
+                showArchivedBtn.innerHTML = '<span class="material-symbols-outlined">history</span> Show Archived Services';
+            } else {
+                archivedContainer.style.display = '';
+                showArchivedBtn.innerHTML = '<span class="material-symbols-outlined">history</span> Hide Archived Services';
+            }
+        });
+    }
+    // ========== ARCHIVED APPOINTMENTS TABLE POPULATION ==========
+    async function populateArchivedAppointmentsTable() {
+        const container = document.getElementById('archived-appointments-table-container');
+        if (!container) return;
+        const table = container.querySelector('table');
+        const thead = table ? table.querySelector('thead tr') : null;
+        const tbody = table ? table.querySelector('tbody') : null;
+        if (!tbody || !thead) return;
+        // Add/ensure the Source column exists
+        if (!thead.querySelector('.archived-source-header')) {
+            const th = document.createElement('th');
+            th.textContent = 'Source';
+            th.className = 'archived-source-header';
+            th.style.textAlign = 'center';
+            thead.appendChild(th);
+        }
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Loading archived services...</td></tr>';
+        try {
+            const db = window.firebase.firestore();
+            // Fetch archive_bookings
+            const bookingsSnap = await db.collection('archive_bookings').get();
+            const archivedAppointments = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), _source: 'Booking' }));
+            // Fetch archive_walkins
+            const walkinsSnap = await db.collection('archive_walkins').get();
+            const archivedWalkins = walkinsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), _source: 'Walk-in' }));
+            // Normalize walk-in fields to match appointment fields for table rendering
+            const normalizedWalkins = archivedWalkins.map(w => ({
+                serviceId: w.id || w.serviceId || '',
+                customer: w.customer || w.carName || w.plate || 'Walk-in',
+                service: w.service || w.serviceNames || '',
+                datetime: w.datetime || '',
+                price: w.price || '',
+                archivedAt: w.archivedAt || '',
+                _source: w._source
+            }));
+            const normalizedAppointments = archivedAppointments.map(a => ({
+                serviceId: a.serviceId || a.id || '',
+                customer: a.customer || a.carName || a.plate || 'N/A',
+                service: a.service || a.serviceNames || '',
+                datetime: a.datetime || '',
+                price: a.price || '',
+                archivedAt: a.archivedAt || '',
+                _source: a._source
+            }));
+            const archived = [...normalizedAppointments, ...normalizedWalkins];
+            tbody.innerHTML = '';
+            if (archived.length === 0) {
+                const tr = document.createElement('tr');
+                tr.classList.add('no-results-row');
+                tr.innerHTML = `<td colspan="8" class="text-center text-muted">No archived services found.</td>`;
+                tbody.appendChild(tr);
+                return;
+            }
+            archived.forEach(a => {
+                const tr = document.createElement('tr');
+                const archivedAt = a.archivedAt ? (new Date(a.archivedAt)).toLocaleString() : 'N/A';
+                tr.innerHTML = `
+                    <td>${a.serviceId}</td>
+                    <td>${a.customer || 'N/A'}</td>
+                    <td>${a.service || 'N/A'}</td>
+                    <td>${a.datetime || 'N/A'}</td>
+                    <td>${a.price || 'N/A'}</td>
+                    <td>${archivedAt}</td>
+                    <td class="text-center">-</td>
+                    <td class="text-center">${a._source}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Failed to load archived services.</td></tr>`;
+            console.error('Error loading archived services:', err);
+        }
+    }
+    // ARCHIVE ALL COMPLETED & PAID BUTTON
+    document.addEventListener('click', async (e) => {
+        const archiveBtn = e.target.closest('#archive-completed-paid-btn');
+        if (!archiveBtn) return;
+        if (!confirm('Archive all completed and paid services? This will move them to the archived section.')) return;
+
+        archiveBtn.disabled = true;
+        archiveBtn.textContent = 'Archiving...';
+        try {
+            const db = window.firebase.firestore();
+            const FieldValue = window.firebase.firestore().FieldValue;
+            // Appointments
+            const appointments = (window.appData.appointments || []).filter(a => String(a.status).toLowerCase() === 'completed' && String(a.paymentStatus).toLowerCase() === 'paid' && !a.archived);
+            // Walk-ins
+            const walkins = (window.appData.walkins || []).filter(w => String(w.status).toLowerCase() === 'completed' && String(w.paymentStatus).toLowerCase() === 'paid' && !w.archived);
+
+            const updates = [];
+            for (const appt of appointments) {
+                updates.push(db.collection('bookings').doc(appt.serviceId).update({ archived: true, archivedAt: FieldValue.serverTimestamp() }));
+                appt.archived = true;
+                appt.archivedAt = new Date().toISOString();
+            }
+            for (const walkin of walkins) {
+                updates.push(db.collection('walkins').doc(walkin.id).update({ archived: true, archivedAt: FieldValue.serverTimestamp() }));
+                walkin.archived = true;
+                walkin.archivedAt = new Date().toISOString();
+            }
+            await Promise.all(updates);
+            if (typeof showSuccessToast === 'function') showSuccessToast('Archived all completed & paid services.');
+            // Optionally, refresh the tables
+            // Remove archived from appData before re-rendering tables
+            if (window.appData && window.appData.appointments) {
+                window.appData.appointments = window.appData.appointments.filter(a => !a.archived);
+            }
+            if (window.appData && window.appData.walkins) {
+                window.appData.walkins = window.appData.walkins.filter(w => !w.archived);
+            }
+            if (typeof populateAppointmentsTable === 'function') populateAppointmentsTable();
+            if (typeof populateWalkinsTable === 'function') populateWalkinsTable();
+            if (typeof populateArchivedAppointmentsTable === 'function') populateArchivedAppointmentsTable();
+        } catch (err) {
+            console.error('Error archiving completed & paid:', err);
+            if (typeof showSuccessToast === 'function') showSuccessToast('Failed to archive some services.', 'error');
+        } finally {
+            archiveBtn.disabled = false;
+            archiveBtn.textContent = 'Archive All Completed & Paid';
+        }
+    });
+    // Populate archived table on load and after data changes
+    if (typeof populateArchivedAppointmentsTable === 'function') populateArchivedAppointmentsTable();
     // --- Pending Queue Functionality ---
     // Helper to get selected date from the calendar widget (if available)
     function getSelectedDate() {
@@ -535,6 +673,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     statusDisplay = `<span class="${statusClass}">${appt.status}</span>`;
                 }
+                // Disable cancel button if completed and paid
+                const disableCancel = appt.status === 'Completed' && appt.paymentStatus === 'Paid';
                 row.innerHTML = `
                     <td>${appt.serviceId}</td>
                     <td>${appt.plate}</td>
@@ -549,7 +689,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="text-center">
                         ${actionButtons}
                         ${paymentActionButton}
-                        <button class="action-icon-btn cancel-btn" title="Cancel Appointment">
+                        <button class="action-icon-btn cancel-btn" title="Cancel Appointment"${disableCancel ? ' disabled style="opacity:0.5;pointer-events:none;"' : ''}>
                             <span class="material-symbols-outlined">cancel</span>
                         </button>
                     </td>
@@ -680,6 +820,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <span class="material-symbols-outlined">payments</span>
                         </button>`;
                 }
+                // Disable cancel button if completed and paid
+                const disableCancel = walkin.status === 'Completed' && walkin.paymentStatus === 'Paid';
                 row.innerHTML = `
                     <td>${walkin.plate}</td>
                     <td>${walkin.carName}</td>
@@ -693,7 +835,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="text-center">
                         ${actionButtons}
                         ${paymentActionButton}
-                        <button class="action-icon-btn cancel-btn" title="Cancel Appointment">
+                        <button class="action-icon-btn cancel-btn" title="Cancel Appointment"${disableCancel ? ' disabled style="opacity:0.5;pointer-events:none;"' : ''}>
                             <span class="material-symbols-outlined">cancel</span>
                         </button>
                     </td>

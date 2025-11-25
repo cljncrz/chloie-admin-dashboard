@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!geofencingForm) return;
 
     // --- DOM Elements ---
-    const hoursGrid = document.getElementById('operating-hours-grid');
+    // const hoursGrid = document.getElementById('operating-hours-grid');
     const locationNameInput = document.getElementById('location-name');
     const locationAddressInput = document.getElementById('location-address');
     const locationLatInput = document.getElementById('location-latitude');
@@ -20,20 +20,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const geofencingStatus = document.getElementById('geofencing-status');
     const notificationsSentCount = document.getElementById('notifications-sent-count');
 
-    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    // const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     // --- Default Settings ---
     const defaultSettings = {
         // isEnabled: false, // Always enabled, toggle removed
-        operatingHours: {
-            Sunday: { isOpen: false, start: '09:00', end: '17:00' },
-            Monday: { isOpen: true, start: '08:00', end: '20:00' },
-            Tuesday: { isOpen: true, start: '08:00', end: '20:00' },
-            Wednesday: { isOpen: true, start: '08:00', end: '20:00' },
-            Thursday: { isOpen: true, start: '08:00', end: '20:00' },
-            Friday: { isOpen: true, start: '08:00', end: '20:00' },
-            Saturday: { isOpen: true, start: '08:00', end: '22:00' },
-        },
         notificationMessage: 'Kingsley Carwash is nearby! Visit us now!',
         notificationsSent: 0
     };
@@ -59,7 +50,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Populate UI (toggle removed, always enabled)
             notificationMessageInput.value = geofencingSettings.notificationMessage || '';
-            populateHoursGrid(geofencingSettings.operatingHours);
             renderLocationsList();
             updateStats();
         } catch (error) {
@@ -68,129 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- Save Settings to Firestore ---
-    const saveSettings = async () => {
-        // Disable save button and show loading state
-        const saveBtn = document.querySelector('button[type="submit"]');
-        const originalText = saveBtn.innerHTML;
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Saving...';
-
-        try {
-            // Validate notification message
-            const notificationMessage = notificationMessageInput.value.trim();
-            if (!notificationMessage) {
-                throw new Error('Notification message cannot be empty');
-            }
-
-            // Collect operating hours
-            const newOperatingHours = {};
-            let hasValidHours = false;
-
-            daysOfWeek.forEach(day => {
-                const isOpen = document.getElementById(`is-open-${day}`).checked;
-                const startTime = document.getElementById(`start-time-${day}`).value;
-                const endTime = document.getElementById(`end-time-${day}`).value;
-
-                // Validate time range if day is open
-                if (isOpen) {
-                    if (!startTime || !endTime) {
-                        throw new Error(`Please set operating hours for ${day}`);
-                    }
-                    if (startTime >= endTime) {
-                        throw new Error(`${day}: End time must be after start time`);
-                    }
-                    hasValidHours = true;
-                }
-
-                newOperatingHours[day] = {
-                    isOpen: isOpen,
-                    start: startTime || '08:00',
-                    end: endTime || '20:00',
-                };
-            });
-
-            // Warn if no days are open
-            if (!hasValidHours) {
-                const proceed = confirm('Warning: No operating hours are set. Geofencing will not trigger on any day. Continue anyway?');
-                if (!proceed) {
-                    saveBtn.disabled = false;
-                    saveBtn.innerHTML = originalText;
-                    return;
-                }
-            }
-
-            // Prepare settings object
-            const updatedSettings = {
-                isEnabled: true, // Always enabled
-                operatingHours: newOperatingHours,
-                notificationMessage: notificationMessage,
-                updatedAt: new Date().toISOString(),
-                updatedBy: firebase.auth().currentUser?.email || 'admin'
-            };
-
-            console.log('🔄 Saving geofencing settings...', updatedSettings);
-
-            // Create batch for atomic updates
-            const batch = db.batch();
-
-            // Update geofencing settings
-            const geofencingRef = db.collection('adminSettings').doc('geofencing');
-            batch.set(geofencingRef, updatedSettings, { merge: true });
-
-            // Update app settings for mobile app
-            const appSettingsRef = db.collection('app_settings').doc('features');
-            batch.set(appSettingsRef, {
-                geofencingEnabled: true, // Always enabled
-                geofencingMessage: notificationMessage,
-                lastUpdated: new Date().toISOString()
-            }, { merge: true });
-
-            // Commit batch
-            await batch.commit();
-
-            // Update local state
-            geofencingSettings = { ...geofencingSettings, ...updatedSettings };
-            
-            console.log('✅ Geofencing settings saved to Firestore');
-            updateStats();
-            
-            // Show detailed success message
-            showSaveSuccessMessage(updatedSettings);
-            
-        } catch (error) {
-            console.error('❌ Error saving geofencing settings:', error);
-            
-            // Show user-friendly error message
-            const errorMessage = document.createElement('div');
-            errorMessage.style.cssText = `
-                position: fixed;
-                top: 80px;
-                right: 20px;
-                background: #ef4444;
-                color: white;
-                padding: 1rem 1.5rem;
-                border-radius: 0.5rem;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                z-index: 1000;
-                max-width: 400px;
-            `;
-            errorMessage.innerHTML = `
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                    <span class="material-symbols-outlined">error</span>
-                    <div>
-                        <strong>Failed to Save Settings</strong>
-                        <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;">${error.message}</p>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(errorMessage);
-            setTimeout(() => errorMessage.remove(), 5000);
-        } finally {
-            // Re-enable save button
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = originalText;
-        }
-    };
+    // No saveSettings needed for hours, as geofencing is always on and hours are not configurable
 
     // --- Show Save Success Message ---
     const showSaveSuccessMessage = (settings) => {
@@ -341,46 +209,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
-    // --- Populate Hours Grid ---
-    const populateHoursGrid = (hoursData) => {
-        hoursGrid.innerHTML = '';
-        daysOfWeek.forEach(day => {
-            const dayData = hoursData[day];
-            const row = document.createElement('div');
-            row.className = 'operating-hours-row';
-            row.innerHTML = `
-                <strong class="day-label">${day}</strong>
-                <div class="form-group">
-                    <input type="time" id="start-time-${day}" value="${dayData.start}" ${!dayData.isOpen ? 'disabled' : ''}>
-                </div>
-                <div class="form-group">
-                    <input type="time" id="end-time-${day}" value="${dayData.end}" ${!dayData.isOpen ? 'disabled' : ''}>
-                </div>
-                <div class="form-group-toggle">
-                    <label class="theme-toggle-switch small-toggle">
-                        <input type="checkbox" id="is-open-${day}" ${dayData.isOpen ? 'checked' : ''}>
-                        <span class="theme-slider"></span>
-                    </label>
-                </div>
-            `;
-            hoursGrid.appendChild(row);
-
-            // Add event listener to enable/disable time inputs
-            const isOpenToggle = row.querySelector(`#is-open-${day}`);
-            const startTimeInput = row.querySelector(`#start-time-${day}`);
-            const endTimeInput = row.querySelector(`#end-time-${day}`);
-            isOpenToggle.addEventListener('change', () => {
-                startTimeInput.disabled = !isOpenToggle.checked;
-                endTimeInput.disabled = !isOpenToggle.checked;
-            });
-        });
-    };
+    // No hours grid to populate, as hours are not configurable
 
     // --- Update Statistics ---
     const updateStats = () => {
         activeLocationsCount.textContent = geofencingLocations.length;
-        geofencingStatus.textContent = geofencingSettings.isEnabled ? 'Enabled' : 'Disabled';
-        geofencingStatus.className = geofencingSettings.isEnabled ? 'stat-value active' : 'stat-value';
+        geofencingStatus.textContent = 'Enabled';
+        geofencingStatus.className = 'stat-value active';
         notificationsSentCount.textContent = geofencingSettings.notificationsSent || 0;
     };
 
@@ -515,96 +350,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Master Control Toggle Event Listener
+    let enabledToggle = document.getElementById('geofencing-enabled-toggle');
     if (enabledToggle) {
         enabledToggle.addEventListener('change', (e) => {
             toggleGeofencing(e.target.checked);
         });
     }
 
-    // Save Operating Hours Button Event Listener
-    const saveOperatingHoursBtn = document.getElementById('save-operating-hours-btn');
-    if (saveOperatingHoursBtn) {
-        saveOperatingHoursBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            
-            // Update button state
-            const originalHTML = saveOperatingHoursBtn.innerHTML;
-            saveOperatingHoursBtn.disabled = true;
-            saveOperatingHoursBtn.innerHTML = '<span class="material-symbols-outlined">sync</span> Saving...';
-            
-            try {
-                // Collect operating hours data
-                const operatingHours = {};
-                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-                
-                // Validate and collect operating hours
-                let isValid = true;
-                for (const day of days) {
-                    const openInput = document.getElementById(`${day}-open`);
-                    const closeInput = document.getElementById(`${day}-close`);
-                    
-                    if (!openInput || !closeInput) {
-                        isValid = false;
-                        break;
-                    }
-                    
-                    const openTime = openInput.value;
-                    const closeTime = closeInput.value;
-                    
-                    if (!openTime || !closeTime) {
-                        showStatusMessage('Please fill in all operating hours', 'error');
-                        isValid = false;
-                        break;
-                    }
-                    
-                    operatingHours[day] = {
-                        open: openTime,
-                        close: closeTime
-                    };
-                }
-                
-                if (!isValid) {
-                    saveOperatingHoursBtn.disabled = false;
-                    saveOperatingHoursBtn.innerHTML = originalHTML;
-                    return;
-                }
-                
-                // Save to Firestore using batch
-                const batch = db.batch();
-                
-                // Update admin_settings
-                const adminSettingsRef = db.collection('adminSettings').doc('geofencing');
-                batch.update(adminSettingsRef, {
-                    operatingHours: operatingHours,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                // Update app_settings
-                const appSettingsRef = db.collection('app_settings').doc('geofencing');
-                batch.update(appSettingsRef, {
-                    operatingHours: operatingHours,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                await batch.commit();
-                
-                // Show success message
-                showStatusMessage('Operating hours saved successfully!', 'success');
-                
-                // Reset button
-                saveOperatingHoursBtn.disabled = false;
-                saveOperatingHoursBtn.innerHTML = originalHTML;
-                
-            } catch (error) {
-                console.error('Error saving operating hours:', error);
-                showStatusMessage('Failed to save operating hours. Please try again.', 'error');
-                
-                // Reset button
-                saveOperatingHoursBtn.disabled = false;
-                saveOperatingHoursBtn.innerHTML = originalHTML;
-            }
-        });
-    }
+    // No save operating hours button, as hours are not configurable
 
     // --- Real-time Listener for Settings Changes ---
     const setupRealtimeListener = () => {

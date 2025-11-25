@@ -10,11 +10,10 @@
     return;
   }
 
-  // Wait for Firebase to initialize with a timeout
+  // Wait for Firebase to initialize with a longer timeout
   const waitForFirebase = async () => {
-    const maxWaitTime = 5000; // 5 seconds max
+    const maxWaitTime = 20000; // 20 seconds max
     const startTime = Date.now();
-    
     while (!window.firebase || !window.firebase.auth) {
       if (Date.now() - startTime > maxWaitTime) {
         console.error('auth-guard: Firebase initialization timeout');
@@ -22,12 +21,9 @@
       }
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    
-    // Also wait for the init promise if it exists
     if (window.firebaseInitPromise) {
       await window.firebaseInitPromise;
     }
-    
     return true;
   };
 
@@ -87,11 +83,5 @@
     }
   });
 
-  // Add a timeout to prevent indefinite loading if auth state never resolves
-  setTimeout(() => {
-    if (!authCheckComplete) {
-      console.warn('auth-guard: Auth check timed out, redirecting to login');
-      window.location.href = 'login.html';
-    }
-  }, 5000);
+  // Removed auto log-off timeout to prevent unnecessary logouts due to slow auth/network
 })();

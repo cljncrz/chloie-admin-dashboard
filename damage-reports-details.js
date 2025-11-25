@@ -223,7 +223,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Show form to add new note
     showResponseFormBtn.addEventListener('click', () => {
-      responseFormTitle.textContent = 'Respond to Customer';
+      if (responseFormTitle) {
+        responseFormTitle.textContent = 'Respond to Customer';
+      }
       document.getElementById('response-textarea').value = '';
       showResponseFormBtn.style.display = 'none';
       adminResponseForm.style.display = 'block';
@@ -232,7 +234,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Show form to edit existing note
     if (editResponseBtn) {
       editResponseBtn.addEventListener('click', () => {
-        responseFormTitle.textContent = 'Edit Response to Customer';
+        if (responseFormTitle) {
+          responseFormTitle.textContent = 'Edit Response to Customer';
+        }
         document.getElementById('response-textarea').value = report.adminResponse || '';
         existingResponseContainer.style.display = 'none';
         adminResponseForm.style.display = 'block';
@@ -283,6 +287,60 @@ document.addEventListener('DOMContentLoaded', async () => {
         adminResponseForm.reset();
         // Show success message
         showNotesUpdateToast();
+
+        // --- Notify customer ---
+        // Helper to get customer ID from name (copied from appointments.js)
+        async function getCustomerIdFromName(customerName) {
+          try {
+            if (!customerName || typeof customerName !== 'string') {
+              return null;
+            }
+            const usersSnapshot = await db.collection('users')
+              .where('fullName', '==', customerName.trim())
+              .where('role', '!=', 'admin')
+              .limit(1)
+              .get();
+            if (usersSnapshot.empty) {
+              console.warn(`⚠️ No customer found with name: ${customerName}`);
+              return null;
+            }
+            return usersSnapshot.docs[0].id;
+          } catch (error) {
+            console.error(`❌ Error looking up customer ID: ${error.message}`);
+            return null;
+          }
+        }
+
+        // Send notification if possible
+        if (window.NotificationService && typeof window.NotificationService.sendNotification === 'function') {
+          const customerName = report.customer || report.customerName || report.fullName;
+          const customerId = await getCustomerIdFromName(customerName);
+          if (customerId) {
+            try {
+              await window.NotificationService.sendNotification({
+                recipientIds: [customerId],
+                title: 'Admin Responded to Your Damage Report',
+                body: 'An admin has responded to your damage report. Tap to chat with us.',
+                type: 'damage_report_response',
+                data: {
+                  reportId: report.reportId,
+                  response: responseText,
+                  action: 'open_chat',
+                  chatTarget: 'admin',
+                  // Optionally, add a deep link or page reference for the app to handle
+                  deepLink: '/chats.html'
+                }
+              });
+              console.log('✅ Customer notified of admin response (with chat link)');
+            } catch (notifyErr) {
+              console.error('❌ Failed to send notification to customer:', notifyErr);
+            }
+          } else {
+            console.warn('⚠️ Could not notify customer: ID not found');
+          }
+        } else {
+          console.warn('NotificationService not available');
+        }
       } catch (error) {
         console.error('❌ Error saving admin response:', error);
         alert('Failed to save admin response: ' + error.message);
