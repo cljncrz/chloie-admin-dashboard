@@ -307,6 +307,85 @@ app.post('/api/media/make-public', async (req, res) => {
 });
 
 /**
+ * Create booking atomically
+ * POST /api/bookings/create
+ * Body: { customer, phone, plate, carName, carType, service, technician?, status?, datetime, paymentStatus?, price?, paymentMethod? }
+ * Ensures no non-cancelled booking exists at the exact datetime using a transaction.
+ */
+app.post('/api/bookings/create', async (req, res) => {
+  try {
+    if (!db) return res.status(500).json({ success: false, error: 'Admin SDK not initialized' });
+
+    const {
+      customer,
+      phone,
+      plate,
+      carName,
+      carType,
+      service,
+      technician = 'Unassigned',
+      status = 'Pending',
+      datetime,
+      paymentStatus = 'Unpaid',
+      price = 0,
+      paymentMethod = null,
+    } = req.body || {};
+
+    if (!customer || !service || !datetime) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: customer, service, datetime' });
+    }
+
+    const bookingsColl = db.collection('bookings');
+
+    const createdId = await db.runTransaction(async (tx) => {
+      // Query for any bookings that match the exact datetime
+      const q = bookingsColl.where('datetime', '==', datetime);
+      const qSnap = await tx.get(q);
+
+      // If any non-cancelled appointment exists at this datetime, abort
+      let conflict = false;
+      qSnap.forEach(d => {
+        const s = d.data().status;
+        if (!s || s.toLowerCase() !== 'cancelled') {
+          conflict = true;
+        }
+      });
+
+      if (conflict) {
+        throw new Error('slot-conflict');
+      }
+
+      const newRef = bookingsColl.doc();
+      tx.set(newRef, {
+        customer,
+        phone: phone || null,
+        plate: plate || null,
+        carName: carName || null,
+        carType: carType || null,
+        service,
+        technician,
+        status,
+        datetime,
+        paymentStatus,
+        price,
+        paymentMethod,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return newRef.id;
+    });
+
+    return res.json({ success: true, id: createdId });
+  } catch (err) {
+    console.error('Error creating booking atomically:', err && err.message ? err.message : err);
+    if (err && err.message === 'slot-conflict') {
+      return res.status(409).json({ success: false, error: 'Slot already booked' });
+    }
+    return res.status(500).json({ success: false, error: err.message || String(err) });
+  }
+});
+
+/**
  * Send push notifications to mobile app users
  * POST /api/notifications/send
  * Body: {

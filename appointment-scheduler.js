@@ -1023,26 +1023,52 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // 4. Persist booking to Firestore (if available), then add to local arrays
             try {
-                if (window.firebase && window.firebase.firestore) {
-                    const db = window.firebase.firestore();
-                    const saveObj = {
-                        customer: newAppointment.customer,
-                        phone: newAppointment.phone,
-                        plate: newAppointment.plate,
-                        carName: newAppointment.carName,
-                        carType: newAppointment.carType,
-                        service: newAppointment.service,
-                        technician: newAppointment.technician,
-                        status: newAppointment.status,
-                        datetime: newAppointment.datetime,
-                        paymentStatus: newAppointment.paymentStatus,
-                        price: newAppointment.price,
-                        paymentMethod: newAppointment.paymentMethod,
-                        createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    const docRef = await db.collection('bookings').add(saveObj);
-                    newAppointment.serviceId = docRef.id;
-                }
+                    if (window.firebase && window.firebase.firestore) {
+                        // Use server-side atomic booking creation to avoid race conditions
+                        const saveObj = {
+                            customer: newAppointment.customer,
+                            phone: newAppointment.phone,
+                            plate: newAppointment.plate,
+                            carName: newAppointment.carName,
+                            carType: newAppointment.carType,
+                            service: newAppointment.service,
+                            technician: newAppointment.technician,
+                            status: newAppointment.status,
+                            datetime: newAppointment.datetime,
+                            paymentStatus: newAppointment.paymentStatus,
+                            price: newAppointment.price,
+                            paymentMethod: newAppointment.paymentMethod,
+                        };
+
+                        try {
+                            const apiRoot = window.serverUrl || 'http://localhost:5000';
+                            const resp = await fetch(`${apiRoot}/api/bookings/create`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(saveObj)
+                            });
+
+                            if (!resp.ok) {
+                                if (resp.status === 409) {
+                                    alert('Selected time slot is no longer available. Please pick another slot.');
+                                } else {
+                                    const body = await resp.text();
+                                    console.error('Server booking create failed:', resp.status, body);
+                                    alert('Failed to create booking on server. See console for details.');
+                                }
+                                // Refresh calendar to show current availability
+                                renderCalendar();
+                                return;
+                            }
+
+                            const result = await resp.json();
+                            newAppointment.serviceId = result.id || (`KC-${Date.now().toString().slice(-6)}`);
+                        } catch (err) {
+                            console.error('Error calling server booking create endpoint:', err);
+                            alert('Error creating booking. Please try again.');
+                            return;
+                        }
+                    }
             } catch (saveErr) {
                 console.warn('Could not save new booking to Firestore:', saveErr);
             }
