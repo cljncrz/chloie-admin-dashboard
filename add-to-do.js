@@ -1,59 +1,67 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Ensure db is defined using the compat Firestore API
-    const db = window.firebase && window.firebase.firestore ? window.firebase.firestore() : (typeof firebase !== 'undefined' && firebase.firestore ? firebase.firestore() : null);
-    const addToDoForm = document.getElementById('add-todo-form');
+    // Wait for Firebase to be ready
+    const waitForFirebase = async () => {
+        if (window.firebaseInitPromise) await window.firebaseInitPromise;
+        if (!window.firebase || !window.firebase.firestore) throw new Error('Firebase not loaded');
+        return window.firebase.firestore();
+    };
 
-    if (addToDoForm && db) {
-        addToDoForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const todoTextInput = document.getElementById('todo-text');
-            const todoDueDateInput = document.getElementById('todo-due-date');
-            const todoDueTimeInput = document.getElementById('todo-due-time');
-            const todoPriorityInput = document.getElementById('todo-priority');
+    (async () => {
+        const db = await waitForFirebase();
+        const addToDoForm = document.getElementById('add-todo-form');
 
-            // Validate that task description is not empty
-            if (!todoTextInput.value.trim()) {
-                if (typeof showToast === 'function') {
-                    showToast('Please enter a task description.', 'error');
-                } else {
-                    alert('Please enter a task description.');
-                }
-                return;
-            }
+        if (addToDoForm && db) {
+            addToDoForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const todoTextInput = document.getElementById('todo-text');
+                const todoDueDateInput = document.getElementById('todo-due-date');
+                const todoDueTimeInput = document.getElementById('todo-due-time');
+                const todoPriorityInput = document.getElementById('todo-priority');
 
-            try {
-                // Add the new to-do item to Firestore using compat API
-                const newTodo = {
-                    text: todoTextInput.value.trim(),
-                    dueDate: todoDueDateInput.value || null,
-                    dueTime: todoDueTimeInput.value || null,
-                    priority: todoPriorityInput.value || 'medium',
-                    completed: false,
-                    archived: false,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-
-                await db.collection('todos').add(newTodo);
-
-                // Show success message
-                if (typeof showSuccessToast === 'function') {
-                    showSuccessToast('New to-do item added!');
-                } else if (typeof showToast === 'function') {
-                    showToast('New to-do item added!', 'success');
+                // Validate that task description is not empty
+                if (!todoTextInput.value.trim()) {
+                    if (typeof showToast === 'function') {
+                        showToast('Please enter a task description.', 'error');
+                    } else {
+                        alert('Please enter a task description.');
+                    }
+                    return;
                 }
 
-                // Redirect back to the to-do list page
-                setTimeout(() => {
-                    window.location.href = 'todo-lists.html';
-                }, 1000);
-            } catch (error) {
-                console.error('Error adding to-do:', error);
-                if (typeof showToast === 'function') {
-                    showToast('Error adding to-do item. Please try again.', 'error');
-                } else {
-                    alert('Error adding to-do item. Please try again.');
+                try {
+                    // Add the new to-do item to Firestore using compat API
+                    const newTodo = {
+                        text: todoTextInput.value.trim(),
+                        dueDate: todoDueDateInput.value || null,
+                        dueTime: todoDueTimeInput.value || null,
+                        priority: todoPriorityInput.value || 'medium',
+                        completed: false,
+                        archived: false,
+                        createdAt: window.firebase.firestore().FieldValue.serverTimestamp()
+                    };
+
+                    await db.collection('todos').add(newTodo);
+
+                    // Show success message
+                    if (typeof showSuccessToast === 'function') {
+                        showSuccessToast('New to-do item added!');
+                    } else if (typeof showToast === 'function') {
+                        showToast('New to-do item added!', 'success');
+                    }
+
+                    // Redirect back to the to-do list page
+                    setTimeout(() => {
+                        window.location.href = 'todo-lists.html';
+                    }, 1000);
+                } catch (error) {
+                    console.error('Error adding to-do:', error);
+                    if (typeof showToast === 'function') {
+                        showToast('Error adding to-do item. Please try again.', 'error');
+                    } else {
+                        alert('Error adding to-do item. Please try again.');
+                    }
                 }
-            }
-        });
-    }
+            });
+        }
+    })();
 });

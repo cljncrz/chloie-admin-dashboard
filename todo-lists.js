@@ -5,127 +5,197 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // --- DOM Elements ---
-    const listContainer = document.getElementById('full-todo-list');
-    const filterButtons = document.getElementById('todo-filter-buttons');
-    const noResultsMessage = listContainer.querySelector('.no-results-row');
-    const archiveCompletedBtn = document.getElementById('archive-completed-btn');
+    // Wait for Firebase to be ready and get db
+    const waitForFirebase = async () => {
+        if (window.firebaseInitPromise) await window.firebaseInitPromise;
+        if (!window.firebase || !window.firebase.firestore) throw new Error('Firebase not loaded');
+        return window.firebase.firestore();
+    };
 
-    // --- State ---
-    let todos = [];
-    let currentFilter = 'all';
-    let unsubscribe = null; // For Firestore listener cleanup
+    (async () => {
+        const db = await waitForFirebase();
 
-    // --- Firebase Reference ---
-    const todosCollection = db.collection('todos');
+        // --- DOM Elements ---
+        const listContainer = document.getElementById('full-todo-list');
+        const filterButtons = document.getElementById('todo-filter-buttons');
+        const noResultsMessage = listContainer.querySelector('.no-results-row');
+        const archiveCompletedBtn = document.getElementById('archive-completed-btn');
 
-    // --- Functions ---
+        // --- State ---
+        let todos = [];
+        let currentFilter = 'all';
+        let unsubscribe = null; // For Firestore listener cleanup
 
-    /**
-     * Renders the to-do items based on the current filter.
-     */
-    const renderTodos = () => {
-        // Clear existing items but not the 'no results' message
-        listContainer.querySelectorAll('.todo-item').forEach(item => item.remove());
+        // --- Firebase Reference ---
+        const todosCollection = db.collection('todos');
 
-        // Show/hide the archive button based on whether there are completable tasks
-        const hasCompletedTasks = todos.some(t => t.completed && !t.archived);
-        archiveCompletedBtn.style.display = hasCompletedTasks ? 'inline-flex' : 'none';
-
-        let filteredTodos = todos.filter(todo => {
-            if (currentFilter === 'completed') return todo.completed && !todo.archived;
-            if (currentFilter === 'active') return !todo.completed && !todo.archived;
-            if (currentFilter === 'archived') return todo.archived;
-            return !todo.archived; // 'all' filter now shows active and completed, but not archived
-        });
-
-        // Sort todos: completed items go to the bottom
-        filteredTodos.sort((a, b) => {
-            // In archived view, sort by newest first
-            if (currentFilter === 'archived') return new Date(b.createdAt) - new Date(a.createdAt);
-            if (a.completed === b.completed) {
-                // If both have the same status, sort by creation date (newest first)
-                return new Date(b.createdAt) - new Date(a.createdAt);
+        // --- Functions ---
+        // Admin/debug: Render all todos in a table
+        const renderAdminTable = () => {
+            const tableBody = document.getElementById('todo-admin-table-body');
+            if (!tableBody) return;
+            if (!todos.length) {
+                tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No to-dos found.</td></tr>';
+                return;
             }
-            return a.completed ? 1 : -1; // Incomplete (false) items first, then completed (true)
-        });
-
-        const getDueDateHTML = (dueDate, dueTime) => {
-            if (!dueDate) return '';
-
-            // Combine date and time for accurate comparison
-            const dueDateTimeString = dueTime ? `${dueDate}T${dueTime}` : dueDate;
-            const due = new Date(dueDateTimeString);
-            const today = new Date();
-
-            const isOverdue = due < today;
-
-            // Format the date and time for display
-            const dateOptions = { month: 'short', day: 'numeric' };
-            const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
-            
-            let formattedDate = due.toLocaleDateString('en-US', dateOptions);
-            if (dueTime) {
-                // If there's a time, format it and append it
-                formattedDate += `, ${due.toLocaleTimeString('en-US', timeOptions)}`;
-            }
-
-            return `<small class="todo-due-date ${isOverdue ? 'overdue' : ''}"><span class="material-symbols-outlined">event</span>${formattedDate}</small>`;
+            tableBody.innerHTML = todos.map(todo => {
+                const createdAt = todo.createdAt && todo.createdAt.toDate ? todo.createdAt.toDate() : todo.createdAt;
+                const createdAtStr = createdAt ? new Date(createdAt).toLocaleString() : '';
+                return `<tr>
+                    <td>${todo.id || ''}</td>
+                    <td>${todo.text || ''}</td>
+                    <td>${todo.dueDate || ''}</td>
+                    <td>${todo.dueTime || ''}</td>
+                    <td>${todo.priority || ''}</td>
+                    <td>${todo.completed ? 'Yes' : 'No'}</td>
+                    <td>${todo.archived ? 'Yes' : 'No'}</td>
+                    <td>${createdAtStr}</td>
+                </tr>`;
+            }).join('');
         };
 
-        if (filteredTodos.length === 0) {
-            noResultsMessage.style.display = 'block';
-            if (currentFilter === 'completed') {
-                noResultsMessage.querySelector('p').textContent = 'No completed tasks found.';
-            } else if (currentFilter === 'active') {
-                noResultsMessage.querySelector('p').textContent = 'All tasks completed! Great job!';
-            } else if (currentFilter === 'archived') {
-                noResultsMessage.querySelector('p').textContent = 'No archived tasks found.';
-            } else {
-                noResultsMessage.querySelector('p').textContent = 'You have no tasks. Add one to get started!';
+        // Render a single to-do by ID
+        const renderSingleTodo = (todo) => {
+            const tableBody = document.getElementById('single-todo-table-body');
+            if (!tableBody) return;
+            if (!todo) {
+                tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Not found.</td></tr>';
+                return;
             }
-        } else {
-            noResultsMessage.style.display = 'none';
-            const fragment = document.createDocumentFragment();
-            filteredTodos.forEach(todo => {
-                const itemEl = document.createElement('div');
-                let itemClass = 'todo-item';
-                if (todo.archived) {
-                    itemClass += ' archived';
-                } else if (todo.completed) {
-                    itemClass += ' completed';
+            const createdAt = todo.createdAt && todo.createdAt.toDate ? todo.createdAt.toDate() : todo.createdAt;
+            const createdAtStr = createdAt ? new Date(createdAt).toLocaleString() : '';
+            tableBody.innerHTML = `<tr>
+                <td>${todo.id || ''}</td>
+                <td>${todo.text || ''}</td>
+                <td>${todo.dueDate || ''}</td>
+                <td>${todo.dueTime || ''}</td>
+                <td>${todo.priority || ''}</td>
+                <td>${todo.completed ? 'Yes' : 'No'}</td>
+                <td>${todo.archived ? 'Yes' : 'No'}</td>
+                <td>${createdAtStr}</td>
+            </tr>`;
+        };
+
+        const renderTodos = () => {
+            // ...existing code...
+        };
+
+        const loadTodos = () => {
+            // Set up real-time listener for all todos
+            unsubscribe = todosCollection.onSnapshot((snapshot) => {
+                todos = [];
+                snapshot.forEach((doc) => {
+                    todos.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                renderTodos();
+                renderAdminTable();
+            }, (error) => {
+                console.error('Error loading todos:', error);
+                if (typeof showToast === 'function') {
+                    showToast('Error loading to-do items', 'error');
                 }
-                itemEl.className = itemClass;
-                itemEl.dataset.id = todo.id;
-                itemEl.dataset.priority = todo.priority || 'medium';
-
-                // Determine which icons/actions to show
-                const isArchived = todo.archived;
-                const completionIconHTML = isArchived ? '' : `<div class="icon-container" title="${todo.completed ? 'Mark as active' : 'Mark as complete'}"><span class="material-symbols-outlined icon-incomplete">radio_button_unchecked</span><span class="material-symbols-outlined icon-complete">check_circle</span></div>`;
-                const priorityIndicatorHTML = isArchived ? '' : `<div class="priority-menu-container"><div class="priority-indicator" title="Change Priority"></div><div class="priority-menu"><div class="priority-option" data-priority-value="high">High</div><div class="priority-option" data-priority-value="medium">Medium</div><div class="priority-option" data-priority-value="low">Low</div></div></div>`;
-                const unarchiveButtonHTML = isArchived ? `<button class="unarchive-todo-btn action-icon-btn" title="Unarchive Task"><span class="material-symbols-outlined">unarchive</span></button>` : '';
-
-                // Use the new, redesigned HTML structure
-                itemEl.innerHTML = `
-                    ${completionIconHTML}
-                    ${priorityIndicatorHTML}
-                    <div class="details">
-                        <h3>${todo.text}</h3>
-                        <div class="todo-meta">
-                            ${getDueDateHTML(todo.dueDate, todo.dueTime)}
-                            <small class="text-muted">Created: ${new Date(todo.createdAt).toLocaleDateString()}</small>
-                        </div>
-                    </div>
-                    ${unarchiveButtonHTML}
-                    <button type="button" class="delete-todo-btn action-icon-btn" title="Delete Task">
-                        <span class="material-symbols-outlined">delete</span>
-                    </button>
-                `;
-                fragment.appendChild(itemEl);
             });
-            listContainer.prepend(fragment);
-        }
-    };
+
+            // Load single to-do by ID
+            todosCollection.doc('qIshukpehkObhzgsemRQ').get().then(doc => {
+                if (doc.exists) {
+                    renderSingleTodo({ id: doc.id, ...doc.data() });
+                } else {
+                    renderSingleTodo(null);
+                }
+            }).catch(() => renderSingleTodo(null));
+        };
+
+        // ...other functions (editTodo, toggleTodo, deleteTodo, changePriority, archiveCompletedTodos, unarchiveTodo)...
+
+        // --- Event Listeners ---
+        if (filterButtons) {
+            filterButtons.addEventListener('click', (e) => {
+                // Only run this script on the todo-lists.html page
+                const todoPageContainer = document.querySelector('.todo-list-page-container');
+                if (!todoPageContainer) {
+                    return;
+                }
+
+                // Wait for Firebase to be ready and get db
+                const waitForFirebase = async () => {
+                    if (window.firebaseInitPromise) await window.firebaseInitPromise;
+                    if (!window.firebase || !window.firebase.firestore) throw new Error('Firebase not loaded');
+                    return window.firebase.firestore();
+                };
+
+                (async () => {
+                    const db = await waitForFirebase();
+
+                    // --- DOM Elements ---
+                    const listContainer = document.getElementById('full-todo-list');
+                    const filterButtons = document.getElementById('todo-filter-buttons');
+                    const noResultsMessage = listContainer.querySelector('.no-results-row');
+                    const archiveCompletedBtn = document.getElementById('archive-completed-btn');
+
+                    // --- State ---
+                    let todos = [];
+                    let currentFilter = 'all';
+                    let unsubscribe = null; // For Firestore listener cleanup
+
+                    // --- Firebase Reference ---
+                    const todosCollection = db.collection('todos');
+
+                    // --- Functions ---
+                    // ...existing code...
+
+                    // --- Event Listeners ---
+                    if (filterButtons) {
+                        filterButtons.addEventListener('click', (e) => {
+                            const button = e.target.closest('.status-filter-btn');
+                            if (button) {
+                                filterButtons.querySelectorAll('.status-filter-btn').forEach(btn => btn.classList.remove('active'));
+                                button.classList.add('active');
+                                currentFilter = button.dataset.filter;
+                                renderTodos();
+                            }
+                        });
+                    }
+                    if (listContainer) {
+                        listContainer.addEventListener('click', (e) => {
+                            const todoItem = e.target.closest('.todo-item');
+                            if (!todoItem) return;
+                            if (listContainer.querySelector('.todo-item.editing')) {
+                                return;
+                            }
+                            const todoId = todoItem.dataset.id;
+                            if (e.target.closest('.delete-todo-btn')) {
+                                e.preventDefault();
+                                deleteTodo(todoId);
+                            } else if (e.target.closest('.unarchive-todo-btn')) {
+                                e.preventDefault();
+                                unarchiveTodo(todoId);
+                            } else if (e.target.closest('.icon-container')) {
+                                toggleTodo(todoId);
+                            } else if (e.target.closest('h3')) {
+                                editTodo(todoItem);
+                            } else if (e.target.closest('.priority-indicator')) {
+                                const menu = todoItem.querySelector('.priority-menu');
+                                if (menu) menu.classList.toggle('show');
+                            } else if (e.target.closest('.priority-option')) {
+                                const newPriority = e.target.dataset.priorityValue;
+                                changePriority(todoId, newPriority);
+                            }
+                        });
+                    }
+                    if (archiveCompletedBtn) {
+                        archiveCompletedBtn.addEventListener('click', archiveCompletedTodos);
+                    }
+                    window.addEventListener('beforeunload', () => {
+                        if (unsubscribe) {
+                            unsubscribe();
+                        }
+                    });
+                    loadTodos();
+                })();
 
     /**
      * Loads todos from Firestore with real-time updates
@@ -141,6 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
             renderTodos();
+            renderAdminTable();
         }, (error) => {
             console.error('Error loading todos:', error);
             if (typeof showToast === 'function') {
@@ -401,4 +472,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     loadTodos();
-});
+    }); // End async IIFE
+}); // End DOMContentLoaded

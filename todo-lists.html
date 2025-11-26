@@ -41,6 +41,8 @@
   <script type="module" src="firebase-setup.js"></script>
   <!-- Authentication Guard -->
   <script src="auth-guard.js" defer></script>
+  <script src="get-admin-name.js" defer></script>
+  <script src="header-profile-picture.js" defer></script>
   </head>
   <body>
     <div class="container">
@@ -274,6 +276,54 @@
         <!-- ========== End of Page Content ========== -->
       </main>
       <!-- ========== End of Main Content ========== -->
+
+      <!-- ========== To-Do Table for Admin/Debug ========== -->
+      <section id="todo-table-section" style="margin: 2rem 0;">
+        <h2>All To-Dos (Admin View)</h2>
+        <div style="overflow-x:auto;">
+          <table id="todo-admin-table" border="1" cellpadding="6" style="width:100%;background:#fff;">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Text</th>
+                <th>Due Date</th>
+                <th>Due Time</th>
+                <th>Priority</th>
+                <th>Completed</th>
+                <th>Archived</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+            <tbody id="todo-admin-table-body">
+              <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== Single To-Do Table ========== -->
+      <section id="single-todo-section" style="margin: 2rem 0;">
+        <h2>To-Do: qIshukpehkObhzgsemRQ</h2>
+        <div style="overflow-x:auto;">
+          <table id="single-todo-table" border="1" cellpadding="6" style="width:100%;background:#fff;">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Text</th>
+                <th>Due Date</th>
+                <th>Due Time</th>
+                <th>Priority</th>
+                <th>Completed</th>
+                <th>Archived</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+            <tbody id="single-todo-table-body">
+              <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
     <!-- ========== Modal ========== -->

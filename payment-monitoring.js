@@ -33,13 +33,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentSortDir = 'desc';
 
     // --- Data Preparation ---
-    // **FIXED**: The data source is now aligned with Firestore collections.
-    // It combines all paid appointments from 'bookings' and walk-ins from 'walkins' with customer details.
+    // Now includes archive_bookings collection in addition to bookings and walkins.
     const getCombinedSalesData = async () => {
         try {
-            // Get Firestore instance using the compat wrapper which has .collection()
             const db = firebase.firestore();
-            
             // Fetch customers from Firestore
             const customersSnapshot = await db.collection('users').get();
             const customersMap = {};
@@ -56,32 +53,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Fetch paid bookings from Firestore
             const bookingsSnapshot = await db.collection('bookings').where('paymentStatus', '==', 'Paid').get();
-            console.log(`Found ${bookingsSnapshot.docs.length} paid bookings`);
-            
             const paidAppointments = bookingsSnapshot.docs.map(doc => {
                 const data = doc.data();
-                console.log('Booking data:', doc.id, data);
-                
                 const scheduleDate = data.scheduleDate?.toDate ? data.scheduleDate.toDate() : (data.scheduleDate ? new Date(data.scheduleDate) : new Date());
-                
-                // Try to get customer data from the users map, or use data stored directly in the booking
                 const customerData = customersMap[data.userId] || {};
                 const customerName = data.customer || data.customerName || customerData.name || 'Unknown';
                 const customerEmail = data.email || customerData.email || '';
                 const customerPhone = data.phone || customerData.phone || '';
                 const plateNumber = data.plate || data.plateNumber || customerData.plateNumber || 'N/A';
                 const carType = data.carType || customerData.carType || '';
-                
-                console.log('Extracted data:', {
-                    customerName,
-                    customerEmail,
-                    plateNumber,
-                    userId: data.userId,
-                    hasCustomerData: !!customerData.name
-                });
-
-                // Use the stored amount/price from the booking
-                // The booking should have stored the price when it was created
                 let bookingAmount = 0;
                 if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
                     bookingAmount = data.amount;
@@ -90,8 +70,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (typeof data.totalAmount === 'number' && !isNaN(data.totalAmount) && data.totalAmount > 0) {
                     bookingAmount = data.totalAmount;
                 }
-
-                // Format service names
                 let serviceName = 'Unknown';
                 if (Array.isArray(data.serviceNames)) {
                     serviceName = data.serviceNames.join(', ');
@@ -100,7 +78,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (data.service) {
                     serviceName = data.service;
                 }
-
                 return {
                     transactionId: doc.id,
                     date: scheduleDate,
@@ -124,8 +101,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = doc.data();
                 const scheduleDate = data.dateTime?.toDate ? data.dateTime.toDate() : (data.dateTime ? new Date(data.dateTime) : new Date());
                 const customerData = customersMap[data.customerId] || { name: data.customerName || 'Walk-in Customer', email: data.email || '', phone: data.phone || '', plateNumber: data.plateNumber || '', carType: data.carType || '' };
-
-                // Use the stored amount/price from the walk-in
                 let walkinAmount = 0;
                 if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
                     walkinAmount = data.amount;
@@ -134,8 +109,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (typeof data.totalAmount === 'number' && !isNaN(data.totalAmount) && data.totalAmount > 0) {
                     walkinAmount = data.totalAmount;
                 }
-
-                // Format service name
                 let serviceName = 'Unknown';
                 if (Array.isArray(data.service)) {
                     serviceName = data.service.join(', ');
@@ -144,7 +117,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (data.serviceNames) {
                     serviceName = data.serviceNames;
                 }
-
                 return {
                     transactionId: doc.id,
                     date: scheduleDate,
@@ -162,12 +134,93 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
             });
 
-            // Combine all sources into one master list
-            const allPayments = [...paidAppointments, ...paidWalkins];
-            
-            console.log('Total payments:', allPayments.length);
-            console.log('Sample payment:', allPayments[0]);
+            // Fetch paid archive_bookings from Firestore
+            const archiveSnapshot = await db.collection('archive_bookings').where('paymentStatus', '==', 'Paid').get();
+            const paidArchived = archiveSnapshot.docs.map(doc => {
+                const data = doc.data();
+                // Use archivedAt or completedAt or createdAt for date
+                const scheduleDate = data.archivedAt?.toDate ? data.archivedAt.toDate() : (data.completedAt?.toDate ? data.completedAt.toDate() : (data.createdAt?.toDate ? data.createdAt.toDate() : new Date()));
+                const customerData = customersMap[data.userId] || {};
+                const customerName = data.customer || data.customerName || customerData.name || 'Unknown';
+                const customerEmail = data.email || customerData.email || '';
+                const customerPhone = data.phone || customerData.phone || '';
+                const plateNumber = data.plate || data.plateNumber || customerData.plateNumber || 'N/A';
+                const carType = data.carType || customerData.carType || '';
+                let bookingAmount = 0;
+                if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
+                    bookingAmount = data.amount;
+                } else if (typeof data.price === 'number' && !isNaN(data.price) && data.price > 0) {
+                    bookingAmount = data.price;
+                } else if (typeof data.totalAmount === 'number' && !isNaN(data.totalAmount) && data.totalAmount > 0) {
+                    bookingAmount = data.totalAmount;
+                }
+                let serviceName = 'Unknown';
+                if (Array.isArray(data.serviceNames)) {
+                    serviceName = data.serviceNames.join(', ');
+                } else if (data.serviceNames) {
+                    serviceName = data.serviceNames;
+                } else if (data.service) {
+                    serviceName = data.service;
+                }
+                return {
+                    transactionId: doc.id,
+                    date: scheduleDate,
+                    customer: customerName,
+                    email: customerEmail,
+                    phone: customerPhone,
+                    plateNumber: plateNumber,
+                    service: serviceName,
+                    paymentMethod: data.paymentMethod || 'Unknown',
+                    amount: bookingAmount,
+                    technician: data.technician || '',
+                    carType: carType,
+                    userId: data.userId,
+                    isArchived: true,
+                };
+            });
 
+            // Fetch paid archive_walkins from Firestore
+            const archiveWalkinsSnapshot = await db.collection('archive_walkins').where('paymentStatus', '==', 'Paid').get();
+            const paidArchiveWalkins = archiveWalkinsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                // Use archivedAt or completedAt or createdAt for date
+                const scheduleDate = data.archivedAt?.toDate ? data.archivedAt.toDate() : (data.completedAt?.toDate ? data.completedAt.toDate() : (data.createdAt?.toDate ? data.createdAt.toDate() : new Date()));
+                const customerData = customersMap[data.customerId] || { name: data.customerName || 'Walk-in Customer', email: data.email || '', phone: data.phone || '', plateNumber: data.plateNumber || '', carType: data.carType || '' };
+                let walkinAmount = 0;
+                if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
+                    walkinAmount = data.amount;
+                } else if (typeof data.price === 'number' && !isNaN(data.price) && data.price > 0) {
+                    walkinAmount = data.price;
+                } else if (typeof data.totalAmount === 'number' && !isNaN(data.totalAmount) && data.totalAmount > 0) {
+                    walkinAmount = data.totalAmount;
+                }
+                let serviceName = 'Unknown';
+                if (Array.isArray(data.service)) {
+                    serviceName = data.service.join(', ');
+                } else if (data.service) {
+                    serviceName = data.service;
+                } else if (data.serviceNames) {
+                    serviceName = data.serviceNames;
+                }
+                return {
+                    transactionId: doc.id,
+                    date: scheduleDate,
+                    customer: customerData.name,
+                    email: customerData.email,
+                    phone: customerData.phone,
+                    plateNumber: customerData.plateNumber,
+                    service: serviceName,
+                    amount: walkinAmount,
+                    paymentMethod: data.paymentMethod || 'Unknown',
+                    technician: data.technician || '',
+                    carType: data.carType || customerData.carType,
+                    customerId: data.customerId,
+                    isArchiveWalkin: true,
+                };
+            });
+
+            // Combine all sources into one master list
+            const allPayments = [...paidAppointments, ...paidWalkins, ...paidArchived, ...paidArchiveWalkins];
             return allPayments.sort((a, b) => b.date - a.date);
         } catch (error) {
             console.error('Error fetching combined sales data from Firestore:', error);
