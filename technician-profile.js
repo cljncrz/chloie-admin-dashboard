@@ -420,14 +420,14 @@ function getCarImage(carType) {
     // Return a default car image based on car type
     // You can customize this to return different images for different car types
     const carImages = {
-        'sedan': './images/sedan.png',
-        'suv': './images/suv.png',
-        'truck': './images/truck.png',
-        'van': './images/van.png',
-        'coupe': './images/coupe.png',
-        'hatchback': './images/hatchback.png'
+        // Map common car types to a bundled image that exists in the repo
+        'sedan': './images/redicon.png',
+        'suv': './images/redicon.png',
+        'truck': './images/redicon.png',
+        'van': './images/redicon.png',
+        'coupe': './images/redicon.png',
+        'hatchback': './images/redicon.png'
     };
-    
     const type = (carType || 'sedan').toLowerCase();
     return carImages[type] || './images/redicon.png'; // Default fallback image
 }

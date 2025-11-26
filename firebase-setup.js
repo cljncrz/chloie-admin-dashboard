@@ -94,6 +94,36 @@ setPersistence(auth, browserLocalPersistence).catch(error => {
   console.error('Error setting auth persistence:', error);
 });
 
+// Keep the user's auth token refreshed to avoid unexpected automatic sign-outs
+// Some environments may expire tokens or drop sessions; refresh token every 5 minutes
+let _authKeepAliveInterval = null;
+const startAuthKeepAlive = () => {
+  if (_authKeepAliveInterval) return;
+  _authKeepAliveInterval = setInterval(async () => {
+    try {
+      if (auth.currentUser) {
+        // Force token refresh to keep session alive
+        await auth.currentUser.getIdToken(true);
+        console.debug('Auth keep-alive: token refreshed');
+      }
+    } catch (e) {
+      console.warn('Auth keep-alive refresh failed:', e);
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+};
+
+const stopAuthKeepAlive = () => {
+  if (_authKeepAliveInterval) {
+    clearInterval(_authKeepAliveInterval);
+    _authKeepAliveInterval = null;
+  }
+};
+
+// Start/stop based on auth state
+onAuthStateChanged(auth, (user) => {
+  if (user) startAuthKeepAlive(); else stopAuthKeepAlive();
+});
+
 // Minimal compat-like wrappers so existing code that calls `window.firebase.auth()`
 // or `window.firebase.firestore()` continues to work.
 window.firebase = {

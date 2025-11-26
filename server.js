@@ -140,8 +140,24 @@ app.post('/api/upload', async (req, res) => {
       },
     });
 
-    // Construct download URL
-    const downloadURL = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media`;
+    // Try to make the file public so the browser can fetch it without auth.
+    // If that fails, fall back to generating a signed URL.
+    let downloadURL;
+    try {
+      await file.makePublic();
+      // Public URL (works once object is public)
+      downloadURL = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media`;
+    } catch (makePublicErr) {
+      console.warn('file.makePublic() failed, attempting signed URL as fallback:', makePublicErr.message);
+      try {
+        const expires = '03-09-2491'; // far-future expiry for convenience
+        const [signedUrl] = await file.getSignedUrl({ action: 'read', expires });
+        downloadURL = signedUrl;
+      } catch (signedErr) {
+        console.warn('Signed URL generation also failed, using REST URL (may 403):', signedErr.message);
+        downloadURL = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media`;
+      }
+    }
 
     // Determine file type
     const isImage = fileType.startsWith('image');
@@ -204,6 +220,24 @@ app.get('/api/media', async (req, res) => {
 });
 
 /**
+ * Get archived appointments (server-side read)
+ * GET /api/archived-appointments?limit=100
+ * Returns archived documents using the Admin SDK so clients don't need Firestore read privileges.
+ */
+app.get('/api/archived-appointments', async (req, res) => {
+  try {
+    if (!admin || !db) return res.status(500).json({ success: false, error: 'Admin SDK not initialized' });
+    const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
+    const snapshot = await db.collection('archive_bookings').orderBy('archivedAt', 'desc').limit(limit).get();
+    const archived = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json({ success: true, archived });
+  } catch (error) {
+    console.error('Error fetching archived appointments:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * Delete media file
  * DELETE /api/media/:id
  */
@@ -237,6 +271,38 @@ app.delete('/api/media/:id', async (req, res) => {
       error: 'Failed to delete media',
       details: error.message,
     });
+  }
+});
+
+/**
+ * Make a file public by storagePath and return its public URL
+ * POST /api/media/make-public
+ * Body: { storagePath: string }
+ */
+app.post('/api/media/make-public', async (req, res) => {
+  try {
+    const { storagePath } = req.body;
+    if (!storagePath) return res.status(400).json({ error: 'Missing storagePath' });
+
+    const file = bucket.file(storagePath);
+    await file.makePublic();
+    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media`;
+
+    // If there is a Firestore doc referencing this storagePath, update its url if possible
+    try {
+      const snapshot = await db.collection('media').where('storagePath', '==', storagePath).limit(1).get();
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        await db.collection('media').doc(doc.id).update({ url: publicUrl });
+      }
+    } catch (updateErr) {
+      console.warn('Failed to update Firestore media doc after makePublic:', updateErr.message);
+    }
+
+    res.json({ success: true, publicUrl });
+  } catch (error) {
+    console.error('Error making file public:', error);
+    res.status(500).json({ error: 'Failed to make file public', details: error.message });
   }
 });
 
@@ -386,6 +452,83 @@ app.post('/api/notifications/send', async (req, res) => {
       error: 'Failed to send notifications',
       details: error.message,
     });
+  }
+});
+
+/**
+ * Archive completed & paid services (server-side).
+ * POST /api/archive-completed-paid
+ * Body: { limit?: number }
+ * This endpoint requires the server to be initialized with a service account
+ * (the Admin SDK). It will move documents from `bookings` and `walkins`
+ * into `archived_appointments`, and delete the originals using batched writes.
+ */
+app.post('/api/archive-completed-paid', async (req, res) => {
+  try {
+    // Require Admin SDK
+    if (!admin || !db) {
+      return res.status(500).json({ success: false, error: 'Admin SDK not initialized' });
+    }
+
+    const { limit = 1000 } = req.body || {};
+    const maxItemsPerBatch = 200; // safe floor (200 items => 400 writes)
+
+    // Helper to move a set of docs
+    const moveDocs = async (collectionName, query) => {
+      const moved = [];
+      const snapshot = await query.get();
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const id = doc.id;
+        const archivedRef = db.collection('archive_bookings').doc(id);
+        // Store _source to identify origin
+        moved.push({ id, data: { ...data, archivedAt: new Date().toISOString(), _source: collectionName === 'bookings' ? 'Booking' : 'Walk-in' }, docRef: db.collection(collectionName).doc(id), archiveRef: archivedRef });
+      }
+      return moved;
+    };
+
+    // Query both collections for completed+paid
+    const bookingsQuery = db.collection('bookings').where('status', '==', 'Completed').where('paymentStatus', '==', 'Paid').limit(limit);
+    const walkinsQuery = db.collection('walkins').where('status', '==', 'Completed').where('paymentStatus', '==', 'Paid').limit(limit);
+
+    const [bookingsToMove, walkinsToMove] = await Promise.all([
+      moveDocs('bookings', bookingsQuery),
+      moveDocs('walkins', walkinsQuery),
+    ]);
+
+    const items = [...bookingsToMove, ...walkinsToMove];
+    if (items.length === 0) {
+      return res.json({ success: true, message: 'No completed & paid services to archive', archived: 0 });
+    }
+
+    let archivedCount = 0;
+    let failedCount = 0;
+
+    // Process in batches
+    for (let i = 0; i < items.length; i += maxItemsPerBatch) {
+      const chunk = items.slice(i, i + maxItemsPerBatch);
+      const batch = db.batch();
+      for (const it of chunk) {
+        batch.set(it.archiveRef, it.data);
+        batch.delete(it.docRef);
+      }
+      try {
+        await batch.commit();
+        archivedCount += chunk.length;
+      } catch (err) {
+        console.error('Server-side batch commit failed:', err);
+        failedCount += chunk.length;
+        // if permission error or fatal, abort
+        if (err && (err.code === 'permission-denied' || String(err).toLowerCase().includes('insufficient'))) {
+          return res.status(500).json({ success: false, archived: archivedCount, failed: failedCount, error: 'permission-denied' });
+        }
+      }
+    }
+
+    return res.json({ success: true, archived: archivedCount, failed: failedCount });
+  } catch (error) {
+    console.error('Error in /api/archive-completed-paid:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -623,6 +766,43 @@ app.post('/api/notifications/register-token', async (req, res) => {
     });
   }
 });
+
+/**
+ * Auto-verify Google sign-in users
+ * POST /api/users/auto-verify-google
+ * Scans Firebase Authentication users and sets `isVerified: true` on Firestore
+ * `users` documents for accounts that have a Google provider.
+ */
+const autoVerifyGoogleHandler = async (req, res) => {
+  try {
+    let verifiedCount = 0;
+    const updated = [];
+    // Paginate through all auth users (1000 per page)
+    let nextPageToken = undefined;
+    do {
+      const listResult = await admin.auth().listUsers(1000, nextPageToken);
+      for (const userRecord of listResult.users) {
+        const providers = (userRecord.providerData || []).map(p => p.providerId);
+        if (providers.includes('google.com')) {
+          const uid = userRecord.uid;
+          await db.collection('users').doc(uid).set({ isVerified: true, provider: 'google' }, { merge: true });
+          verifiedCount++;
+          updated.push(uid);
+        }
+      }
+      nextPageToken = listResult.pageToken;
+    } while (nextPageToken);
+
+    res.json({ success: true, verified: verifiedCount, updated });
+  } catch (err) {
+    console.error('Error auto-verifying Google users:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Support both POST and GET for convenience (some clients may perform GET)
+app.post('/api/users/auto-verify-google', autoVerifyGoogleHandler);
+app.get('/api/users/auto-verify-google', autoVerifyGoogleHandler);
 
 /**
  * Unregister FCM token

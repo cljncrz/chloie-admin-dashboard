@@ -43,6 +43,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const fetchImagesFromStorage = async () => {
         if (galleryLoader) mediaManagerContainer.classList.add('is-loading');
         try {
+            // If the client is not authenticated, listing Storage will fail with
+            // storage/unauthenticated. In that case, skip attempting to list
+            // directly and let the caller fall back to Firestore-based docs.
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                console.warn('Skipping Storage listing because user is not signed in. Falling back to Firestore.');
+                return false;
+            }
             // List all files under 'media/'
             const listRef = storage.ref('media');
             const res = await listRef.listAll();
@@ -50,23 +58,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             const imageItems = res.items.filter(item => item.name.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i));
             // Get download URLs and build mediaData
             const imageData = await Promise.all(imageItems.map(async (item) => {
-                const url = await item.getDownloadURL();
+                // Some storage wrappers expose getDownloadURL directly on the ref,
+                // otherwise use the global helper if available.
+                let url;
+                if (typeof item.getDownloadURL === 'function') {
+                    url = await item.getDownloadURL();
+                } else if (window._firebaseStorageAPI && typeof window._firebaseStorageAPI.getDownloadURL === 'function') {
+                    url = await window._firebaseStorageAPI.getDownloadURL(window._firebaseStorageAPI.ref(item.fullPath));
+                } else {
+                    // As a last resort construct the public REST URL (may 403 if not public)
+                    url = `https://firebasestorage.googleapis.com/v0/b/${storage.app.options.storageBucket}/o/${encodeURIComponent(item.fullPath)}?alt=media`;
+                }
+
                 return {
                     id: item.fullPath, // Use storage path as id
                     name: item.name,
                     url: url,
                     storagePath: item.fullPath,
                     type: 'image',
-                    size: '', // Size not available from Storage listAll
+                    size: '', // Size not available from Storage listAll in this wrapper
                     createdAt: null,
                 };
             }));
+
             mediaData = imageData;
             renderGallery(false);
+            return true; // success
         } catch (error) {
             console.error('Error fetching images from Storage:', error);
-            noResultsEl.innerHTML = '<p>Error loading images from Storage. Please try again.</p>';
+            // Let caller fallback to Firestore; show a concise message in the UI
+            noResultsEl.innerHTML = '<p>Error loading images from Storage. Falling back to Firestore...</p>';
             noResultsEl.style.display = 'block';
+            return false;
         } finally {
             if (galleryLoader) mediaManagerContainer.classList.remove('is-loading');
         }
@@ -586,8 +609,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Initial Render
-    fetchMedia();
+    // Initial Render: prefer Storage listing from gs://.../media, fallback to Firestore
+    (async () => {
+        const ok = await fetchImagesFromStorage();
+        if (!ok) await fetchMedia();
+    })();
 
     // Add event listener for the fetch-from-storage button if present
     if (fetchFromStorageBtn) {

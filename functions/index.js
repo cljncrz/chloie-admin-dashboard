@@ -15,6 +15,38 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+// ============================================================
+// AUTH TRIGGER: Auto-verify Google sign-in users
+// ============================================================
+const functions = require('firebase-functions');
+
+/**
+ * When a new Firebase Auth user is created, if they used Google as a provider
+ * mark their Firestore `users/{uid}` document with `isVerified: true` and
+ * record `provider: 'google'` (merge to avoid overwriting other fields).
+ */
+exports.onAuthUserCreateAutoVerifyGoogle = functions.auth.user().onCreate(async (user) => {
+  try {
+    const providers = (user.providerData || []).map(p => p.providerId);
+    if (providers.includes('google.com')) {
+      const uid = user.uid;
+      const docRef = admin.firestore().collection('users').doc(uid);
+      await docRef.set({
+        isVerified: true,
+        provider: 'google',
+        email: user.email || null,
+        fullName: user.displayName || null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      logger.log(`Auto-verified Google user ${uid}`);
+    } else {
+      logger.log(`User ${user.uid} created with providers: ${providers.join(',')}`);
+    }
+  } catch (err) {
+    logger.error('Error auto-verifying Google user onAuthCreate:', err);
+  }
+});
+
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
 // traffic spikes by instead downgrading performance. This limit is a

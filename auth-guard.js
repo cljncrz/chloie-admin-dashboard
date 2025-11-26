@@ -37,14 +37,33 @@
 
   let authCheckComplete = false;
 
+  // Debounce redirect when auth reports null briefly (token refresh/transient state)
+  let _nullRedirectTimer = null;
+  const scheduleRedirectToLogin = (delay = 3000) => {
+    if (_nullRedirectTimer) return;
+    _nullRedirectTimer = setTimeout(() => {
+      console.log('auth-guard: No user found after debounce, redirecting to login');
+      window.location.href = 'login.html';
+    }, delay);
+  };
+  const cancelScheduledRedirect = () => {
+    if (_nullRedirectTimer) {
+      clearTimeout(_nullRedirectTimer);
+      _nullRedirectTimer = null;
+    }
+  };
+
   window.firebase.auth().onAuthStateChanged(async (user) => {
     try {
       if (!user) {
-        // Not signed in — send to the login page
-        console.log('auth-guard: No user found, redirecting to login');
-        window.location.href = 'login.html';
+        // Avoid immediate redirect — wait a short time for transient nulls to resolve
+        console.log('auth-guard: onAuthStateChanged reported null user — deferring redirect');
+        scheduleRedirectToLogin(3000);
         return;
       }
+
+      // We have a user now — cancel any pending redirect
+      cancelScheduledRedirect();
 
       // User signed in — verify admin role in Firestore
       const db = window.firebase.firestore();
@@ -53,7 +72,7 @@
       
       if (!userDoc.exists) {
         console.warn('auth-guard: User document does not exist. Signing out.');
-        await window.firebase.auth().signOut();
+        try { await window.firebase.auth().signOut(); } catch(e){ console.error('Error signing out:', e); }
         window.location.href = 'login.html';
         return;
       }
@@ -62,7 +81,7 @@
       
       if (role !== 'admin') {
         console.warn('auth-guard: Signed-in user is not admin. Signing out and redirecting to login.');
-        await window.firebase.auth().signOut();
+        try { await window.firebase.auth().signOut(); } catch(e){ console.error('Error signing out:', e); }
         window.location.href = 'login.html';
         return;
       }
@@ -74,11 +93,7 @@
     } catch (err) {
       console.error('auth-guard error:', err);
       // On error, be conservative and redirect to login to avoid exposing protected pages
-      try { 
-        await window.firebase.auth().signOut(); 
-      } catch (e) { 
-        console.error('Error signing out:', e);
-      }
+      try { await window.firebase.auth().signOut(); } catch (e) { console.error('Error signing out:', e); }
       window.location.href = 'login.html';
     }
   });
