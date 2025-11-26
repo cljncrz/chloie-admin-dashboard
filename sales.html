@@ -226,6 +226,9 @@
             </div>
 
             <!-- Sales Insights -->
+            <div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:0.5rem;">
+              <small class="text-muted" id="insights-note">Insights and charts are based on <b>Paid</b> transactions only.</small>
+            </div>
             <div class="insights" id="sales-page-insights">
               <div class="card sales">
                 <div class="card-header">
@@ -325,9 +328,10 @@
                       <th>Amount</th>
                       <th>Payment</th>
                       <th>Technician</th>
+                      <th>Archived</th>
                     </tr>
                   </thead>
-                  <tbody id="sales-tbody">
+                    <tbody id="sales-tbody">
                     <!-- Sales data will be populated by sales.js -->
                   </tbody>
                 </div>

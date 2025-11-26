@@ -473,34 +473,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Attach the auth state listener in a resilient way. If Firebase isn't ready yet we retry
 // silently rather than logging a noisy error.
 const attachAuthListener = () => {
-    if (window.firebase && typeof window.firebase.auth === 'function') {
-        try {
-            window.firebase.auth().onAuthStateChanged((user) => {
-                if (user) {
-                    // User is signed in.
-                    console.log('Authenticated user found:', user.uid);
-                    populateUserProfile(user);
-                    initializeProfilePage(user);
-                    populateAdminActivity(user);
-                } else {
-                    // User is signed out. Handled by auth-guard.js
-                    console.log('No authenticated user. Auth guard will redirect.');
-                }
-            });
-        } catch (error) {
-            // Firebase app not initialized yet, retry after a delay
-            console.debug('Firebase app not fully initialized yet; retrying shortly.', error);
-            setTimeout(attachAuthListener, 500);
-        }
-    } else {
-        // Not ready yet — retry shortly. This avoids noisy console.error when startup order
-        // varies between pages.
-        console.debug('Firebase not ready for auth listener; retrying shortly.');
-        setTimeout(() => {
-            if (window.firebase && typeof window.firebase.auth === 'function') {
-                attachAuthListener();
+    // Ensure firebase is present and an app has been initialized before calling auth().
+    // For compat SDK `firebase.apps` should exist and have at least one app. Avoid calling
+    // `firebase.auth()` when the compat function is present but no app has been created yet
+    // (that call throws "No Firebase App '[DEFAULT]' has been created").
+    const firebaseReady = window.firebase && Array.isArray(window.firebase.apps) && window.firebase.apps.length > 0;
+
+    if (!firebaseReady) {
+        // Retry quietly until firebase is initialized.
+        setTimeout(attachAuthListener, 500);
+        return;
+    }
+
+    // At this point it's safe to call auth()
+    try {
+        window.firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                // User is signed in.
+                console.log('Authenticated user found:', user.uid);
+                populateUserProfile(user);
+                initializeProfilePage(user);
+                populateAdminActivity(user);
+            } else {
+                // User is signed out. Handled by auth-guard.js
+                console.log('No authenticated user. Auth guard will redirect.');
             }
-        }, 500);
+        });
+    } catch (error) {
+        // Unexpected: schedule retry
+        console.debug('Auth attach failed; retrying shortly.', error);
+        setTimeout(attachAuthListener, 500);
     }
 };
 
