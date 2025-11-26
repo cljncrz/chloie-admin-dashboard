@@ -13,6 +13,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const app = express();
@@ -22,6 +23,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Optional cookie parser: allows __session cookie token extraction
+app.use(cookieParser());
 
 // Initialize Firebase Admin SDK
 const admin = require('firebase-admin');
@@ -79,6 +82,49 @@ try {
 
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
+// Admin email list: can be set via ADMIN_EMAILS env var (comma-separated)
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e=>e.trim()).filter(Boolean);
+
+/**
+ * Middleware: verify Firebase ID token if present (Authorization: Bearer <token> or __session cookie).
+ * If token is missing, responds 401 — route handlers can choose to allow unauthenticated reads.
+ */
+const verifyFirebaseIdToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  let idToken = null;
+  if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    idToken = authHeader.split('Bearer ')[1];
+  } else if (req.cookies && req.cookies.__session) {
+    idToken = req.cookies.__session;
+  }
+
+  if (!idToken) {
+    return res.status(401).json({ error: 'Missing auth token. Please sign in.' });
+  }
+
+  try {
+    // NOTE: we do not pass checkRevoked=true here to avoid token revocation auto-logout
+    // This keeps the behavior lightweight and prevents a token revoke from explicitly
+    // causing a permanent server rejection without the client attempting a token refresh.
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    req.user = decoded;
+    return next();
+  } catch (err) {
+    console.warn('verifyIdToken failed:', err && err.message ? err.message : err);
+    return res.status(401).json({ error: 'Invalid or expired auth token. Please sign in again.' });
+  }
+};
+
+/** Middleware: require admin privileges. Checks custom claim `admin`, `isAdmin`, `role` or fallback to email list. */
+const requireAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Missing authentication' });
+  const user = req.user;
+  const isAdmin = !!(user.admin || user.isAdmin || user.role === 'admin' || (user.email && ADMIN_EMAILS.includes(user.email)));
+  if (!isAdmin) {
+    return res.status(403).json({ error: 'Forbidden: admin-only' });
+  }
+  return next();
+};
 
 // Load central config (includes the AI feature flag we added to config.js)
 let aiConfig = null;
@@ -279,10 +325,11 @@ app.delete('/api/media/:id', async (req, res) => {
  * POST /api/media/make-public
  * Body: { storagePath: string }
  */
-app.post('/api/media/make-public', async (req, res) => {
+app.post('/api/media/make-public', verifyFirebaseIdToken, requireAdmin, async (req, res) => {
   try {
     const { storagePath } = req.body;
     if (!storagePath) return res.status(400).json({ error: 'Missing storagePath' });
+    console.log(`📢 make-public requested by ${req.user && req.user.email ? req.user.email : 'unknown user'} for ${storagePath}`);
 
     const file = bucket.file(storagePath);
     await file.makePublic();
@@ -303,6 +350,34 @@ app.post('/api/media/make-public', async (req, res) => {
   } catch (error) {
     console.error('Error making file public:', error);
     res.status(500).json({ error: 'Failed to make file public', details: error.message });
+  }
+});
+
+/**
+ * Return current authenticated user info if token supplied; otherwise return isAdmin:false
+ * GET /api/me
+ */
+app.get('/api/me', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    let idToken = null;
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      idToken = authHeader.split('Bearer ')[1];
+    } else if (req.cookies && req.cookies.__session) {
+      idToken = req.cookies.__session;
+    }
+
+    if (!idToken) {
+      return res.json({ user: null, isAdmin: false });
+    }
+
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const isAdmin = !!(decoded.admin || decoded.isAdmin || decoded.role === 'admin' || (decoded.email && ADMIN_EMAILS.includes(decoded.email)));
+    res.json({ user: { uid: decoded.uid, email: decoded.email, name: decoded.name || decoded.displayName || null, claims: decoded }, isAdmin });
+  } catch (err) {
+    // If token is invalid or expired, treat as unauthenticated
+    console.warn('/api/me: token verify failed:', err && err.message ? err.message : err);
+    return res.json({ user: null, isAdmin: false });
   }
 });
 

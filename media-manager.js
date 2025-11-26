@@ -5,6 +5,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const db = window.firebase.firestore();
     const auth = window.firebase.auth();
     const storage = window.firebase.storage();
+    // API base for server-side fallbacks (make-public, media listing, etc.)
+    const API_BASE = window._MEDIA_API_BASE || 'http://localhost:5000';
+    let apiAvailable = false;
+    const checkApiAvailable = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/health`);
+            apiAvailable = res.ok;
+        } catch (e) {
+            apiAvailable = false;
+        }
+    };
+    // Check quickly on load, but functions will re-check as needed
+    checkApiAvailable();
     
     const mediaManagerContainer = document.querySelector('.media-manager-container');
 
@@ -34,6 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // This will be populated from Firestore or Storage
     let mediaData = [];
+    let isCurrentUserAdmin = false; // controlled by server /api/me or token claims
     let currentFilter = 'all'; // 'all', 'image', or 'video'
 
     /**
@@ -95,6 +109,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    // Helper: fetch `GET /api/me` (optional token) to find admin status for the current user
+    const fetchCurrentUserAdmin = async () => {
+        try {
+            const currentUser = auth.currentUser;
+            let headers = {};
+            if (currentUser) {
+                const token = await currentUser.getIdToken();
+                headers.Authorization = `Bearer ${token}`;
+            }
+            const res = await fetch(`${API_BASE}/api/me`, { headers });
+            if (res.ok) {
+                const data = await res.json();
+                isCurrentUserAdmin = !!data.isAdmin;
+            } else {
+                isCurrentUserAdmin = false;
+            }
+        } catch (e) {
+            console.warn('Failed to check admin status', e);
+            isCurrentUserAdmin = false;
+        }
+    };
+
     const createMediaCard = (mediaItem) => {
         const card = document.createElement('div');
         card.className = 'media-card';
@@ -102,8 +138,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         card.dataset.id = mediaItem.id;
 
         let previewHtml = '';
+        const storageBucket = storage.app?.options?.storageBucket || '';
+        const restUrl = mediaItem.storagePath ? `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(mediaItem.storagePath)}?alt=media` : '';
+        const urlToUse = mediaItem.url || restUrl || '';
         if (mediaItem.type === 'image') {
-            previewHtml = `<img src="${mediaItem.url}" alt="${mediaItem.name}">`;
+            previewHtml = `<img src="${urlToUse}" alt="${mediaItem.name}" loading="lazy">`;
         } else if (mediaItem.type === 'video') {
             previewHtml = `
                 <video muted loop playsinline>
@@ -125,6 +164,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="media-card-actions">
                     <button class="action-icon-btn copy-url-btn" title="Copy URL">
                         <span class="material-symbols-outlined">content_copy</span>
+                    </button>
+                    <button class="action-icon-btn make-public-btn" title="Make public" style="display:none;">
+                        <span class="material-symbols-outlined">public</span>
                     </button>
                     <button class="action-icon-btn delete-media-btn" title="Delete Media">
                         <span class="material-symbols-outlined">delete</span>
@@ -207,7 +249,150 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+        // Show/Hide Make Public if storagePath exists
+        const makePublicBtn = card.querySelector('.make-public-btn');
+        if (makePublicBtn) {
+            if (mediaItem.storagePath && isCurrentUserAdmin) {
+                makePublicBtn.style.display = 'inline-block';
+            } else {
+                makePublicBtn.style.display = 'none';
+            }
+            makePublicBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (!confirm('Make this file public? This will update its URL to a public link.')) return;
+                try {
+                    const headers = { 'Content-Type': 'application/json' };
+                    const cu = auth.currentUser;
+                    if (cu) {
+                        const token = await cu.getIdToken();
+                        headers['Authorization'] = `Bearer ${token}`;
+                    }
+                    const res = await fetch(`${API_BASE}/api/media/make-public`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ storagePath: mediaItem.storagePath })
+                    });
+                    if (!res.ok) {
+                        const errorData = await res.json().catch(() => ({}));
+                        if (res.status === 401) {
+                            if (typeof showErrorToast === 'function') showErrorToast('You must be signed in to perform this action.');
+                            else alert('Sign in required');
+                        } else if (res.status === 403) {
+                            if (typeof showErrorToast === 'function') showErrorToast('You must be an admin to make files public.');
+                            else alert('Admin required');
+                        }
+                        throw new Error(errorData.error || 'Make public request failed');
+                    }
+                    const data = await res.json();
+                    if (data && data.publicUrl) {
+                        mediaItem.url = data.publicUrl;
+                        // Update image src and UI
+                        const imageEl = card.querySelector('.media-preview img');
+                        if (imageEl) imageEl.src = data.publicUrl;
+                        if (typeof showSuccessToast === 'function') showSuccessToast('File made public');
+                    }
+                } catch (err) {
+                    console.error('Make public failed', err);
+                    if (typeof showErrorToast === 'function') showErrorToast('Failed to make file public');
+                }
+            });
+        }
+
+        // Attach image error handler to the image element so fallbacks will try when an image fails to load
+        const imageEl = card.querySelector('.media-preview img');
+        if (imageEl) {
+            attachImgErrorHandler(imageEl, mediaItem, card);
+        }
         return card;
+    };
+
+    /** Attach an error handler to an <img> element that tries a sequence of fallbacks to get a working URL. */
+    const attachImgErrorHandler = (imgEl, mediaItem, card) => {
+        imgEl.addEventListener('error', async () => {
+            const currentUser = auth.currentUser;
+            // Fade to placeholder quickly
+            const preview = card.querySelector('.media-preview');
+            if (preview) preview.classList.add('loading');
+
+            // 1) Try to getDownloadURL from Storage if user is signed in (SDK will respect rules)
+            if (currentUser && mediaItem.storagePath) {
+                try {
+                    const ref = storage.ref(mediaItem.storagePath);
+                    const url = await ref.getDownloadURL();
+                    mediaItem.url = url;
+                    imgEl.src = url;
+                    if (preview) preview.classList.remove('loading');
+                    return;
+                } catch (e) {
+                    console.warn('SDK getDownloadURL failed, will try server fallback', e.message || e);
+                }
+            }
+
+            // 2) Try server make-public fallback if available (re-check availability first)
+            if (mediaItem.storagePath) {
+                await checkApiAvailable();
+            }
+            if (apiAvailable && mediaItem.storagePath) {
+                try {
+                    const headers = { 'Content-Type': 'application/json' };
+                    const cu = auth.currentUser;
+                    if (cu) {
+                        const token = await cu.getIdToken();
+                        headers['Authorization'] = `Bearer ${token}`;
+                    }
+                    const res = await fetch(`${API_BASE}/api/media/make-public`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ storagePath: mediaItem.storagePath })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.publicUrl) {
+                            mediaItem.url = data.publicUrl;
+                            imgEl.src = data.publicUrl;
+                            if (preview) preview.classList.remove('loading');
+                            return;
+                        }
+                    } else {
+                        const errorData = await res.json().catch(()=>({}));
+                        if (res.status === 401) {
+                            if (typeof showErrorToast === 'function') showErrorToast('You must be signed in to perform this action.');
+                            else alert('Sign in required');
+                        } else if (res.status === 403) {
+                            if (typeof showErrorToast === 'function') showErrorToast('You must be an admin to make files public.');
+                            else alert('Admin required');
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Server make-public failed', e.message || e);
+                }
+            }
+
+            // 3) Construct the REST URL fallback (may 403 if not public)
+            if (mediaItem.storagePath) {
+                try {
+                    const restUrl = `https://firebasestorage.googleapis.com/v0/b/${storage.app.options.storageBucket}/o/${encodeURIComponent(mediaItem.storagePath)}?alt=media`;
+                    mediaItem.url = restUrl;
+                    imgEl.src = restUrl;
+                    if (preview) preview.classList.remove('loading');
+                    return;
+                } catch (e) {
+                    console.warn('REST fallback failed', e.message || e);
+                }
+            }
+
+            // 4) Last resort: show CSS placeholder and overlay a 'Sign in to view' CTA when no user
+            if (preview) {
+                preview.innerHTML = `<div class="media-placeholder"><span class="material-symbols-outlined">image_not_supported</span><p>Unavailable</p></div>`;
+                preview.classList.remove('loading');
+                if (!currentUser) {
+                    const overlay = document.createElement('div');
+                    overlay.className = 'signin-to-view';
+                    overlay.textContent = 'Sign in to view';
+                    preview.appendChild(overlay);
+                }
+            }
+        }, { once: true });
     };
 
     const toggleSelection = (card, isSelected) => {
@@ -611,6 +796,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initial Render: prefer Storage listing from gs://.../media, fallback to Firestore
     (async () => {
+        // Ensure admin status is checked early
+        await fetchCurrentUserAdmin();
         const ok = await fetchImagesFromStorage();
         if (!ok) await fetchMedia();
     })();
