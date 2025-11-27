@@ -86,35 +86,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Card view renderer: creates a card DOM element for a technician
                 const createTechnicianCard = (tech) => {
                     // Defensive check for valid data
-                        const card = document.createElement('div');
-                        card.className = 'tech-card';
-                        card.dataset.technicianId = tech.id;
+                    const card = document.createElement('div');
+                    card.className = 'tech-card';
+                    card.dataset.technicianId = tech.id;
 
-                        const stars = createStarRating(tech.rating || 0);
-                        const avatarSrc = tech.avatar ? tech.avatar : './images/redicon.png';
-                        card.innerHTML = `
-                                <div class="status-badge">${tech.status || 'Active'}</div>
-                                <div class="profile-photo"><img src="${avatarSrc}" alt="${tech.name}"></div>
-                                <div class="tech-name">${tech.name}</div>
-                                <div class="tech-desc">${tech.description || 'No description available.'}</div>
-                                <hr />
-                                <div class="summary">
-                                    <div>
-                                        <div class="label">Avg. Rating</div>
-                                        ${stars}
-                                    </div>
-                                    <div>
-                                        <div class="label">Tasks</div>
-                                        <div class="value">${tech.tasks ?? 0}</div>
-                                    </div>
-                                </div>
-                                <div class="card-actions">
-                                    <button type="button" class="btn action-view btn-primary" data-tech-id="${tech.id}" title="View Profile"><span class="material-symbols-outlined">visibility</span> View Profile</button>
-                                    <button type="button" class="btn action-delete" data-tech-id="${tech.id}" title="Delete Technician"><span class="material-symbols-outlined">delete</span></button>
-                                </div>
-                        `;
-
-                        return card;
+                    const stars = createStarRating(tech.rating || 0);
+                    const avatarSrc = tech.photoURL ? tech.photoURL : (tech.avatar ? tech.avatar : './images/redicon.png');
+                    // Determine active/inactive status
+                    const isActive = tech.active !== false; // treat undefined as active
+                    const statusLabel = isActive ? 'Active' : 'Inactive';
+                    const statusClass = isActive ? 'active-badge' : 'inactive-badge';
+                    if (!isActive) {
+                        card.classList.add('inactive-profile');
+                    }
+                    card.innerHTML = `
+                        <div class="status-badge ${statusClass}">${statusLabel}</div>
+                        <div class="profile-photo"><img src="${avatarSrc}" alt="${tech.name}"></div>
+                        <div class="tech-name">${tech.name}</div>
+                        <div class="tech-desc">${tech.description || 'No description available.'}</div>
+                        <hr />
+                        <div class="summary">
+                            <div>
+                                <div class="label">Avg. Rating</div>
+                                ${stars}
+                            </div>
+                            <div>
+                                <div class="label">Tasks</div>
+                                <div class="value">${tech.tasks ?? 0}</div>
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                            <button type="button" class="btn action-view btn-primary" data-tech-id="${tech.id}" title="View Profile"><span class="material-symbols-outlined">visibility</span> View Profile</button>
+                            <button type="button" class="btn action-delete" data-tech-id="${tech.id}" title="Delete Technician"><span class="material-symbols-outlined">delete</span></button>
+                        </div>
+                    `;
+                    return card;
                 };
   
     // --- Main Fetch and Render Function ---
@@ -219,6 +225,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
         const deleteTechnician = async (techId) => {
+            const confirmDelete = window.confirm('Are you sure you want to delete this technician profile? This action cannot be undone.');
+            if (!confirmDelete) return;
             try {
                 // 1. Delete from Firestore
                 await db.collection('technicians').doc(techId).delete();

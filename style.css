@@ -1,3 +1,95 @@
+.tech-card.inactive-profile .btn.action-view,
+.tech-card.inactive-profile .btn.action-view *,
+.tech-card.inactive-profile .btn.action-view span {
+    opacity: 1 !important;
+    filter: none !important;
+    background: var(--color-primary) !important;
+    color: #fff !important;
+    z-index: 2;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+/* Ensure View Profile button is always fully opaque, even on inactive cards */
+.tech-card.inactive-profile .btn.action-view {
+    opacity: 1 !important;
+    filter: none !important;
+    background: var(--color-primary);
+    color: #fff;
+    z-index: 1;
+    position: relative;
+}
+.status-badge.inactive-badge {
+    background: #ef4444 !important;
+    color: #fff !important;
+    border: 1px solid #b91c1c !important;
+}
+/* Technician Active/Inactive Badge Styles */
+.status-badge.active-badge {
+    background: #22c55e;
+    color: #fff;
+    border: 1px solid #1e9c4b;
+}
+.status-badge.inactive-badge {
+    background: #ef4444;
+    color: #fff;
+    border: 1px solid #b91c1c;
+}
+
+/* Make inactive technician cards slightly transparent */
+.tech-card.inactive-profile {
+    opacity: 0.6;
+    filter: grayscale(0.2);
+}
+/* Modern Toggle Switch Redesign for Technician Profile */
+.switch-redesign {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch-redesign input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider-redesign {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.slider-redesign:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+.switch-redesign input:checked + .slider-redesign {
+    background-color: var(--color-primary);
+}
+
+.switch-redesign input:checked + .slider-redesign:before {
+    transform: translateX(20px);
+}
+
+.switch-redesign .slider-redesign:active:before {
+    width: 22px;
+}
 /* Approved status badge with custom hover tooltip */
 .status-badge.approved {
     background: #22c55e;

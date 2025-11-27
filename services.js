@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 servicesData = snapshot.docs.map(doc => {
                     const data = doc.data();
-                    const imageUrl = data.imageUrl || data.image || data.bannerUrl || null;
+                    const imageUrl = data.photoURL || data.imageUrl || data.image || data.bannerUrl || null;
                     
                     // Extract pricing values from the dynamic pricing object
                     const pricingObj = data.pricing || {};

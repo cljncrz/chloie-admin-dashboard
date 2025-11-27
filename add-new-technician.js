@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await window.firebaseInitPromise;
 
   const db = window.firebase.firestore();
-  const storage = window.firebase.storage();
+  // const storage = window.firebase.storage(); // No longer needed
 
   // --- DOM Elements ---
   const form = document.getElementById('add-technician-form');
@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const successToast = document.getElementById('success-toast');
 
   let selectedFile = null;
+  let selectedBase64 = null;
 
   // --- Avatar Upload Handler ---
   avatarInput.addEventListener('change', (e) => {
@@ -23,8 +24,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const reader = new FileReader();
       reader.onload = (event) => {
         avatarPreview.src = event.target.result;
+        selectedBase64 = event.target.result; // Store base64 string
       };
       reader.readAsDataURL(file);
+    } else {
+      selectedBase64 = null;
     }
   });
 
@@ -41,21 +45,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      let avatarUrl = './images/redicon.png'; // Default avatar
-
-      // Upload avatar if selected
-      if (selectedFile) {
-        const fileName = `technician-pictures/${Date.now()}_${selectedFile.name}`;
-        const storageRef = storage.ref(fileName);
-        await storageRef.put(selectedFile);
-        avatarUrl = await storageRef.getDownloadURL();
+      let photoURL = './images/redicon.png'; // Default avatar
+      if (selectedBase64) {
+        photoURL = selectedBase64;
       }
 
       // Create technician document
       const technicianData = {
         name,
         description,
-        avatar: avatarUrl,
+        photoURL,
         status: 'Active',
         rating: 0,
         reviews: 0,
@@ -72,6 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       form.reset();
       avatarPreview.src = './images/redicon.png';
       selectedFile = null;
+      selectedBase64 = null;
 
       // Redirect to technicians page after 1.5 seconds
       setTimeout(() => {

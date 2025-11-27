@@ -24,27 +24,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const uploadOverlay = imagePreview ? imagePreview.querySelector('.upload-overlay') : null;
 
     // --- Image Preview Logic ---
+    let selectedBase64 = null;
     imageInput.addEventListener('change', function () {
-        console.log("Image input changed");
         const file = this.files[0];
-
         if (file) {
             const reader = new FileReader();
-
             if (imageUploaderPlaceholder) {
                 imageUploaderPlaceholder.style.display = 'none';
             }
             imagePreviewImage.style.opacity = '1';
             imagePreviewImage.style.visibility = 'visible';
-
             reader.addEventListener('load', function () {
                 imagePreviewImage.setAttribute('src', this.result);
-                // Hide the upload overlay text when an image is present
+                selectedBase64 = this.result;
                 if (uploadOverlay) uploadOverlay.querySelector('span:last-child').style.display = 'none';
             });
-
             reader.readAsDataURL(file);
-        } else { // No file selected, revert to placeholder
+        } else {
+            selectedBase64 = null;
             if (imageUploaderPlaceholder) {
                 imageUploaderPlaceholder.style.display = 'block';
             }
@@ -155,7 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const priceSmall = getPriceValue('price-small');
         const priceMedium = getPriceValue('price-medium');
         const isFeatured = featuredToggle ? featuredToggle.checked : false;
-        
+
         // Disable submit button to prevent double submission
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalBtnText = submitBtn.textContent;
@@ -163,99 +160,41 @@ document.addEventListener('DOMContentLoaded', async () => {
             submitBtn.disabled = true;
             submitBtn.textContent = 'Creating Service...';
         }
-        
-        // Build pricing object with proper labels
-        const pricingScheme = vehicleType === 'Motorcycle' ? 'Motorcycle CCs' : 'Car Sizes';
-        const pricingObj = {};
-        
-        if (pricingScheme === 'Motorcycle CCs') {
-            if (priceSmall !== null) pricingObj['399cc below'] = priceSmall;
-            if (priceMedium !== null) pricingObj['400cc above'] = priceMedium;
-        } else {
+
+        // Build pricing object
+        let pricingObj = {};
+        if (vehicleType === 'Cars') {
             if (priceSmall !== null) pricingObj['5-Seater'] = priceSmall;
             if (priceMedium !== null) pricingObj['7-Seater'] = priceMedium;
+        } else if (vehicleType === 'Motorcycle') {
+            if (priceSmall !== null) pricingObj['399cc below'] = priceSmall;
+            if (priceMedium !== null) pricingObj['400cc above'] = priceMedium;
         }
-        
+
+        // Set pricing scheme
+        const pricingScheme = vehicleType === 'Cars' ? 'Car Sizes' : 'Motorcycle CCs';
+
         // Generate unique service ID
         const timestamp = Date.now();
         const serviceId = `SER-${timestamp.toString().slice(-8)}`;
 
-        // Save to Firestore
+        // Handle image URL (simulate upload or use a static URL for now)
+        let imageUrl = '';
+        if (selectedBase64) {
+            // In a real app, you would upload the image and get a URL
+            // For now, we use a placeholder or you can integrate upload logic
+            imageUrl = selectedBase64; // Or upload and get the URL
+        } else {
+            imageUrl = './images/services.png';
+        }
+
         try {
-            // Check Firebase initialization
-            if (!window.firebase || !window.firebase.firestore || !window.firebase.auth) {
+            if (!window.firebase || !window.firebase.firestore) {
                 throw new Error('Firebase is not initialized. Please refresh the page and try again.');
             }
-
-            // Check if user is authenticated before proceeding
-            // Authentication check removed to allow admin and all users to create services
-
             const db = window.firebase.firestore();
-            const storage = window.firebase.storage();
-            let imageUrl = null;
-
-            // Upload image to Firebase Storage if one was selected
-            const imageFile = imageInput.files[0];
-            if (imageFile) {
-                // Validate image file
-                const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                if (!validImageTypes.includes(imageFile.type)) {
-                    throw new Error('Invalid image format. Please upload a JPEG, PNG, GIF, or WebP image.');
-                }
-
-                // Check file size (max 5MB)
-                const maxSize = 5 * 1024 * 1024; // 5MB in bytes
-                if (imageFile.size > maxSize) {
-                    throw new Error('Image file is too large. Maximum size is 5MB.');
-                }
-
-                try {
-                    const fileExtension = imageFile.name.split('.').pop();
-                    const fileName = `${serviceId}.${fileExtension}`;
-                    const storagePath = `services/${fileName}`;
-                    
-                    console.log('Starting image upload...');
-                    console.log('- Storage path:', storagePath);
-                    console.log('- File size:', (imageFile.size / 1024).toFixed(2), 'KB');
-                    console.log('- File type:', imageFile.type);
-                    
-                    submitBtn.textContent = 'Uploading Image...';
-                    
-                    // Use the native storage API exposed by firebase-setup.js
-                    if (!window._firebaseStorageAPI) {
-                        console.error('Storage API not available');
-                        throw new Error('Firebase Storage API not initialized. Please refresh the page.');
-                    }
-                    
-                    console.log('Storage API available:', Object.keys(window._firebaseStorageAPI));
-                    
-                    const { ref, uploadBytes, getDownloadURL } = window._firebaseStorageAPI;
-                    const fileRef = ref(storagePath);
-                    
-                    console.log('File reference created, starting upload...');
-                    const snapshot = await uploadBytes(fileRef, imageFile);
-                    console.log('Upload complete, getting download URL...');
-                    
-                    imageUrl = await getDownloadURL(snapshot.ref);
-                    console.log('✓ Image uploaded successfully!');
-                    console.log('  Download URL:', imageUrl);
-                } catch (uploadError) {
-                    console.error('✗ Image upload failed:', uploadError);
-                    console.error('  Error code:', uploadError.code);
-                    console.error('  Error message:', uploadError.message);
-                    
-                    // Show user-friendly error
-                    const uploadErrorMsg = uploadError.code === 'storage/unauthorized' 
-                        ? 'You do not have permission to upload images. Please check your Firebase Storage rules.'
-                        : uploadError.message;
-                    
-                    throw new Error(`Image upload failed: ${uploadErrorMsg}`);
-                }
-            }
-            
-            // Create the service document in Firestore
             submitBtn.textContent = 'Saving Service...';
-            
+            const now = new Date();
             const serviceData = {
                 service: serviceName,
                 category: serviceCategory,
@@ -266,21 +205,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 availability: 'Available',
                 imageUrl: imageUrl,
                 createdAt: db.FieldValue.serverTimestamp(),
+                updatedAt: db.FieldValue.serverTimestamp(),
                 status: 'Published'
             };
-
             await db.collection('services').doc(serviceId).set(serviceData);
-            
             console.log('Service created successfully!', serviceData);
             alert('Service created successfully!');
-            
-            // Redirect back to the services list
             window.location.href = 'services.html';
-            
         } catch (error) {
             console.error('Error creating service:', error);
-            
-            // User-friendly error messages
             let errorMessage = 'Failed to create service. ';
             if (error.code === 'permission-denied') {
                 errorMessage += 'You do not have permission to create services.';
@@ -289,14 +222,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 errorMessage += error.message || 'An unknown error occurred.';
             }
-            
             alert(errorMessage);
-            
-            // Re-enable submit button on error
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalBtnText;
             }
         }
+        // (Removed duplicate error handling block)
     });
 });

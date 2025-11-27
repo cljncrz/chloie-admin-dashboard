@@ -19,10 +19,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileHeaderRole = document.getElementById('profile-header-role');
     const profileDetailsRoleContainer = document.getElementById('profile-details-role');
     const profileId = document.getElementById('profile-id');
+    const profileAvatar = document.getElementById('profile-avatar');
 
     if (profileName) profileName.textContent = techData.name || 'N/A';
     if (profileId) profileId.textContent = `ID: ${techData.id || 'N/A'}`;
     if (profileHeaderRole) profileHeaderRole.textContent = currentRole;
+    if (profileAvatar) {
+        profileAvatar.src = techData.photoURL ? techData.photoURL : (techData.avatar ? techData.avatar : './images/redicon.png');
+    }
+
+    // --- Active/Inactive Switch ---
+    const activeSwitch = document.getElementById('active-switch');
+    const activeStatusLabel = document.getElementById('active-status-label');
+    if (activeSwitch && activeStatusLabel) {
+        // Set initial state from techData.active (default true)
+        const isActive = techData.active !== false; // treat undefined as active
+        activeSwitch.checked = isActive;
+        activeStatusLabel.textContent = isActive ? 'Active' : 'Inactive';
+        activeStatusLabel.style.color = isActive ? 'var(--color-success)' : 'var(--color-danger)';
+
+        activeSwitch.addEventListener('change', async () => {
+            const newActive = activeSwitch.checked;
+            activeStatusLabel.textContent = newActive ? 'Active' : 'Inactive';
+            activeStatusLabel.style.color = newActive ? 'var(--color-success)' : 'var(--color-danger)';
+            try {
+                const db = window.firebase.firestore();
+                await db.collection('technicians').doc(techData.id).update({ active: newActive });
+                techData.active = newActive;
+                if (typeof showSuccessToast === 'function') {
+                    showSuccessToast(`Technician marked as ${newActive ? 'Active' : 'Inactive'}`);
+                }
+            } catch (err) {
+                // Revert UI if update fails
+                activeSwitch.checked = !newActive;
+                activeStatusLabel.textContent = !newActive ? 'Active' : 'Inactive';
+                activeStatusLabel.style.color = !newActive ? 'var(--color-success)' : 'var(--color-danger)';
+                alert('Failed to update status. Please try again.');
+            }
+        });
+    }
     
     // --- Role Dropdown Functionality ---
     if (profileDetailsRoleContainer) {

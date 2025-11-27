@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     uploadProgressContainer.appendChild(uploadProgressBar);
     if (imageUploaderContainer) imageUploaderContainer.appendChild(uploadProgressContainer);
     const chooseFromManagerBtn = document.querySelector('.choose-from-manager-btn');
-    const saveDraftBtn = document.getElementById('save-draft-btn');
+    const deleteServiceBtn = document.getElementById('delete-service-btn');
     const serviceIdSubtitle = document.getElementById('service-id-subtitle');
 
     // --- UI helpers ---
@@ -142,7 +142,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Image Update Logic ---
     const renderImage = () => {
         const placeholderUrl = './images/services.png';
-        imageElement.src = serviceData.imageUrl || placeholderUrl;
+        // If imageUrl is a base64 string, use it directly, otherwise fallback
+        if (serviceData.imageUrl && serviceData.imageUrl.startsWith('data:image/')) {
+            imageElement.src = serviceData.imageUrl;
+        } else {
+            imageElement.src = serviceData.imageUrl || placeholderUrl;
+        }
         imageElement.onerror = () => { imageElement.src = placeholderUrl; };
     };
 
@@ -160,9 +165,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const file = this.files[0];
         if (!file) return;
 
-        // Ensure we have a serviceId to reference in Storage and Firestore
+        // Ensure we have a serviceId to reference in Firestore
         if (!serviceData.serviceId) {
-            alert('Service identifier not found. Cannot upload image.');
+            alert('Service identifier not found. Cannot update image.');
             this.value = '';
             return;
         }
@@ -186,86 +191,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         showImageLoading();
 
         try {
-            // Check Firebase initialization
-            if (!window._firebaseStorageAPI) {
-                throw new Error('Firebase Storage API not initialized');
-            }
-
-            const fileExtension = file.name.split('.').pop();
-            const fileName = `${serviceData.serviceId}.${fileExtension}`;
-            const storagePath = `services/${fileName}`;
-            
-            console.log('Uploading image to Firebase Storage:', storagePath);
-            
-            if (uploadProgressContainer) uploadProgressContainer.style.display = 'block';
-            
-            // Use the native storage API exposed by firebase-setup.js
-            const { ref, uploadBytesResumable, getDownloadURL } = window._firebaseStorageAPI;
-            const fileRef = ref(storagePath);
-            
-            console.log('Using native SDK upload with progress tracking...');
-            
-            // Upload the file with progress tracking
-            const uploadTask = uploadBytesResumable(fileRef, file);
-            
-            uploadTask.on('state_changed',
-                (snapshot) => {
-                    // Track upload progress
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    console.log('Upload progress:', progress + '%');
-                    if (uploadProgressBar) {
-                        uploadProgressBar.style.width = progress + '%';
-                    }
-                },
-                (error) => {
-                    // Handle upload errors
-                    throw error;
-                },
-                async () => {
-                    // Upload complete, get the download URL
-                    try {
-                        const url = await getDownloadURL(uploadTask.snapshot.ref);
-                        console.log('Image uploaded successfully:', url);
-                        
-                        // Update the image in the UI
-                        serviceData.imageUrl = url;
-                        if (imageElement) imageElement.src = url;
-                        
-                        // Update Firestore
-                        const db = window.firebase.firestore();
-                        await db.collection('services').doc(serviceData.serviceId).update({
-                            imageUrl: url,
-                            updatedAt: db.FieldValue.serverTimestamp()
-                        });
-                        
-                        showSuccessToast('Image updated successfully!');
-                        hideImageLoading();
-                        imageInput.value = '';
-                        
-                        if (uploadProgressContainer) {
-                            setTimeout(() => {
-                                uploadProgressContainer.style.display = 'none';
-                                if (uploadProgressBar) uploadProgressBar.style.width = '0%';
-                            }, 500);
-                        }
-                    } catch (error) {
-                        throw error;
-                    }
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64 = e.target.result;
+                serviceData.imageUrl = base64;
+                if (imageElement) imageElement.src = base64;
+                // Update Firestore
+                const db = window.firebase.firestore();
+                await db.collection('services').doc(serviceData.serviceId).update({
+                    imageUrl: base64,
+                    updatedAt: db.FieldValue.serverTimestamp()
+                });
+                showSuccessToast('Image updated successfully!');
+                hideImageLoading();
+                imageInput.value = '';
+                if (uploadProgressContainer) {
+                    setTimeout(() => {
+                        uploadProgressContainer.style.display = 'none';
+                        if (uploadProgressBar) uploadProgressBar.style.width = '0%';
+                    }, 500);
                 }
-            );
+            };
+            reader.readAsDataURL(file);
         } catch (error) {
-            console.error('Error during image upload:', error);
-            
-            let errorMessage = 'Failed to upload image. ';
-            if (error.code === 'storage/unauthorized') {
-                errorMessage += 'You do not have permission to upload images.';
-            } else if (error.code === 'storage/canceled') {
-                errorMessage += 'Upload was canceled.';
-            } else {
-                errorMessage += error.message || 'An unknown error occurred.';
-            }
-            
-            alert(errorMessage);
+            console.error('Error updating image:', error);
+            alert('Failed to update image. Please try again.');
             hideImageLoading();
             imageInput.value = '';
             if (uploadProgressContainer) uploadProgressContainer.style.display = 'none';
@@ -379,66 +329,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     };
 
-    // --- Save as Draft Logic ---
-    if (saveDraftBtn) {
-        saveDraftBtn.addEventListener('click', async () => {
-            // Validate form before saving draft
-            const validationErrors = validateForm();
-            if (validationErrors.length > 0) {
-                alert('Please fix the following errors before saving as draft:\n\n' + validationErrors.join('\n'));
+    // --- Delete Service Logic ---
+    if (deleteServiceBtn) {
+        deleteServiceBtn.addEventListener('click', async () => {
+            if (!serviceData.serviceId) {
+                alert('Service identifier not found. Cannot delete service.');
                 return;
             }
+            const confirmed = confirm('Are you sure you want to delete this service? This action cannot be undone.');
+            if (!confirmed) return;
 
             // Disable button to prevent double clicks
-            const originalText = saveDraftBtn.textContent;
-            saveDraftBtn.disabled = true;
-            saveDraftBtn.textContent = 'Saving Draft...';
+            const originalText = deleteServiceBtn.textContent;
+            deleteServiceBtn.disabled = true;
+            deleteServiceBtn.textContent = 'Deleting...';
 
             try {
-                const formData = getFormData();
-                
-                // Build pricing object
-                const pricingObj = {};
-                if (formData.pricingScheme === 'Motorcycle CCs') {
-                    if (formData.small !== null) pricingObj['399cc below'] = formData.small;
-                    if (formData.medium !== null) pricingObj['400cc above'] = formData.medium;
-                } else {
-                    if (formData.small !== null) pricingObj['5-Seater'] = formData.small;
-                    if (formData.medium !== null) pricingObj['7-Seater'] = formData.medium;
-                }
-
-                // Save as draft in Firestore
                 const db = window.firebase.firestore();
-                
-                const draftData = {
-                    service: formData.service,
-                    category: formData.category,
-                    pricingScheme: formData.pricingScheme,
-                    notes: formData.notes,
-                    pricing: pricingObj,
-                    featured: formData.featured,
-                    imageUrl: formData.imageUrl,
-                    availability: serviceData.availability || 'Available',
-                    status: 'Draft',
-                    updatedAt: db.FieldValue.serverTimestamp()
-                };
+                await db.collection('services').doc(serviceData.serviceId).delete();
 
-                await db.collection('services').doc(serviceData.serviceId).update(draftData);
-                
-                console.log('Draft saved successfully!');
-                alert('Draft saved successfully!');
-                
                 // Clean up and redirect
                 sessionStorage.removeItem('selectedServiceData');
-                window.location.href = 'services.html';
-                
+                window.removeEventListener('storage', handleMediaSelection);
+
+                if (typeof showSuccessToast === 'function') {
+                    showSuccessToast('Service deleted successfully!');
+                } else {
+                    alert('Service deleted successfully!');
+                }
+
+                setTimeout(() => {
+                    window.location.href = 'services.html';
+                }, 1200);
             } catch (error) {
-                console.error('Error saving draft:', error);
-                alert('Failed to save draft: ' + (error.message || 'Unknown error'));
-                
-                // Re-enable button
-                saveDraftBtn.disabled = false;
-                saveDraftBtn.textContent = originalText;
+                console.error('Error deleting service:', error);
+                alert('Failed to delete service: ' + (error.message || 'Unknown error'));
+                deleteServiceBtn.disabled = false;
+                deleteServiceBtn.textContent = originalText;
             }
         });
     }
