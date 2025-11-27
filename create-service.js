@@ -183,14 +183,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Save to Firestore
         try {
             // Check Firebase initialization
-            if (!window.firebase || !window.firebase.firestore) {
+            if (!window.firebase || !window.firebase.firestore || !window.firebase.auth) {
                 throw new Error('Firebase is not initialized. Please refresh the page and try again.');
             }
-            
+
+            // Check if user is authenticated before proceeding
+            // Authentication check removed to allow admin and all users to create services
+
             const db = window.firebase.firestore();
             const storage = window.firebase.storage();
             let imageUrl = null;
-            
+
             // Upload image to Firebase Storage if one was selected
             const imageFile = imageInput.files[0];
             if (imageFile) {

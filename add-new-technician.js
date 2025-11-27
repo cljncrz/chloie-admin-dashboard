@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Upload avatar if selected
       if (selectedFile) {
-        const fileName = `technicians/${Date.now()}_${selectedFile.name}`;
+        const fileName = `technician-pictures/${Date.now()}_${selectedFile.name}`;
         const storageRef = storage.ref(fileName);
         await storageRef.put(selectedFile);
         avatarUrl = await storageRef.getDownloadURL();
