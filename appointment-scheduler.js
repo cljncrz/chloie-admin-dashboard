@@ -386,62 +386,99 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Time Slot Logic ---
     const renderTimeSlots = () => {
-        timeSlotsDate.textContent = selectedDate.toLocaleDateString(
-            'en-US',
-            {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-            }
-        );
+        // Update the date header
+        timeSlotsDate.textContent = selectedDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+        });
 
-        const slots = generateTimeSlots();
+        // Ensure container uses the redesigned timeline layout
+        try {
+            timeSlotsContainer.classList.add('slots-timeline');
+        } catch (_) { /* ignore */ }
 
-        timeSlotsContainer.innerHTML = ''; // Clear previous content
+        // Merge bookings and walk-ins for the selected date
+        const combined = [];
+        const pushIfSameDay = (item, type) => {
+            if (!item || item.status === 'Cancelled') return;
+            let when = item.datetimeRaw ? new Date(item.datetimeRaw) : window.appData.parseCustomDate(item.datetime);
+            if (!(when instanceof Date) || isNaN(when)) return;
+            if (when.toDateString() !== selectedDate.toDateString()) return;
+            combined.push({ appt: item, when, type });
+        };
 
-        slots.forEach(slot => {
-            const slotEl = document.createElement('div');
-            slotEl.classList.add('time-slot');
-            slotEl.dataset.time = slot.startTime; // Use startTime for selection
+        (window.appData.appointments || []).forEach(a => pushIfSameDay(a, 'booking'));
+        (window.appData.walkins || []).forEach(w => pushIfSameDay(w, 'walkin'));
 
-            if (slot.available) {
-                slotEl.classList.add('available');
-                slotEl.innerHTML = `
-                    <span class="time">${slot.time}</span>
-                    <span class="status">Available</span>
-                `;
-                slotEl.title = `Click to select ${slot.time}`;
+        combined.sort((a, b) => a.when - b.when);
+
+        // Render list
+        timeSlotsContainer.innerHTML = '';
+        if (combined.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'slots-empty text-muted';
+            empty.textContent = 'No appointments on this date.';
+            timeSlotsContainer.appendChild(empty);
+            return;
+        }
+
+        combined.forEach(({ appt, when, type }) => {
+            const serviceId = type === 'booking' ? (appt.serviceId || '') : (appt.id || '');
+            const timeLabel = when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            const serviceName = appt.serviceNames || appt.service || '';
+            const plate = appt.plate || '';
+            const customerLike = appt.customer || appt.carName || plate || 'Customer';
+            const statusClass = (appt.status || '').toLowerCase().replace(/\s+/g, '-');
+            const technician = appt.technician || 'Unassigned';
+            const typeLabel = type === 'walkin' ? 'Walk-in' : 'Booking';
+
+            // Determine date indicator
+            const now = new Date();
+            const todayStr = now.toDateString();
+            const apptDateStr = when.toDateString();
+            let dateIndicator = '';
+            if (apptDateStr === todayStr) {
+                dateIndicator = '<span class="date-indicator today">Today</span>';
+            } else if (when < now) {
+                dateIndicator = '<span class="date-indicator past">Past</span>';
             } else {
-                slotEl.classList.add('booked');
-                // Find the appointment(s) at this slot
-                const appointmentsAtSlot = appointments.filter(appt => {
-                    const apptDate = window.appData.parseCustomDate(appt.datetime);
-                    return apptDate &&
-                           apptDate.getFullYear() === selectedDate.getFullYear() &&
-                           apptDate.getMonth() === selectedDate.getMonth() &&
-                           apptDate.getDate() === selectedDate.getDate() &&
-                           appt.status !== 'Cancelled' &&
-                           apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) === slot.startTime;
-                });
-
-                if (appointmentsAtSlot.length > 0) {
-                    const appt = appointmentsAtSlot[0]; // Assuming one per slot, but handle multiple if needed
-                    slotEl.innerHTML = `
-                        <span class="time">${slot.time}</span>
-                        <span class="customer-name">${appt.customer}</span>
-                        <span class="service-name text-muted">${appt.service}</span>
-                    `;
-                    slotEl.title = `${appt.customer} - ${appt.service} at ${slot.time}`;
-                } else {
-                    // If not available but no appointment found, still mark as booked
-                    slotEl.innerHTML = `
-                        <span class="time">${slot.time}</span>
-                        <span class="status">Booked</span>
-                    `;
-                }
+                dateIndicator = '<span class="date-indicator upcoming">Upcoming</span>';
             }
 
-            timeSlotsContainer.appendChild(slotEl);
+            const card = document.createElement('div');
+            card.className = 'slot-card';
+            card.dataset.type = type;
+            card.dataset.serviceId = serviceId;
+
+            card.innerHTML = `
+                <div class="slot-time">
+                    <span class="time">${timeLabel}</span>
+                    <span class="dot" aria-hidden="true"></span>
+                </div>
+                <div class="slot-content">
+                    <div class="slot-header">
+                        <span class="badge type ${type}">${typeLabel}</span>
+                        ${statusClass ? `<span class="slot-status ${statusClass}">${appt.status}</span>` : ''}
+                        ${dateIndicator}
+                    </div>
+                    <div class="slot-title">
+                        <span class="customer">${customerLike}</span>
+                        ${plate ? `<span class="separator">•</span><span class="plate">${plate}</span>` : ''}
+                    </div>
+                    <div class="slot-subtitle">
+                        <span class="service">${serviceName}</span>
+                        <span class="separator">•</span>
+                        <span class="technician" title="Technician">${technician}</span>
+                    </div>
+                    <div class="slot-actions">
+                        <button class="btn-link show-appt-btn" data-type="${type}" data-service-id="${serviceId}" title="Show in table">Show</button>
+                    </div>
+                </div>
+            `;
+
+            timeSlotsContainer.appendChild(card);
         });
     };
 
@@ -1158,6 +1195,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     timeSlotsContainer.addEventListener('click', (e) => {
+        // Jump to appointment in main table
+        const showBtn = e.target.closest('.show-appt-btn');
+        if (showBtn && showBtn.dataset.serviceId) {
+            const apptId = showBtn.dataset.serviceId;
+            const itemType = showBtn.dataset.type || 'booking';
+            if (itemType === 'booking') {
+                const table = document.querySelector('#main-appointments-table-container');
+                if (table) {
+                    const searchInput = table.querySelector('#appointment-search');
+                    if (searchInput) {
+                        searchInput.value = apptId;
+                        const inputEvt = new Event('input', { bubbles: true });
+                        searchInput.dispatchEvent(inputEvt);
+                    }
+                    table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setTimeout(() => {
+                        const row = table.querySelector(`tbody tr[data-service-id="${apptId}"]`);
+                        if (row) {
+                            row.classList.add('card-flash');
+                            setTimeout(() => row.classList.remove('card-flash'), 1000);
+                        }
+                    }, 400);
+                }
+            } else {
+                // Walk-in table jump
+                const table = document.querySelector('#walk-in-appointments-table-container');
+                if (table) {
+                    const searchInput = table.querySelector('#walkin-appointment-search');
+                    if (searchInput) {
+                        searchInput.value = apptId; // rows use data-service-id = walkin.id
+                        const inputEvt = new Event('input', { bubbles: true });
+                        searchInput.dispatchEvent(inputEvt);
+                    }
+                    table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setTimeout(() => {
+                        const row = table.querySelector(`tbody tr[data-service-id="${apptId}"]`);
+                        if (row) {
+                            row.classList.add('card-flash');
+                            setTimeout(() => row.classList.remove('card-flash'), 1000);
+                        }
+                    }, 400);
+                }
+            }
+            return; // Do not treat as slot selection
+        }
+
         const slotEl = e.target.closest('.time-slot');
         if (slotEl && !slotEl.classList.contains('booked')) {
             // Remove 'active' from any previously selected slot
@@ -1281,7 +1364,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --- Initial Page Render ---
-    // This was missing, causing the calendar not to show on load.
     renderCalendar();
+
+    // Expose helpers for other scripts
+    window.rerenderCalendar = () => {
+        renderCalendar();
+    };
+
+    // Allow external code to set the calendar date (and re-render)
+    window.setCalendarDate = (dateLike) => {
+        try {
+            const d = (typeof dateLike === 'string') ? new Date(dateLike) : new Date(dateLike.getTime ? dateLike.getTime() : dateLike);
+            if (!isNaN(d)) {
+                selectedDate = new Date(d);
+                currentDate = new Date(d.getFullYear(), d.getMonth(), 1);
+                // update selected class and re-render
+                renderCalendar();
+            }
+        } catch (_) { /* ignore */ }
+    };
 
 });

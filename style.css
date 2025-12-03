@@ -6352,6 +6352,177 @@ input[type="checkbox"]:checked::after {
     box-shadow: var(--box-shadow);
 }
 
+/* === Redesigned Appointment Slots Timeline === */
+#time-slots-container.slots-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    position: relative;
+    padding-left: 1rem;
+    border-left: 2px solid var(--color-light);
+}
+
+.slot-card {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 0.8rem;
+    align-items: start;
+}
+
+.slot-time {
+    position: relative;
+    text-align: right;
+    padding-right: 0.5rem;
+    color: var(--color-dark-variant);
+    font-weight: 600;
+}
+.slot-time .dot {
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-white);
+}
+
+.slot-content {
+    background: var(--color-white);
+    border-radius: var(--border-radius-2);
+    box-shadow: var(--box-shadow);
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--color-light);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.slot-card:hover .slot-content {
+    box-shadow: none;
+}
+
+.slot-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+.badge.type {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.date-indicator {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: auto;
+}
+.date-indicator.today {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+.date-indicator.past {
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+}
+.date-indicator.upcoming {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+.badge.type.booking {
+    background: #e0e7ff;
+    color: #1e3a8a;
+    border: 1px solid #c7d2fe;
+}
+.badge.type.walkin {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.slot-status {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--color-light);
+}
+.slot-status.pending {
+    background: #fef9c3;
+    color: #92400e;
+    border-color: #fde68a;
+}
+.slot-status.in-progress {
+    background: var(--color-primary-variant);
+    color: #ffffff;
+    border-color: var(--color-primary-variant);
+}
+.slot-status.completed {
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #34d399;
+}
+.slot-status.cancelled {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fecaca;
+}
+
+.slot-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: var(--color-dark);
+}
+.slot-title .separator,
+.slot-subtitle .separator {
+    color: var(--color-info-light);
+}
+.slot-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    color: var(--color-info-dark);
+}
+.slot-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.2rem;
+}
+
+.slots-empty {
+    padding: 0.8rem 0.4rem;
+}
+
+@media (max-width: 640px) {
+    .slot-card {
+        grid-template-columns: 90px 1fr;
+    }
+    .slot-time .time {
+        font-size: 0.95rem;
+    }
+}
+
+.dark-theme-variables #time-slots-container.slots-timeline {
+    border-left-color: #42464d;
+}
+.dark-theme-variables .slot-content {
+    background: var(--color-white);
+    border-color: #42464d;
+}
+
 .selected-booking-time {
     background: var(--color-light);
     padding: 1rem;
@@ -6378,22 +6549,81 @@ input[type="checkbox"]:checked::after {
 }
 
 .queue-item {
+    background: var(--color-light);
+    padding: 1rem;
+    border-radius: var(--border-radius-2);
+    border-left: 3px solid var(--color-primary);
+    transition: all 0.3s ease;
+}
+
+.queue-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transform: translateX(2px);
+}
+
+.queue-item-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--color-light);
-    padding: 0.8rem 1rem;
-    border-radius: var(--border-radius-2);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.queue-item-header strong {
+    font-size: 1rem;
+    color: var(--color-dark);
+}
+
+.queue-item-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.queue-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.85rem;
 }
 
 .queue-item-info strong {
-    display: block;
-    font-size: 0.9rem;
+    color: var(--color-info-dark);
+    margin-right: 0.25rem;
+}
+
+.queue-item-actions {
+    display: flex;
+    flex-direction: column;
 }
 
 .queue-item-time {
     font-weight: 600;
     color: var(--color-primary);
+}
+
+/* Dark theme support for queue items */
+.dark-theme-variables .queue-item {
+    background: var(--color-dark);
+    border-left-color: var(--color-primary);
+}
+
+.dark-theme-variables .queue-item-header {
+    border-bottom-color: var(--color-dark-variant);
+}
+
+.dark-theme-variables .queue-item-header strong {
+    color: var(--color-white);
+}
+
+/* Responsive queue items */
+@media screen and (max-width: 768px) {
+    .queue-item-body {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
 }
 
 /* ================== RESCHEDULE REQUESTS WIDGET ================== */

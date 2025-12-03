@@ -278,6 +278,8 @@
   }
 
   let filteredReports = [];
+  let currentPage = 1;
+  const itemsPerPage = 20;
 
   function renderDamageReports() {
     const table = $('#damage-reports-table');
@@ -310,6 +312,7 @@
           : `No reports with status "${statusFilter}".`;
       }
       updateTotals(0);
+      updatePaginationUI();
       return;
     }
 
@@ -319,7 +322,13 @@
       noResultsRow.style.display = 'none';
     }
 
-    filteredReports.forEach((rep) => {
+    // Calculate pagination
+    const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredReports.length);
+    const pageReports = filteredReports.slice(startIndex, endIndex);
+
+    pageReports.forEach((rep) => {
       const row = document.createElement('tr');
       row.dataset.reportId = rep.reportId;
       
@@ -345,8 +354,62 @@
       tbody.appendChild(row);
     });
 
-    // update totals
+    // update totals and pagination
     updateTotals(filteredReports.length);
+    updatePaginationUI();
+  }
+
+  function updatePaginationUI() {
+    const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+    const pageInfo = document.querySelector('#damage-reports-table-container .page-info');
+    const prevBtn = document.querySelector('#damage-reports-table-container .pagination-btn[data-action="prev"]');
+    const nextBtn = document.querySelector('#damage-reports-table-container .pagination-btn[data-action="next"]');
+
+    if (pageInfo) {
+      if (filteredReports.length === 0) {
+        pageInfo.textContent = 'No reports';
+      } else {
+        const startIndex = (currentPage - 1) * itemsPerPage + 1;
+        const endIndex = Math.min(currentPage * itemsPerPage, filteredReports.length);
+        pageInfo.textContent = `Showing ${startIndex}-${endIndex} of ${filteredReports.length}`;
+      }
+    }
+
+    if (prevBtn) {
+      prevBtn.disabled = currentPage === 1;
+    }
+
+    if (nextBtn) {
+      nextBtn.disabled = currentPage >= totalPages || filteredReports.length === 0;
+    }
+  }
+
+  function setupPagination() {
+    const prevBtn = document.querySelector('#damage-reports-table-container .pagination-btn[data-action="prev"]');
+    const nextBtn = document.querySelector('#damage-reports-table-container .pagination-btn[data-action="next"]');
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderDamageReports();
+          // Scroll to top of table
+          document.getElementById('damage-reports-table-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+        if (currentPage < totalPages) {
+          currentPage++;
+          renderDamageReports();
+          // Scroll to top of table
+          document.getElementById('damage-reports-table-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
   }
 
   // Setup batch actions
@@ -521,7 +584,109 @@
     const statusFilter = $('#status-filter');
     if (statusFilter) {
       statusFilter.addEventListener('change', () => {
+        currentPage = 1; // Reset to first page
         renderDamageReports();
+      });
+    }
+  }
+
+  // Setup search functionality
+  function setupSearch() {
+    const searchInput = $('#damage-report-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase().trim();
+        currentPage = 1; // Reset to first page
+        
+        if (!searchTerm) {
+          renderDamageReports();
+          return;
+        }
+
+        // Get current status filter
+        const statusFilter = document.getElementById('status-filter')?.value || 'all';
+        
+        // Apply search filter
+        let searchResults = damageReports.filter(rep => {
+          const customer = (rep.customer || '').toLowerCase();
+          const contact = (rep.contact || '').toLowerCase();
+          const location = (rep.location || '').toLowerCase();
+          const description = (rep.description || '').toLowerCase();
+          
+          return customer.includes(searchTerm) || 
+                 contact.includes(searchTerm) || 
+                 location.includes(searchTerm) ||
+                 description.includes(searchTerm);
+        });
+
+        // Also apply status filter if not 'all'
+        if (statusFilter !== 'all') {
+          searchResults = searchResults.filter(rep => rep.status === statusFilter);
+        }
+
+        // Render filtered results
+        filteredReports = searchResults;
+        const table = $('#damage-reports-table');
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        // Clear existing rows
+        tbody.querySelectorAll('tr').forEach(tr => {
+          if (!tr.classList.contains('no-results-row')) tr.remove();
+        });
+
+        if (filteredReports.length === 0) {
+          const noResultsRow = tbody.querySelector('.no-results-row');
+          if (noResultsRow) {
+            noResultsRow.style.display = '';
+            noResultsRow.querySelector('td').textContent = `No reports found matching "${searchTerm}".`;
+          }
+          updateTotals(0);
+          updatePaginationUI();
+          return;
+        }
+
+        // Hide no results row
+        const noResultsRow = tbody.querySelector('.no-results-row');
+        if (noResultsRow) {
+          noResultsRow.style.display = 'none';
+        }
+
+        // Calculate pagination for search results
+        const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, filteredReports.length);
+        const pageReports = filteredReports.slice(startIndex, endIndex);
+
+        // Render filtered results
+        pageReports.forEach((rep) => {
+          const row = document.createElement('tr');
+          row.dataset.reportId = rep.reportId;
+          
+          const displayText = rep.description.length > 40 
+            ? rep.description.substring(0, 40) + '...' 
+            : rep.description;
+          
+          row.innerHTML = `
+            <td><input type="checkbox" class="damage-review-checkbox"></td>
+            <td>${rep.customer}</td>
+            <td>${rep.contact}</td>
+            <td>${rep.location}</td>
+            <td class="damage-comment" title="${rep.description}">${displayText}</td>
+            <td>${getStatusBadge(rep.status)}</td>
+            <td>${rep.date}</td>
+            <td class="text-center actions-cell">
+              <button type="button" class="action-icon-btn view-btn" title="View Full Details">
+                <span class="material-symbols-outlined">visibility</span>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        updateTotals(filteredReports.length);
+        updatePaginationUI();
       });
     }
   }
@@ -540,6 +705,8 @@
       observeTableMutations();
       setupBatchActions();
       setupStatusFilter();
+      setupSearch();
+      setupPagination();
     } catch (error) {
       console.error('Error initializing damage reviews:', error);
       hideLoader();

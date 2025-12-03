@@ -264,7 +264,7 @@
               </div>
               <div class="time-slots-widget">
                 <div class="widget-header">
-                  <h3>Time for Booking</h3>
+                  <h3>Appointment Slots</h3>
                   <button class="btn-primary" id="book-new-appointment-btn">
                     <span class="material-symbols-outlined">add</span> Book New
                   </button>
@@ -307,6 +307,11 @@
                       id="appointment-search"
                       placeholder="Search appointments..."
                     />
+                  </div>
+                  <div class="table-date-filter" style="display:flex;align-items:center;gap:8px;">
+                    <label for="appointments-date-filter" class="text-muted" style="font-size:0.9rem;">Date</label>
+                    <input type="date" id="appointments-date-filter" />
+                    <button type="button" id="appointments-date-clear" class="btn-secondary" title="Clear date filter" style="padding:6px 10px;">Clear</button>
                   </div>
                   <div class="status-filter-container">
                     <select class="status-filter"></select>
