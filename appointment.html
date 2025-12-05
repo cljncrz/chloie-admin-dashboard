@@ -276,11 +276,27 @@
               </div>
               <div class="queue-widget">
                 <div class="widget-header">
-                  <h3>Pending Queue</h3>
-                  <small>For selected date</small>
+                  <h3>Daily Slot Counter</h3>
+                  <small>Max 10 slots per day</small>
                 </div>
-                <div id="queue-list" class="queue-list-container">
-                  <!-- Pending appointments will be displayed by JS -->
+                <div id="slot-counter-container" class="slot-counter-container">
+                  <div class="slot-summary">
+                    <div class="slot-stat">
+                      <span class="slot-label">Available Slots:</span>
+                      <span class="slot-value" id="available-slots">10</span>
+                    </div>
+                    <div class="slot-stat">
+                      <span class="slot-label">Booked/Approved:</span>
+                      <span class="slot-value" id="booked-slots">0</span>
+                    </div>
+                    <div class="slot-stat">
+                      <span class="slot-label">Pending Approval:</span>
+                      <span class="slot-value" id="pending-slots">0</span>
+                    </div>
+                  </div>
+                  <div id="slot-appointments-list" class="slot-appointments-list">
+                    <!-- Appointments will be listed here in chronological order -->
+                  </div>
                 </div>
               </div>
             </div>

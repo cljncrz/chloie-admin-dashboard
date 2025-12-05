@@ -161,6 +161,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
+                // Check slot availability before approving
+                const apptDate = window.appData.parseCustomDate(appointment.datetime);
+                if (apptDate) {
+                    const counts = countAppointmentsForDate(apptDate);
+                    const available = MAX_SLOTS_PER_DAY - counts.inprogress;
+                    if (available <= 0) {
+                        alert(`Cannot approve: Maximum ${MAX_SLOTS_PER_DAY} in-progress slots reached for ${apptDate.toLocaleDateString('en-US')}`);
+                        approveBtn.disabled = false;
+                        return;
+                    }
+                }
+
                 try {
                     const db = window.firebase.firestore();
                     // Update the booking in Firestore with the new status and technician
@@ -549,35 +561,67 @@ document.addEventListener('DOMContentLoaded', async () => {
         return slots;
     };
 
-    // --- Queue Logic ---
+    // --- Slot Counter Logic ---
+    const MAX_SLOTS_PER_DAY = 10;
+    
+    const countAppointmentsForDate = (dateObj) => {
+        if (!dateObj) return { booked: 0, pending: 0, total: 0 };
+        const dateStr = dateObj.toDateString();
+        const bookings = window.appData?.appointments || [];
+        const walkins = window.appData?.walkins || [];
+        
+        let booked = 0; // Approved, In Progress, or Completed
+        let pending = 0; // Pending approval
+        
+        [...bookings, ...walkins].forEach(item => {
+            const apptDate = window.appData.parseCustomDate(item.datetime);
+            if (!apptDate || apptDate.toDateString() !== dateStr) return;
+            if (String(item.status).toLowerCase() === 'cancelled') return;
+            
+            const status = String(item.status).toLowerCase();
+            if (status === 'pending') {
+                pending++;
+            } else if (['approved', 'in progress', 'completed'].includes(status)) {
+                booked++;
+            }
+        });
+        
+        return { booked, pending, total: booked + pending };
+    };
+    
     const renderQueue = () => {
-        // For this example, the queue shows 'Pending' appointments for the selected day
-        const pendingAppointments = (window.appData.appointments || []).filter(appt => {
-           const apptDate = window.appData.parseCustomDate(appt.datetime);
-            return apptDate && appt.status === 'Pending' &&
-                   apptDate.toDateString() === selectedDate.toDateString();
-        });
+        if (!queueList) return;
+        
+        // Update slot counter display
+        const counts = countAppointmentsForDate(selectedDate);
+        const available = Math.max(0, MAX_SLOTS_PER_DAY - counts.total);
+        
+        queueList.innerHTML = `
+            <div class="slot-summary" style="margin-bottom: 1rem;">
+                <div class="slot-stat">
+                    <span class="slot-label">Available:</span>
+                    <span class="slot-value" id="scheduler-available-slots">${available}</span>
+                </div>
+                <div class="slot-stat">
+                    <span class="slot-label">Booked:</span>
+                    <span class="slot-value" id="scheduler-booked-slots">${counts.booked}</span>
+                </div>
+                <div class="slot-stat">
+                    <span class="slot-label">Pending:</span>
+                    <span class="slot-value" id="scheduler-pending-slots">${counts.pending}</span>
+                </div>
+            </div>
+            <small class="text-muted" style="display: block; text-align: center;">Max ${MAX_SLOTS_PER_DAY} slots per day</small>
+        `;
 
-        queueList.innerHTML = '';
-        if (pendingAppointments.length === 0) {
-            queueList.innerHTML = '<p class="text-muted">No pending appointments in the queue for this day.</p>';
-            return;
+        // Apply theme-aware classes
+        const schedAvailEl = queueList.querySelector('#scheduler-available-slots');
+        if (schedAvailEl) {
+            schedAvailEl.classList.remove('ok','low','full');
+            if (available === 0) schedAvailEl.classList.add('full');
+            else if (available <= 3) schedAvailEl.classList.add('low');
+            else schedAvailEl.classList.add('ok');
         }
-
-        pendingAppointments.forEach(appt => {
-            const itemEl = document.createElement('div');
-            itemEl.classList.add('queue-item');
-            itemEl.innerHTML = `
-                <div class="queue-item-info">
-                    <strong>${appt.customer}</strong>
-                    <small>${appt.service}</small>
-                </div>
-                <div class="queue-item-time">
-                    ${window.appData.parseCustomDate(appt.datetime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                </div>
-            `;
-            queueList.appendChild(itemEl);
-        });
     };
 
     // --- Reschedule Logic ---
@@ -1025,6 +1069,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const customerData = window.appData.customers.find(c => c.name === selectedCustomerName);
         if (customerData) {
+            // 1. Check slot availability for the selected date
+            const counts = countAppointmentsForDate(selectedDate);
+            const available = MAX_SLOTS_PER_DAY - counts.total;
+            if (available <= 0) {
+                alert(`Cannot book appointment: Maximum ${MAX_SLOTS_PER_DAY} slots reached for ${selectedDate.toLocaleDateString('en-US')}`);
+                return;
+            }
+            
             // 2. Helper function to calculate price for service
             const getPriceForService = (serviceName, carType) => {
                 const serviceData = (window.appData.services || []).find(s => s.service === serviceName);

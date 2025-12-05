@@ -493,6 +493,16 @@
     --chart-grid-color: rgba(132, 139, 200, 0.18); /* Subtle grid lines */
     --chart-header-bg: var(--color-white); /* Match card background */
     --chart-header-border: var(--color-light); /* Use standard light border */
+    
+    /* Slot counter status colors (light mode) */
+    --slot-bg-pending: #fff3cd;
+    --slot-text-pending: #856404;
+    --slot-bg-approved: #d1ecf1;
+    --slot-text-approved: #0c5460;
+    --slot-bg-inprogress: #d4edda;
+    --slot-text-inprogress: #155724;
+    --slot-bg-completed: #d4edda;
+    --slot-text-completed: #155724;
 }
 
 /* ================== DARK THEME VARIABLES ================== */
@@ -514,6 +524,16 @@
     --chart-grid-color: rgba(255, 255, 255, 0.2); /* A visible but not distracting grid line */
     --chart-header-bg: #2c2f33; /* A slightly lighter background for the chart header */
     --chart-header-border: #42464d; /* A subtle border for the chart header */
+    
+    /* Slot counter status colors (dark mode – transparent variants for better contrast) */
+    --slot-bg-pending: rgba(255, 243, 205, 0.06);
+    --slot-text-pending: var(--color-warning-variant);
+    --slot-bg-approved: rgba(209, 236, 241, 0.06);
+    --slot-text-approved: var(--color-info-dark);
+    --slot-bg-inprogress: rgba(52, 154, 120, 0.06);
+    --slot-text-inprogress: var(--color-success-variant);
+    --slot-bg-completed: rgba(52, 154, 120, 0.06);
+    --slot-text-completed: var(--color-success-variant);
 
     /* Scrollbar Colors */
     --scrollbar-track-color: transparent;
@@ -6548,74 +6568,153 @@ input[type="checkbox"]:checked::after {
     overflow-y: auto;
 }
 
-.queue-item {
-    background: var(--color-light);
-    padding: 1rem;
-    border-radius: var(--border-radius-2);
-    border-left: 3px solid var(--color-primary);
-    transition: all 0.3s ease;
+/* ================== SLOT COUNTER STYLES ================== */
+.slot-counter-container {
+    padding: 0.5rem;
 }
 
-.queue-item:hover {
+.slot-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--color-light);
+    border-radius: var(--border-radius-2);
+    margin-bottom: 1rem;
+}
+
+.slot-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0.5rem;
+}
+
+.slot-label {
+    font-size: 0.75rem;
+    color: var(--color-info-dark);
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.slot-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-dark);
+}
+
+.slot-value.ok {
+    color: var(--color-success-variant);
+}
+.slot-value.low {
+    color: var(--color-warning-variant);
+}
+.slot-value.full {
+    color: var(--color-danger);
+}
+
+.slot-appointments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.slot-appointment-item {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--color-light);
+    border-radius: var(--border-radius-2);
+    border-left: 3px solid var(--color-primary);
+    transition: all 0.2s ease;
+}
+
+.slot-appointment-item:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     transform: translateX(2px);
 }
 
-.queue-item-header {
+.slot-number {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--color-border);
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--color-primary);
+    color: var(--color-white);
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 0.9rem;
 }
 
-.queue-item-header strong {
-    font-size: 1rem;
+.slot-appointment-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.slot-appointment-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.slot-appointment-header strong {
+    font-size: 0.95rem;
     color: var(--color-dark);
 }
 
-.queue-item-body {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    align-items: start;
+.slot-appointment-info {
+    font-size: 0.8rem;
 }
 
-.queue-item-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    font-size: 0.85rem;
-}
-
-.queue-item-info strong {
-    color: var(--color-info-dark);
-    margin-right: 0.25rem;
-}
-
-.queue-item-actions {
-    display: flex;
-    flex-direction: column;
-}
-
-.queue-item-time {
+.slot-status {
+    padding: 2px 8px;
+    border-radius: var(--border-radius-1);
+    font-size: 0.7rem;
     font-weight: 600;
-    color: var(--color-primary);
 }
 
-/* Dark theme support for queue items */
-.dark-theme-variables .queue-item {
-    background: var(--color-dark);
-    border-left-color: var(--color-primary);
+.slot-status.pending {
+    background: var(--slot-bg-pending);
+    color: var(--slot-text-pending);
 }
 
-.dark-theme-variables .queue-item-header {
-    border-bottom-color: var(--color-dark-variant);
+.slot-status.approved {
+    background: var(--slot-bg-approved);
+    color: var(--slot-text-approved);
 }
 
-.dark-theme-variables .queue-item-header strong {
+.slot-status.in-progress {
+    background: var(--slot-bg-inprogress);
+    color: var(--slot-text-inprogress);
+}
+
+.slot-status.completed {
+    background: var(--slot-bg-completed);
+    color: var(--slot-text-completed);
+}
+
+/* Dark theme support for slot counter: use chart header background for contrast */
+.dark-theme-variables .slot-summary,
+.dark-theme-variables .slot-appointment-item {
+    background: var(--chart-header-bg);
+}
+
+.dark-theme-variables .slot-value,
+.dark-theme-variables .slot-appointment-header strong {
     color: var(--color-white);
+}
+
+.dark-theme-variables .slot-label {
+    color: var(--color-info-light);
 }
 
 /* Responsive queue items */

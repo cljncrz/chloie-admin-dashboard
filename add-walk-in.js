@@ -240,6 +240,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Combine date and time into a single Date object for Firestore
             const dateTime = new Date(`${date}T${time}`);
+            
+            // Check slot availability for the selected date
+            const MAX_SLOTS_PER_DAY = 10;
+            try {
+                const db = window.firebase.firestore();
+                const startOfDay = new Date(dateTime);
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(dateTime);
+                endOfDay.setHours(23, 59, 59, 999);
+                // Only count 'in progress' walk-ins and bookings for slot limit
+                const [bookingsSnap, walkinsSnap] = await Promise.all([
+                    db.collection('bookings')
+                        .where('dateTime', '>=', startOfDay)
+                        .where('dateTime', '<=', endOfDay)
+                        .where('status', '==', 'In Progress')
+                        .get(),
+                    db.collection('walkins')
+                        .where('dateTime', '>=', startOfDay)
+                        .where('dateTime', '<=', endOfDay)
+                        .where('status', '==', 'In Progress')
+                        .get()
+                ]);
+                const inProgressCount = bookingsSnap.size + walkinsSnap.size;
+                if (inProgressCount >= MAX_SLOTS_PER_DAY) {
+                    alert(`Cannot add walk-in: Maximum ${MAX_SLOTS_PER_DAY} in-progress slots reached for ${dateTime.toLocaleDateString('en-US')}`);
+                    return;
+                }
+            } catch (err) {
+                console.warn('Could not check slot availability:', err);
+                // Continue with creation - better to allow than block on error
+            }
 
             const newWalkinData = {
                 customerName,

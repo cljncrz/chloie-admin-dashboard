@@ -1,3 +1,14 @@
+/*
+ * APPOINTMENTS.JS - Appointment Management System
+ * 
+ * Key Features:
+ * - Slot-based system: Maximum 10 appointments per day
+ * - Appointment statuses: Pending -> Approved only (no in-progress transition)
+ * - Real-time slot counter showing available/booked/pending slots
+ * - Chronological appointment list prioritizing app bookings over walk-ins
+ * - Slot validation on approval to prevent overbooking
+ */
+
     // Defensive: Prevent approve if no technician, even if button is enabled by DOM manipulation
     document.addEventListener('click', function(e) {
         const approveBtn = e.target.closest('.approve-btn');
@@ -407,7 +418,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     // Populate archived table on load and after data changes
     if (typeof populateArchivedAppointmentsTable === 'function') populateArchivedAppointmentsTable();
-    // --- Pending Queue Functionality ---
+    // --- Slot Counter Functionality ---
+    // Maximum slots per day
+    const MAX_SLOTS_PER_DAY = 10;
+
     // Helper to get selected date from the calendar widget (if available)
     function getSelectedDate() {
         const dateStr = document.getElementById('time-slots-date')?.textContent;
@@ -420,94 +434,132 @@ document.addEventListener('DOMContentLoaded', async () => {
         return isNaN(fallback) ? null : new Date(fallback);
     }
 
-    // Render the pending queue for the selected date
-    function renderPendingQueue() {
-        const queueList = document.getElementById('queue-list');
-        if (!queueList) return;
-        const selectedDate = getSelectedDate();
-        if (!selectedDate) {
-            queueList.innerHTML = '<div class="text-muted">No date selected.</div>';
-            return;
-        }
-        // Get all pending bookings and walk-ins for the selected date
+    // Count appointments for a specific date (excluding cancelled)
+    function countAppointmentsForDate(dateObj) {
+        if (!dateObj) return { inprogress: 0, pending: 0, total: 0 };
+        const dateStr = dateObj.toDateString();
         const bookings = window.appData?.appointments || [];
         const walkins = window.appData?.walkins || [];
-        const technicians = window.appData?.technicians || [];
-        const items = [];
-        bookings.forEach(appt => {
-            if (String(appt.status).toLowerCase() !== 'pending') return;
-            const t = appt.datetimeRaw ? new Date(appt.datetimeRaw) : null;
-            if (!t) return;
-            if (t.toDateString() !== selectedDate.toDateString()) return;
-            items.push({ type:'booking', id: appt.serviceId, time: t, data: appt });
+        let inprogress = 0; // Only 'in progress' appointments count for slot limit
+        let pending = 0;
+        [...bookings, ...walkins].forEach(item => {
+            const t = item.datetimeRaw ? new Date(item.datetimeRaw) : null;
+            if (!t || t.toDateString() !== dateStr) return;
+            if (String(item.status).toLowerCase() === 'cancelled') return;
+            const status = String(item.status).toLowerCase();
+            if (status === 'pending') {
+                pending++;
+            } else if (status === 'in progress') {
+                inprogress++;
+            }
         });
-        walkins.forEach(w => {
-            if (String(w.status).toLowerCase() !== 'pending') return;
-            const t = w.datetimeRaw ? new Date(w.datetimeRaw) : null;
-            if (!t) return;
-            if (t.toDateString() !== selectedDate.toDateString()) return;
-            items.push({ type:'walkin', id: w.id, time: t, data: w });
-        });
-        if (items.length === 0) {
-            queueList.innerHTML = '<div class="text-muted">No pending appointments for this date.</div>';
+        return { inprogress, pending, total: inprogress + pending };
+    }
+
+    // Render the slot counter for the selected date
+    function renderSlotCounter() {
+        const slotCounterContainer = document.getElementById('slot-counter-container');
+        if (!slotCounterContainer) return;
+        
+        const selectedDate = getSelectedDate();
+        if (!selectedDate) {
+            slotCounterContainer.querySelector('#available-slots').textContent = '10';
+            slotCounterContainer.querySelector('#booked-slots').textContent = '0';
+            slotCounterContainer.querySelector('#pending-slots').textContent = '0';
+            const listContainer = document.getElementById('slot-appointments-list');
+            if (listContainer) listContainer.innerHTML = '<div class="text-muted" style="padding:1rem;text-align:center;">No date selected.</div>';
             return;
         }
-        queueList.innerHTML = '';
-        items.sort((a,b) => a.time - b.time).forEach(({type, id, time, data}) => {
+        
+        // Count appointments for the selected date
+        const counts = countAppointmentsForDate(selectedDate);
+        const available = Math.max(0, MAX_SLOTS_PER_DAY - counts.inprogress);
+        // Update slot summary
+        const availableEl = document.getElementById('available-slots');
+        const bookedEl = document.getElementById('booked-slots');
+        const pendingEl = document.getElementById('pending-slots');
+        if (availableEl) availableEl.textContent = available;
+        if (bookedEl) bookedEl.textContent = counts.inprogress;
+        if (pendingEl) pendingEl.textContent = counts.pending;
+        
+        // Color code based on availability — use CSS classes for theme adaptivity
+        if (availableEl) {
+            availableEl.classList.remove('ok', 'low', 'full');
+            if (available === 0) availableEl.classList.add('full');
+            else if (available <= 3) availableEl.classList.add('low');
+            else availableEl.classList.add('ok');
+        }
+        
+        // Render chronological list of appointments
+        const listContainer = document.getElementById('slot-appointments-list');
+        if (!listContainer) return;
+        
+        const bookings = window.appData?.appointments || [];
+        const walkins = window.appData?.walkins || [];
+        const dateStr = selectedDate.toDateString();
+        const items = [];
+        
+        [...bookings, ...walkins].forEach(item => {
+            const t = item.datetimeRaw ? new Date(item.datetimeRaw) : null;
+            if (!t || t.toDateString() !== dateStr) return;
+            if (String(item.status).toLowerCase() === 'cancelled') return;
+            
+            const type = item.serviceId ? 'booking' : 'walkin';
+            items.push({ type, id: item.serviceId || item.id, time: t, data: item });
+        });
+        
+        // Sort by time (prioritize app bookings at same time)
+        items.sort((a, b) => {
+            const timeDiff = a.time - b.time;
+            if (timeDiff !== 0) return timeDiff;
+            // If same time, prioritize bookings over walk-ins
+            if (a.type === 'booking' && b.type === 'walkin') return -1;
+            if (a.type === 'walkin' && b.type === 'booking') return 1;
+            return 0;
+        });
+        
+        if (items.length === 0) {
+            listContainer.innerHTML = '<div class="text-muted" style="padding:1rem;text-align:center;">No appointments for this date.</div>';
+            return;
+        }
+        
+        listContainer.innerHTML = '';
+        items.forEach(({type, id, time, data}, index) => {
             const div = document.createElement('div');
-            div.className = 'queue-item';
+            div.className = 'slot-appointment-item';
             div.dataset.type = type;
             div.dataset.serviceId = id;
+            
             const serviceName = data.serviceNames || data.service || '';
             const plateOrName = data.plate || data.carName || data.customer || 'N/A';
-            
-            // Build technician dropdown
-            const currentTechnician = data.technician || '';
-            let technicianOptions = '<option value="">Select Technician</option>';
-            technicians.forEach(tech => {
-                const selected = tech.name === currentTechnician ? 'selected' : '';
-                technicianOptions += `<option value="${tech.name}" ${selected}>${tech.name}</option>`;
-            });
+            const status = String(data.status);
+            const statusClass = status.toLowerCase().replace(/\s+/g, '-');
+            const timeStr = time.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
             
             div.innerHTML = `
-                <div class="queue-item-header">
-                    <div>
+                <div class="slot-number">${index + 1}</div>
+                <div class="slot-appointment-details">
+                    <div class="slot-appointment-header">
                         <strong>${plateOrName}</strong>
-                        <span class="badge type ${type}" style="margin-left:6px;">${type === 'walkin' ? 'Walk-in' : 'Booking'}</span>
+                        <span class="badge type ${type}" style="margin-left:6px;font-size:0.7rem;">${type === 'walkin' ? 'Walk-in' : 'App'}</span>
+                        <span class="slot-status ${statusClass}" style="margin-left:6px;font-size:0.7rem;">${status}</span>
                     </div>
-                    <small class="text-muted">${time.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true })}</small>
-                </div>
-                <div class="queue-item-body">
-                    <div class="queue-item-info">
-                        <div><strong>Service:</strong> ${serviceName}</div>
-                        <div><strong>Date:</strong> ${time.toLocaleDateString('en-US')}</div>
-                    </div>
-                    <div class="queue-item-actions">
-                        <select class="technician-select-queue" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--color-border);border-radius:4px;">
-                            ${technicianOptions}
-                        </select>
-                        <div style="display:flex;gap:6px;">
-                            <button class="btn-primary approve-queue-btn" data-type="${type}" data-service-id="${id}" style="flex:1;padding:6px 12px;font-size:0.85rem;" ${!currentTechnician ? 'disabled' : ''}>
-                                <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">check_circle</span> Approve
-                            </button>
-                            <button class="btn-link show-appt-btn" data-type="${type}" data-service-id="${id}" style="padding:6px 12px;font-size:0.85rem;">
-                                <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">visibility</span> Show
-                            </button>
-                        </div>
+                    <div class="slot-appointment-info">
+                        <small class="text-muted">${timeStr} • ${serviceName}</small>
                     </div>
                 </div>
             `;
-            queueList.appendChild(div);
+            listContainer.appendChild(div);
         });
     }
 
     // Hook into calendar date selection and appointment data updates
-    function setupPendingQueueListeners() {
+    function setupSlotCounterListeners() {
         // Listen for changes to the date (calendar)
         const timeSlotsDate = document.getElementById('time-slots-date');
         if (timeSlotsDate) {
             const observer = new MutationObserver(() => {
-                renderPendingQueue();
+                renderSlotCounter();
                 // Keep the explicit date filter input in sync with the calendar only when using calendar mode
                 try {
                     if (window.tableDateFilterMode === 'calendar') {
@@ -533,7 +585,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const origFetchAndPopulate = fetchAndPopulateAppointments;
         fetchAndPopulateAppointments = async function(...args) {
             await origFetchAndPopulate.apply(this, args);
-            renderPendingQueue();
+            renderSlotCounter();
             if (typeof populateAppointmentsTable === 'function') populateAppointmentsTable();
             if (typeof window.rerenderCalendar === 'function') window.rerenderCalendar();
         };
@@ -1012,11 +1064,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <span class="material-symbols-outlined">check_circle</span>
                             </button>`;
                     }
-                } else if (['Approve', 'Approved'].includes(appt.status)) {
-                    actionButtons = `
-                        <button class="action-icon-btn start-service-btn" title="Start Service">
-                            <span class="material-symbols-outlined">play_arrow</span>
-                        </button>`;
+                } else if (appt.status === 'Approved') {
+                    // Show Start button for approved bookings; require technician assigned
+                    if (appt.technician && appt.technician !== 'Unassigned') {
+                        actionButtons = `
+                            <button class="action-icon-btn start-service-btn" title="Start Service">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>`;
+                    } else {
+                        actionButtons = `
+                            <button class="action-icon-btn start-service-btn" title="Start Service" disabled style="opacity:0.5;pointer-events:none;user-select:none;" tabindex="-1" aria-disabled="true">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>`;
+                    }
                 } else if (appt.status === 'In Progress') {
                     actionButtons = `
                         <button class="action-icon-btn complete-service-btn" title="Complete Service">
@@ -1187,11 +1247,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 let actionButtons = '';
                 if (walkin.status === 'Pending') {
+                    // Show Start button for pending walk-ins only when a technician is assigned
+                    if (walkin.technician && walkin.technician !== 'Unassigned') {
+                        actionButtons = `
+                            <button class="action-icon-btn start-service-btn" title="Start Service">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>`;
+                    } else {
+                        // No action button: admin must assign technician from the row/table UI
+                        actionButtons = ``;
+                    }
+                } else if (walkin.status === 'Approved') {
                     actionButtons = `
-                        <button class="action-icon-btn start-service-btn" title="Start Service">
-                            <span class="material-symbols-outlined">play_arrow</span>
+                        <button class="action-icon-btn complete-service-btn" title="Complete Service">
+                            <span class="material-symbols-outlined">check</span>
                         </button>`;
                 } else if (walkin.status === 'In Progress') {
+                    // Keep complete button for legacy in-progress states
                     actionButtons = `
                         <button class="action-icon-btn complete-service-btn" title="Complete Service">
                             <span class="material-symbols-outlined">check</span>
@@ -1353,6 +1425,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return;
                     }
                     if (appointment.status === 'Pending') {
+                        // Check slot availability for the appointment date
+                        const apptDate = appointment.datetimeRaw ? new Date(appointment.datetimeRaw) : null;
+                        if (apptDate) {
+                            const counts = countAppointmentsForDate(apptDate);
+                            const available = MAX_SLOTS_PER_DAY - counts.total;
+                            if (available <= 0) {
+                                if (typeof showSuccessToast === 'function') showSuccessToast(`Cannot approve: Maximum ${MAX_SLOTS_PER_DAY} slots reached for ${apptDate.toLocaleDateString('en-US')}`, 'error');
+                                else alert(`Cannot approve: Maximum ${MAX_SLOTS_PER_DAY} slots reached for this date.`);
+                                return;
+                            }
+                        }
+                        
                         const db = window.firebase.firestore();
                         try {
                             await db.collection('bookings').doc(appointment.serviceId).update({
@@ -1367,21 +1451,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                         appointment.status = 'Approved';
                         row.dataset.status = 'Approved';
                         const statusCell = row.querySelector('td:nth-last-child(3)');
-                        statusCell.innerHTML = `<span class="status-badge approved" title="Approved">Approved</span><div class=\"status-note\" style=\"color: #1976d2; font-size: 0.95em; margin-top: 4px;\">Ask customer to get their vehicle to kingsley site</div>`;
+                        statusCell.innerHTML = `<span class="status-badge approved" title="Approved">Approved</span><div class=\"status-note\" style=\"color: #1976d2; font-size: 0.95em; margin-top: 4px;\">Customer can now bring vehicle to site</div>`;
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Appointment for ${appointment.customer} has been approved.`);
                         updateAppointmentPageStats();
+                        renderSlotCounter(); // Update slot counter
                         // --- Send notification to mobile app user ---
                         if (typeof NotificationService !== 'undefined' && typeof NotificationService.notifyAppointmentApproved === 'function') {
                             NotificationService.notifyAppointmentApproved(appointment.customerId || appointment.customer, appointment);
                         }
-                        // Replace the approve button with a start button
+                        // Replace the approve button with a start service button (if technician assigned)
                         const actionsCell = approveButton.parentElement;
                         approveButton.remove();
-                        actionsCell.insertAdjacentHTML('afterbegin', `
-                            <button class="action-icon-btn start-service-btn" title="Start Service">
-                                <span class="material-symbols-outlined">play_arrow</span>
-                            </button>
-                        `);
+                        if (appointment.technician && appointment.technician !== 'Unassigned') {
+                            actionsCell.insertAdjacentHTML('afterbegin', `
+                                <button class="action-icon-btn start-service-btn" title="Start Service">
+                                    <span class="material-symbols-outlined">play_arrow</span>
+                                </button>
+                            `);
+                        }
                     }
                     return;
                 }
@@ -1446,7 +1533,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         row.dataset.status = 'In Progress';
                         row.dataset.startTime = startTime;
                         const statusCell = row.querySelector('td:nth-last-child(3)'); // The 3rd cell from the end is Status
-                        statusCell.innerHTML = `<span class="in-progress">In Progress</span>`;
+                        if (statusCell) statusCell.innerHTML = `<span class="in-progress">In Progress</span>`;
 
                         if (originalStatus === 'Pending') increaseTechnicianTaskCount(appointment.technician);
 
@@ -1458,8 +1545,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                         // Replace the start button with a complete button
                         const actionsCell = startServiceButton.parentElement;
-                        startServiceButton.remove();
-                        actionsCell.insertAdjacentHTML('afterbegin', `
+                        if (startServiceButton) startServiceButton.remove();
+                        if (actionsCell) actionsCell.insertAdjacentHTML('afterbegin', `
                             <button class="action-icon-btn complete-service-btn" title="Complete Service">
                                 <span class="material-symbols-outlined">check</span>
                             </button>
@@ -1478,7 +1565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const appointments = window.appData.appointments || [];
                     const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
 
-                    if (appointment && appointment.status === 'In Progress') {
+                    if (appointment && (appointment.status === 'In Progress' || appointment.status === 'Approved')) {
                         await fetchCurrentUserFullName();
                         // Admins may complete; otherwise only assigned technician
                         if (currentUserFullName !== appointment.technician && window.currentUserRole !== 'admin') {
@@ -1699,12 +1786,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (startServiceButton) {
                     const walkins = window.appData.walkins || [];
-                    const walkin = walkins.find(w => w.plate === row.dataset.plate && w.service === row.dataset.service);
+                    const walkin = walkins.find(w => (w.id && w.id === row.dataset.serviceId) || (w.plate === row.dataset.plate && w.service === row.dataset.service));
 
                     if (walkin && walkin.status === 'Pending') {
                         await fetchCurrentUserFullName();
 
-                        // Admins may start regardless; others must be assigned technician
+                        // Ensure a technician is assigned
                         if (!walkin.technician || walkin.technician === 'Unassigned') {
                             if (typeof showSuccessToast === 'function') showSuccessToast('Cannot start service: no technician assigned.', 'error');
                             else alert('Cannot start service: no technician assigned.');
@@ -1712,28 +1799,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
 
                         // Validate walk-in date is today
-                        const walkinDate = walkin.datetimeRaw 
-                            ? new Date(walkin.datetimeRaw) 
-                            : window.appData.parseCustomDate(walkin.datetime);
+                        const walkinDate = walkin.datetimeRaw ? new Date(walkin.datetimeRaw) : window.appData.parseCustomDate(walkin.datetime);
                         const today = new Date();
                         const isToday = walkinDate && 
                             walkinDate.getDate() === today.getDate() &&
                             walkinDate.getMonth() === today.getMonth() &&
                             walkinDate.getFullYear() === today.getFullYear();
-                        
                         if (!isToday) {
                             if (typeof showSuccessToast === 'function') showSuccessToast('Cannot start service: walk-in is not scheduled for today.', 'error');
                             else alert('Cannot start service: walk-in is not scheduled for today.');
                             return;
                         }
 
+                        // Technician may start the service, or admins can start any
                         if (currentUserFullName !== walkin.technician && window.currentUserRole !== 'admin') {
                             if (typeof showSuccessToast === 'function') showSuccessToast('Only the assigned technician can start this service.', 'error');
                             else alert('Only the assigned technician can start this service.');
                             return;
                         }
 
-                        const originalStatus = walkin.status; // Capture original status
+                        const originalStatus = walkin.status;
                         const db = window.firebase.firestore();
                         try {
                             await db.collection('walkins').doc(walkin.id).update({
@@ -1752,19 +1837,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                         walkin.status = 'In Progress';
                         walkin.startTime = startTime;
                         row.dataset.status = 'In Progress';
-                        row.dataset.startTime = startTime; // prettier-ignore
+                        row.dataset.startTime = startTime;
                         const statusCell = row.querySelector('td:nth-last-child(3)'); // The 3rd cell from the end is Status
-                        statusCell.innerHTML = `<span class="in-progress">In Progress</span>`;
+                        if (statusCell) statusCell.innerHTML = `<span class="in-progress">In Progress</span>`;
 
                         if (originalStatus === 'Pending') increaseTechnicianTaskCount(walkin.technician);
-
                         updateAppointmentPageStats(); // Refresh stats
                         if (typeof showSuccessToast === 'function') showSuccessToast(`Service for walk-in ${walkin.plate} has started.`);
 
                         // Replace the start button with a complete button
                         const actionsCell = startServiceButton.parentElement;
-                        startServiceButton.remove();
-                        actionsCell.insertAdjacentHTML('afterbegin', `
+                        if (startServiceButton) startServiceButton.remove();
+                        if (actionsCell) actionsCell.insertAdjacentHTML('afterbegin', `
                             <button class="action-icon-btn complete-service-btn" title="Complete Service">
                                 <span class="material-symbols-outlined">check</span>
                             </button>
@@ -1783,7 +1867,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const walkins = window.appData.walkins || [];
                     const walkin = walkins.find(w => w.plate === row.dataset.plate && w.service === row.dataset.service);
 
-                    if (walkin && walkin.status === 'In Progress') {
+                    if (walkin && (walkin.status === 'In Progress' || walkin.status === 'Approved')) {
                         await fetchCurrentUserFullName();
                         if (currentUserFullName !== walkin.technician && window.currentUserRole !== 'admin') {
                             if (typeof showSuccessToast === 'function') showSuccessToast('Only the assigned technician can complete this service.', 'error');
@@ -2135,178 +2219,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (mainAppointmentsContainer) { // Only run these on the main appointments page
             populateStatusFilters();
             setupTableInteractions();
-            setupPendingQueueListeners();
+            setupSlotCounterListeners();
             fetchAndPopulateAppointments(); // Fetch data from Firestore on initial load
             updateAppointmentPageStats(); // Call the new function to update stats
             if (typeof window.initializeTableFunctionality === 'function') {
                 window.initializeTableFunctionality('#main-appointments-table');
                 window.initializeTableFunctionality('#walk-in-appointments-table');
             }
-            // Queue "Show" action to focus a specific appointment
-            const queueList = document.getElementById('queue-list');
-            if (queueList) {
-                // Handle Show button clicks
-                queueList.addEventListener('click', (e) => {
-                    const btn = e.target.closest('.show-appt-btn');
-                    if (!btn) return;
-                    const apptId = btn.dataset.serviceId;
-                    const type = btn.dataset.type || 'booking';
-
-                    if (type === 'booking') {
-                        const table = document.querySelector('#main-appointments-table-container');
-                        if (!table) return;
-                        const searchInput = table.querySelector('#appointment-search');
-                        if (searchInput) {
-                            searchInput.value = apptId;
-                            const evt = new Event('input', { bubbles: true });
-                            searchInput.dispatchEvent(evt);
-                        }
-                        table.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        setTimeout(() => {
-                            const row = table.querySelector(`tbody tr[data-service-id="${apptId}"]`);
-                            if (row) {
-                                row.classList.add('card-flash');
-                                setTimeout(() => row.classList.remove('card-flash'), 1000);
-                            }
-                        }, 400);
-                    } else {
-                        const table = document.querySelector('#walk-in-appointments-table-container');
-                        if (!table) return;
-                        const searchInput = table.querySelector('#walkin-appointment-search');
-                        if (searchInput) {
-                            searchInput.value = apptId;
-                            const evt = new Event('input', { bubbles: true });
-                            searchInput.dispatchEvent(evt);
-                        }
-                        table.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        setTimeout(() => {
-                            const row = table.querySelector(`tbody tr[data-service-id="${apptId}"]`);
-                            if (row) {
-                                row.classList.add('card-flash');
-                                setTimeout(() => row.classList.remove('card-flash'), 1000);
-                            }
-                        }, 400);
-                    }
-                });
-
-                // Handle technician dropdown changes
-                queueList.addEventListener('change', async (e) => {
-                    if (!e.target.classList.contains('technician-select-queue')) return;
-                    
-                    const queueItem = e.target.closest('.queue-item');
-                    if (!queueItem) return;
-                    
-                    const type = queueItem.dataset.type;
-                    const serviceId = queueItem.dataset.serviceId;
-                    const technicianName = e.target.value;
-                    const approveBtn = queueItem.querySelector('.approve-queue-btn');
-                    
-                    // Enable/disable approve button based on technician selection
-                    if (approveBtn) {
-                        approveBtn.disabled = !technicianName;
-                    }
-                    
-                    // Save technician assignment
-                    if (technicianName) {
-                        try {
-                            const db = window.firebase.firestore();
-                            const collection = type === 'booking' ? 'bookings' : 'walkins';
-                            await db.collection(collection).doc(serviceId).update({
-                                technician: technicianName,
-                                updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            
-                            // Update local data
-                            if (type === 'booking') {
-                                const appt = window.appData.appointments.find(a => a.serviceId === serviceId);
-                                if (appt) appt.technician = technicianName;
-                            } else {
-                                const walkin = window.appData.walkins.find(w => w.id === serviceId);
-                                if (walkin) walkin.technician = technicianName;
-                            }
-                            
-                            if (typeof showSuccessToast === 'function') {
-                                showSuccessToast(`Technician ${technicianName} assigned successfully`, 'success');
-                            }
-                        } catch (err) {
-                            console.error('Error assigning technician:', err);
-                            if (typeof showSuccessToast === 'function') {
-                                showSuccessToast('Failed to assign technician', 'error');
-                            }
-                        }
-                    }
-                });
-
-                // Handle Approve button clicks
-                queueList.addEventListener('click', async (e) => {
-                    const btn = e.target.closest('.approve-queue-btn');
-                    if (!btn || btn.disabled) return;
-                    
-                    const type = btn.dataset.type;
-                    const serviceId = btn.dataset.serviceId;
-                    const queueItem = btn.closest('.queue-item');
-                    const techSelect = queueItem?.querySelector('.technician-select-queue');
-                    const technicianName = techSelect?.value;
-                    
-                    if (!technicianName) {
-                        if (typeof showSuccessToast === 'function') {
-                            showSuccessToast('Please select a technician first', 'error');
-                        }
-                        return;
-                    }
-                    
-                    // Disable button during processing
-                    btn.disabled = true;
-                    const originalHTML = btn.innerHTML;
-                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">hourglass_empty</span> Approving...';
-                    
-                    try {
-                        const db = window.firebase.firestore();
-                        const collection = type === 'booking' ? 'bookings' : 'walkins';
-                        
-                        await db.collection(collection).doc(serviceId).update({
-                            status: 'Approved',
-                            technician: technicianName,
-                            approvedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
-                            updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        
-                        // Update local data
-                        if (type === 'booking') {
-                            const appt = window.appData.appointments.find(a => a.serviceId === serviceId);
-                            if (appt) {
-                                appt.status = 'Approved';
-                                appt.technician = technicianName;
-                            }
-                        } else {
-                            const walkin = window.appData.walkins.find(w => w.id === serviceId);
-                            if (walkin) {
-                                walkin.status = 'Approved';
-                                walkin.technician = technicianName;
-                            }
-                        }
-                        
-                        if (typeof showSuccessToast === 'function') {
-                            showSuccessToast('Appointment approved successfully!', 'success');
-                        }
-                        
-                        // Refresh the queue and tables
-                        setTimeout(() => {
-                            renderPendingQueue();
-                            if (typeof populateAppointmentsTable === 'function') populateAppointmentsTable();
-                            if (typeof populateWalkinAppointmentsTable === 'function') populateWalkinAppointmentsTable();
-                        }, 500);
-                        
-                    } catch (err) {
-                        console.error('Error approving appointment:', err);
-                        btn.disabled = false;
-                        btn.innerHTML = originalHTML;
-                        if (typeof showSuccessToast === 'function') {
-                            showSuccessToast('Failed to approve appointment', 'error');
-                        }
-                    }
-                });
-            }
+            // Note: Old queue-list handlers removed since we now use slot counter display
         }
 
         // --- Add event listener to refresh data when page is shown ---
