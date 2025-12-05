@@ -45,16 +45,74 @@ document.addEventListener('DOMContentLoaded', () => {
     const verificationEl = document.getElementById('profile-verification');
     const verificationText = verificationEl.querySelector('span:last-child');
     
-    // The `isVerified` property will only exist for mobile app customers.
-    // We can use its presence to determine the verification status.
-    if (profileData.isVerified === true) {
-        verificationEl.classList.add('verified');
-        verificationText.textContent = 'Verified App User';
-    } else {
-        // This now covers both `isVerified: false` and cases where it's not defined (walk-ins)
-        verificationEl.classList.add('not-verified');
-        verificationText.textContent = 'Not Verified';
-    }
+    // Check phoneVerified status from profileData first, then fetch from Firestore if needed
+    const checkPhoneVerification = async () => {
+        try {
+            // First, check if phoneVerified exists in the profileData passed from customers.js
+            if (profileData.phoneVerified === true) {
+                verificationEl.classList.add('verified');
+                verificationText.textContent = 'Verified';
+                return;
+            }
+            
+            // If not in profileData, try to fetch from Firestore
+            let userId = profileData.customerId || null;
+            
+            // If no customerId, try to get userId from Firestore by matching fullName
+            if (!userId && profileData.fullName) {
+                const db = window.firebase.firestore();
+                try {
+                    const userSnapshot = await db.collection('users')
+                        .where('fullName', '==', profileData.fullName)
+                        .limit(1)
+                        .get();
+                    
+                    if (!userSnapshot.empty) {
+                        userId = userSnapshot.docs[0].id;
+                    }
+                } catch (err) {
+                    console.warn('Could not fetch userId from Firestore:', err);
+                }
+            }
+            
+            // If we have a userId, fetch the phoneVerified status
+            if (userId) {
+                const db = window.firebase.firestore();
+                const userDoc = await db.collection('users').doc(userId).get();
+                
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    if (userData.phoneVerified === true) {
+                        verificationEl.classList.add('verified');
+                        verificationText.textContent = 'Verified';
+                        return;
+                    }
+                }
+            }
+            
+            // Fallback to isVerified property
+            if (profileData.isVerified === true) {
+                verificationEl.classList.add('verified');
+                verificationText.textContent = 'Verified App User';
+            } else {
+                // This now covers both `isVerified: false` and cases where it's not defined (walk-ins)
+                verificationEl.classList.add('not-verified');
+                verificationText.textContent = 'Not Verified';
+            }
+        } catch (error) {
+            console.error('Error checking phone verification:', error);
+            // Fallback logic
+            if (profileData.isVerified === true) {
+                verificationEl.classList.add('verified');
+                verificationText.textContent = 'Verified App User';
+            } else {
+                verificationEl.classList.add('not-verified');
+                verificationText.textContent = 'Not Verified';
+            }
+        }
+    };
+    
+    checkPhoneVerification();
     
     // --- Create and Populate Service Progress Tracker ---
     const createStatusTracker = (currentStatus) => {

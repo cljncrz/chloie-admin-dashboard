@@ -3450,7 +3450,7 @@ main .insights::-webkit-scrollbar-thumb {
 }
 
 .verification-status.verified {
-    background: #41cea2;
+    background: var(--color-success-variant);
     color: #ffffff;
 }
 

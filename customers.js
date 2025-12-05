@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const row = document.createElement('tr');
                 row.dataset.id = customer.id; // Use Firestore document ID
 
-                const verificationBadge = customer.isVerified ?
+                const verificationBadge = customer.phoneVerified ?
                     `<span class="status-badge verified">Verified</span>` :
                     `<span class="status-badge not-verified">Not Verified</span>`;
 
