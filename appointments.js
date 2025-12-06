@@ -701,6 +701,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         animateInsightNumbers(cancelledEl);
     };
 
+    // --- Helper function to check if appointment is beyond service date ---
+    window.appData.isBeyondServiceDate = (appointment) => {
+        if (!appointment || !appointment.datetimeRaw) return false;
+        const apptDate = new Date(appointment.datetimeRaw);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        apptDate.setHours(0, 0, 0, 0);
+        return apptDate < today; // Returns true if appointment date is in the past
+    };
+
     // This function will now be defined here to ensure it uses live data from Firestore
     window.appData.createTechnicianDropdown = (selectedTechnician, disabled = false) => {
         const technicians = window.appData.technicians || [];
@@ -1112,14 +1122,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     statusDisplay = `<span class="${statusClass}">${appt.status}</span>`;
                 }
+
+                // Check if appointment is beyond service date
+                const isBeyond = window.appData.isBeyondServiceDate(appt);
+                let beyondBadge = '';
+                if (isBeyond) {
+                    beyondBadge = '<div style="margin-top: 4px;"><span class="status-badge beyond-date">Beyond Service Date</span></div>';
+                }
+
                 // Disable cancel button if completed and paid, approved, or in progress
+                // BUT allow cancelling if appointment is beyond service date
                 let disableCancel = (appt.status === 'Completed' && appt.paymentStatus === 'Paid') || 
                                    appt.status === 'In Progress' || 
                                    appt.status === 'Approved' || 
                                    appt.status === 'Approve';
+                
+                // Allow cancel if beyond service date (can always cancel old appointments)
+                if (isBeyond && appt.status !== 'Completed') {
+                    disableCancel = false;
+                }
+                
                 let cancelTooltip = 'Cancel Appointment';
                 
-                if (appt.status === 'In Progress') {
+                if (isBeyond && appt.status !== 'Completed') {
+                    cancelTooltip = 'Cancel - Beyond service date (available for archiving)';
+                } else if (appt.status === 'In Progress') {
                     cancelTooltip = 'Cannot cancel: service has started';
                 } else if (appt.status === 'Approved' || appt.status === 'Approve') {
                     cancelTooltip = 'Cannot cancel: appointment has been approved';
@@ -1136,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td>${appt.datetime}</td>
                     <td>${appt.price}</td>
                     <td>${technicianDropdown}</td>
-                    <td class="text-center">${statusDisplay}</td>
+                    <td class="text-center">${statusDisplay}${beyondBadge}</td>
                     <td class="text-center">${paymentBadge}</td>
                     <td class="text-center">
                         ${actionButtons}
@@ -1261,8 +1288,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <span class="material-symbols-outlined">play_arrow</span>
                             </button>`;
                     } else {
-                        // No action button: admin must assign technician from the row/table UI
-                        actionButtons = ``;
+                        // Show disabled Start button: admin must assign technician from the row/table UI
+                        actionButtons = `
+                            <button class="action-icon-btn start-service-btn" title="Start Service - Choose a technician first" disabled style="opacity:0.5;pointer-events:none;user-select:none;" tabindex="-1" aria-disabled="true">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>`;
                     }
                 } else if (walkin.status === 'Approved') {
                     actionButtons = `
@@ -1290,15 +1320,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </button>`;
                 }
                 
+                // Check if walk-in is beyond service date
+                const isBeyond = window.appData.isBeyondServiceDate(walkin);
+                let beyondBadge = '';
+                if (isBeyond) {
+                    beyondBadge = '<div style="margin-top: 4px;"><span class="status-badge beyond-date">Beyond Service Date</span></div>';
+                }
+
                 // Disable cancel button if completed and paid, approved, or in progress
-                // Allow deletion for Pending walk-ins
+                // BUT allow cancelling if walk-in is beyond service date
                 let disableCancel = (walkin.status === 'Completed' && walkin.paymentStatus === 'Paid') || 
                                    walkin.status === 'In Progress' || 
                                    walkin.status === 'Approved' || 
                                    walkin.status === 'Approve';
+                
+                // Allow cancel if beyond service date (can always cancel old walk-ins)
+                if (isBeyond && walkin.status !== 'Completed') {
+                    disableCancel = false;
+                }
+                
                 let cancelTooltip = 'Delete Walk-in';
                 
-                if (walkin.status === 'Pending') {
+                if (isBeyond && walkin.status !== 'Completed') {
+                    cancelTooltip = 'Cancel - Beyond service date (available for archiving)';
+                } else if (walkin.status === 'Pending') {
                     cancelTooltip = 'Delete Pending Walk-in';
                 } else if (walkin.status === 'In Progress') {
                     cancelTooltip = 'Cannot cancel: service has started';
@@ -1316,7 +1361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td>${walkin.datetime}</td>
                     <td>${walkin.price}</td>
                     <td>${technicianDropdown}</td>
-                    <td class="text-center"><span class="${statusClass}">${walkin.status}</span></td>
+                    <td class="text-center"><span class="${statusClass}">${walkin.status}</span>${beyondBadge}</td>
                     <td class="text-center">${paymentBadge}</td>
                     <td class="text-center">
                         ${actionButtons}
@@ -2019,8 +2064,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         
                         cancelButton.disabled = true;
                         updateAppointmentPageStats(); // Refresh stats
-                        // Re-render the table with current filters
+                        // Re-render the tables with current filters
                         populateWalkinsTable();
+                        try { renderCancelledTable(); } catch (e) { /* ignore */ }
                     }
                     return;
                 }
@@ -2226,9 +2272,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         increaseTechnicianTaskCount(newTechnicianName);
                     }
                     if (typeof showSuccessToast === 'function') showSuccessToast(`Technician for walk-in ${walkin.plate} changed to ${newTechnicianName}.`);
-                        // Update approve button state in the row (if present) for walk-ins
+                        // Update approve/start button state in the row (if present) for walk-ins
                         try {
                             const approveBtn = row.querySelector('.approve-btn');
+                            const startServiceBtn = row.querySelector('.start-service-btn');
+                            
                             if (approveBtn) {
                                 if (walkin.status === 'Pending' && newTechnicianName && newTechnicianName !== '') {
                                     approveBtn.removeAttribute('disabled');
@@ -2246,8 +2294,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     approveBtn.style.userSelect = 'none';
                                 }
                             }
+                            
+                            // Enable start service button for pending walk-ins when technician is selected
+                            if (startServiceBtn) {
+                                if (walkin.status === 'Pending' && newTechnicianName && newTechnicianName !== '') {
+                                    startServiceBtn.removeAttribute('disabled');
+                                    startServiceBtn.removeAttribute('tabindex');
+                                    startServiceBtn.removeAttribute('aria-disabled');
+                                    startServiceBtn.style.opacity = '';
+                                    startServiceBtn.style.pointerEvents = '';
+                                    startServiceBtn.style.userSelect = '';
+                                    startServiceBtn.title = 'Start Service';
+                                } else {
+                                    startServiceBtn.setAttribute('disabled', '');
+                                    startServiceBtn.setAttribute('tabindex', '-1');
+                                    startServiceBtn.setAttribute('aria-disabled', 'true');
+                                    startServiceBtn.style.opacity = '0.5';
+                                    startServiceBtn.style.pointerEvents = 'none';
+                                    startServiceBtn.style.userSelect = 'none';
+                                    startServiceBtn.title = 'Start Service - Choose a technician first';
+                                }
+                            }
                         } catch (e) {
-                            console.debug('Could not update approve button state in walk-in row:', e);
+                            console.debug('Could not update button state in walk-in row:', e);
                         }
                 } catch (error) {
                     console.error("Error updating walk-in technician in Firestore:", error);
@@ -2298,9 +2367,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         // --- Add event listener to refresh data when page is shown ---
         // This handles cases where the user navigates back to this page.
         window.addEventListener('pageshow', (event) => {
-            // The 'persisted' property is true if the page is from the back/forward cache.
-            if (event.persisted) {
-                if (mainAppointmentsContainer) fetchAndPopulateAppointments();
+            // Re-fetch and re-render when the page is shown (always), not only when loaded from bfcache.
+            // Ensures that changes like cancellations made from another page are reflected immediately.
+            if (mainAppointmentsContainer) {
+                console.debug('pageshow: reloading appointments and walk-ins');
+                try { fetchAndPopulateAppointments(); } catch (err) { console.debug('Error fetching appointments on pageshow:', err); }
+                try { renderCancelledTable(); } catch (err) { /* ignore */ }
             }
         });
     }

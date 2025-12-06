@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const timeSlotsContainer = document.getElementById('time-slots-container');
     const timeSlotsDate = document.getElementById('time-slots-date');
     const queueList = document.getElementById('queue-list');
+    const dailyCounterList = document.getElementById('daily-counter-list');
     const bookNewAppointmentBtn = document.getElementById('book-new-appointment-btn');
     if (bookNewAppointmentBtn) {
         bookNewAppointmentBtn.style.display = 'none';
@@ -42,7 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let appointments = [...(window.appData.appointments || [])];
     let selectedTimeSlot = null;
     let reschedulingAppointment = null; // Holds the appointment being rescheduled
-     const pendingApprovalsBadge = document.getElementById('pending-approvals-badge');
+    let unavailableSlots = []; // Array of {date: 'YYYY-MM-DD', time: 'HH:MM AM/PM'} objects
+    const pendingApprovalsBadge = document.getElementById('pending-approvals-badge');
     const pendingApprovalsList = document.getElementById('pending-approvals-list');
 
     // --- Pending Approvals Logic ---
@@ -371,21 +373,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 dayCell.classList.add('selected');
             }
 
-           // Check if there are appointments on this day
-            const appointmentsOnDay = appointments.filter(appt => {
-                const apptDate = window.appData.parseCustomDate(appt.datetime);
-                return apptDate &&
-                       apptDate.getFullYear() === year &&
-                       apptDate.getMonth() === month &&
-                       apptDate.getDate() === i &&
-                       appt.status !== 'Cancelled'; // Don't show dots for cancelled appointments
-            });
+            // Check if there are appointments on this day (including walk-ins)
+            const count = getCountForDate(cellDate);
 
-            if (appointmentsOnDay.length > 0) {
+            if (count > 0) {
                 dayCell.classList.add('has-appointments');
-                const dot = document.createElement('span');
-                dot.classList.add('appointment-dot');
-                dayCell.appendChild(dot);
+                const badge = document.createElement('span');
+                badge.classList.add('appointment-count-badge');
+                badge.textContent = (count > 99) ? '99+' : String(count);
+                dayCell.appendChild(badge);
             }
 
             fragment.appendChild(dayCell);
@@ -514,6 +510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const now = new Date();
         const isToday = selectedDate.toDateString() === now.toDateString();
         const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+        const selectedDateStr = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
 
         slotDefinitions.forEach(def => {
             const slotTime = new Date(selectedDate);
@@ -528,6 +525,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             slotTime.setHours(hour, minute, 0, 0);
 
             let isAvailable = true;
+            let markedUnavailable = false;
+
+            // Check if this slot is manually marked as unavailable
+            const isBlockedByAdmin = unavailableSlots.some(slot => 
+                slot.date === selectedDateStr && slot.time === def.start
+            );
+            if (isBlockedByAdmin) {
+                isAvailable = false;
+                markedUnavailable = true;
+            }
 
             // Rule 1: If it's today, the slot must be at least 1 hour in the future.
             if (isToday && slotTime < oneHourFromNow) {
@@ -555,10 +562,64 @@ document.addEventListener('DOMContentLoaded', async () => {
                 startTime: def.start,
                 available: isAvailable,
                 bookingCount: bookingCount,
+                markedUnavailable: markedUnavailable,
             });
         });
 
         return slots;
+    };
+
+    // --- Unavailable Slots Management ---
+    const loadUnavailableSlots = async () => {
+        try {
+            if (!window.db) return;
+            const doc = await window.db.collection('settings').doc('unavailableSlots').get();
+            if (doc.exists) {
+                const data = doc.data();
+                unavailableSlots = data.slots || [];
+            }
+        } catch (err) {
+            console.error('Error loading unavailable slots:', err);
+        }
+    };
+
+    const saveUnavailableSlots = async () => {
+        try {
+            if (!window.db) return;
+            await window.db.collection('settings').doc('unavailableSlots').set({
+                slots: unavailableSlots,
+                updatedAt: new Date().toISOString()
+            });
+        } catch (err) {
+            console.error('Error saving unavailable slots:', err);
+        }
+    };
+
+    const toggleSlotAvailability = async (dateStr, timeStr) => {
+        const index = unavailableSlots.findIndex(slot => 
+            slot.date === dateStr && slot.time === timeStr
+        );
+        
+        if (index >= 0) {
+            // Remove from unavailable list (make available)
+            unavailableSlots.splice(index, 1);
+            if (typeof showSuccessToast === 'function') {
+                showSuccessToast('Timeslot marked as available');
+            } else {
+                alert('Timeslot marked as available');
+            }
+        } else {
+            // Add to unavailable list (block)
+            unavailableSlots.push({ date: dateStr, time: timeStr });
+            if (typeof showSuccessToast === 'function') {
+                showSuccessToast('Timeslot marked as unavailable');
+            } else {
+                alert('Timeslot marked as unavailable');
+            }
+        }
+        
+        await saveUnavailableSlots();
+        renderQueue(); // Refresh the display
     };
 
     // --- Slot Counter Logic ---
@@ -588,15 +649,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         return { booked, pending, total: booked + pending };
     };
+
+    // Helper: Count all appointments and walk-ins for a specific date
+    const getCountForDate = (dateObj) => {
+        if (!dateObj) return 0;
+        const dateStr = dateObj.toDateString();
+        const bookings = window.appData?.appointments || [];
+        const walkins = window.appData?.walkins || [];
+
+        let count = 0;
+        [...bookings, ...walkins].forEach(item => {
+            // Try to parse date in either window.appData.parseCustomDate or local parse function
+            const apptDate = (window.appData && typeof window.appData.parseCustomDate === 'function') ? window.appData.parseCustomDate(item.datetime) : parseCustomDate(item.datetime);
+            if (!apptDate || apptDate.toDateString() !== dateStr) return;
+            if (String(item.status).toLowerCase() === 'cancelled') return;
+            count++;
+        });
+        return count;
+    };
     
-    const renderQueue = () => {
-        if (!queueList) return;
+    // --- Daily Slot Counter ---
+    const renderDailySlotCounter = () => {
+        const target = dailyCounterList || queueList;
+        if (!target) return;
         
-        // Update slot counter display
         const counts = countAppointmentsForDate(selectedDate);
         const available = Math.max(0, MAX_SLOTS_PER_DAY - counts.total);
         
-        queueList.innerHTML = `
+        // Create or update the slot counter section
+        let counterSection = target.querySelector('.daily-slot-counter-section');
+        if (!counterSection) {
+            counterSection = document.createElement('div');
+            counterSection.className = 'daily-slot-counter-section';
+            target.appendChild(counterSection);
+        }
+        
+        counterSection.innerHTML = `
             <div class="slot-summary" style="margin-bottom: 1rem;">
                 <div class="slot-stat">
                     <span class="slot-label">Available:</span>
@@ -613,14 +701,91 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
             <small class="text-muted" style="display: block; text-align: center;">Max ${MAX_SLOTS_PER_DAY} slots per day</small>
         `;
-
+        
         // Apply theme-aware classes
-        const schedAvailEl = queueList.querySelector('#scheduler-available-slots');
+        const schedAvailEl = counterSection.querySelector('#scheduler-available-slots');
         if (schedAvailEl) {
             schedAvailEl.classList.remove('ok','low','full');
             if (available === 0) schedAvailEl.classList.add('full');
             else if (available <= 3) schedAvailEl.classList.add('low');
             else schedAvailEl.classList.add('ok');
+        }
+    };
+    
+    // --- Timeslot Availability Manager ---
+    const renderTimeslotAvailability = () => {
+        const target = queueList || dailyCounterList;
+        if (!target) return;
+        
+        const slots = generateTimeSlots();
+        const selectedDateStr = selectedDate.toISOString().split('T')[0];
+        
+        // Create or update the timeslot availability section
+        let availSection = target.querySelector('.timeslot-availability-section');
+        if (!availSection) {
+            availSection = document.createElement('div');
+            availSection.className = 'timeslot-availability-section';
+            target.appendChild(availSection);
+        }
+        
+        availSection.innerHTML = `
+            <div class="timeslot-availability-header" style="margin-top: 1.5rem; margin-bottom: 0.75rem;">
+                <h4 style="font-size: 0.9rem; margin: 0; color: var(--color-dark);">Timeslot Availability Controls</h4>
+                <small class="text-muted" style="font-size: 0.75rem;">Block/unblock individual timeslots from users</small>
+            </div>
+            <div class="timeslots-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem;">
+                ${slots.map(slot => {
+                    const isUnavailable = slot.markedUnavailable;
+                    const isBooked = slot.bookingCount > 0;
+                    const bgColor = isUnavailable ? '#ff4444' : (isBooked ? '#ff9800' : '#4caf50');
+                    const statusText = isUnavailable ? 'Blocked' : (isBooked ? 'Booked' : 'Available');
+                    const canToggle = !isBooked; // Can't toggle if already booked
+                    
+                    return `
+                        <button 
+                            class="timeslot-toggle-btn"
+                            data-date="${selectedDateStr}"
+                            data-time="${slot.startTime}"
+                            style="
+                                padding: 0.5rem;
+                                border: none;
+                                border-radius: 6px;
+                                background: ${bgColor};
+                                color: white;
+                                font-size: 0.75rem;
+                                cursor: ${canToggle ? 'pointer' : 'not-allowed'};
+                                opacity: ${canToggle ? '1' : '0.6'};
+                                transition: all 0.2s;
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                gap: 0.25rem;
+                            "
+                            ${!canToggle ? 'disabled' : ''}
+                            title="${canToggle ? 'Click to toggle availability' : 'Cannot toggle - slot is booked'}"
+                        >
+                            <span style="font-weight: 600;">${slot.startTime}</span>
+                            <span style="font-size: 0.7rem; opacity: 0.9;">${statusText}</span>
+                        </button>
+                    `;
+                }).join('')}
+            </div>
+            <small class="text-muted" style="display: block; margin-top: 0.75rem; font-size: 0.75rem;">
+                🟢 Green = Available to block | 🟠 Orange = Booked (cannot toggle) | 🔴 Red = Blocked
+            </small>
+        `;
+    };
+    
+    const renderQueue = () => {
+        // Render timeslot availability under the calendar
+        if (queueList) {
+            queueList.innerHTML = '';
+            renderTimeslotAvailability();
+        }
+        // Render daily counter in the right column
+        if (dailyCounterList) {
+            dailyCounterList.innerHTML = '';
+            renderDailySlotCounter();
         }
     };
 
@@ -1330,6 +1495,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Event listener for timeslot toggle buttons
+    if (queueList) {
+        queueList.addEventListener('click', async (e) => {
+            const toggleBtn = e.target.closest('.timeslot-toggle-btn');
+            if (toggleBtn && !toggleBtn.disabled) {
+                const dateStr = toggleBtn.dataset.date;
+                const timeStr = toggleBtn.dataset.time;
+                await toggleSlotAvailability(dateStr, timeStr);
+            }
+        });
+    }
+
     // --- Service Search Event Listeners ---
     serviceSearchInput.addEventListener('input', () => {
         populateServiceOptions(serviceSearchInput.value);
@@ -1415,8 +1592,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // Event listener for timeslot toggle buttons
+    if (queueList) {
+        queueList.addEventListener('click', async (e) => {
+            const toggleBtn = e.target.closest('.timeslot-toggle-btn');
+            if (toggleBtn && !toggleBtn.disabled) {
+                const dateStr = toggleBtn.dataset.date;
+                const timeStr = toggleBtn.dataset.time;
+                await toggleSlotAvailability(dateStr, timeStr);
+            }
+        });
+    }
+
     // --- Initial Page Render ---
-    renderCalendar();
+    // Load unavailable slots before rendering
+    loadUnavailableSlots().then(() => {
+        renderCalendar();
+    });
 
     // Expose helpers for other scripts
     window.rerenderCalendar = () => {

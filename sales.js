@@ -95,17 +95,13 @@ document.addEventListener('DOMContentLoaded', () => {
       console.info(`Sales: loaded ${appointments.length || 0} bookings, ${walkins.length || 0} walkins, ${window.appData.archiveBookings.length || 0} archived`);
       return true;
     } catch (err) {
-      console.warn('Could not load from Firestore, falling back to window.appData:', err && err.message ? err.message : err);
-      const fallbackAppts = (window.appData.appointments || []);
-      const fallbackWalkins = (window.appData.walkins || []);
-      const archived = Array.isArray(window.appData.archiveBookings) ? window.appData.archiveBookings.map(a => ({ ...a, archived: true })) : [];
-      appointments = fallbackAppts.concat(archived);
-      walkins = fallbackWalkins;
-      servicesData = window.appData.services || [];
-      console.info(`Sales: using fallback ${appointments.length || 0} bookings, ${walkins.length || 0} walkins, ${archived.length || 0} archived`);
-      window.appData.appointments = appointments;
-      window.appData.walkins = walkins = fallbackWalkins;
-      window.appData.archiveBookings = archived;
+      console.error('Could not load walk-in appointments from Firestore:', err && err.message ? err.message : err);
+      // Only use Firebase data - no local fallback
+      window.appData = window.appData || {};
+      window.appData.appointments = [];
+      window.appData.walkins = [];
+      window.appData.services = [];
+      window.appData.archiveBookings = [];
       return false;
     }
   }
