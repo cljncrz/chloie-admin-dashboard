@@ -263,9 +263,65 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    /**
+     * Handles appointment deletion.
+     * Archives the appointment to archive_bookings and removes it from bookings.
+     */
+    const deleteAppointment = async () => {
+        if (!appointmentData || !appointmentData.serviceId) {
+            if (typeof window.showSuccessToast === 'function') {
+                window.showSuccessToast('Error: Appointment data not found.', 'error');
+            }
+            return;
+        }
+
+        const confirmDelete = confirm(`Are you sure you want to delete the appointment for ${appointmentData.customer}? This will move it to archived. This action cannot be undone.`);
+        if (!confirmDelete) return;
+
+        try {
+            const db = window.firebase.firestore();
+            const now = new Date();
+            const archivedBy = window.currentUserFullName || 'Admin';
+
+            // Archive the appointment
+            await db.collection('archive_bookings').doc(appointmentData.serviceId).set({
+                ...appointmentData,
+                archivedAt: now.toISOString(),
+                archivedBy: archivedBy,
+                _source: 'Booking',
+                _originalCollection: 'bookings'
+            });
+
+            // Delete from active bookings
+            await db.collection('bookings').doc(appointmentData.serviceId).delete();
+
+            if (typeof window.showSuccessToast === 'function') {
+                window.showSuccessToast(`Appointment ${appointmentData.serviceId} has been archived.`);
+            }
+
+            // Redirect back after 1.5 seconds
+            setTimeout(() => {
+                window.location.href = 'appointment.html';
+            }, 1500);
+        } catch (error) {
+            console.error('Error deleting appointment:', error);
+            if (typeof window.showSuccessToast === 'function') {
+                window.showSuccessToast('Failed to delete appointment. Please try again.', 'error');
+            }
+        }
+    };
+
     // --- Event Listeners ---
     if (backBtn) {
         backBtn.addEventListener('click', handleBackClick);
+    }
+
+    const deleteBtn = document.getElementById('delete-appointment-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            deleteAppointment();
+        });
     }
 
         // --- Initial Load ---

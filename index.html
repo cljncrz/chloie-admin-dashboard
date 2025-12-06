@@ -255,10 +255,11 @@
                     <table>
                       <thead>
                         <tr class="sortable-header">
-                          <th data-sortable="true">Appointment ID</th>
+                          <th data-sortable="true">Customer</th>
                           <th data-sortable="true">Plate No.</th>
                           <th data-sortable="true">Service</th>
-                          <th data-sortable="true">Created</th>
+                          <th data-sortable="true">Date & Time</th>
+                          <th data-sortable="true">Price</th>
                           <th data-sortable="true" class="text-center">
                             Status
                           </th>
@@ -266,7 +267,7 @@
                       </thead>
                       <tbody>
                         <tr class="no-results-row">
-                          <td colspan="5" class="text-center text-muted">
+                          <td colspan="6" class="text-center text-muted">
                             No appointments found.
                           </td>
                         </tr>
@@ -311,9 +312,11 @@
                     <table>
                       <thead>
                         <tr class="sortable-header">
-                              <th data-sortable="true">Appointment ID</th>
+                          <th data-sortable="true">Customer</th>
                           <th data-sortable="true">Plate No.</th>
                           <th data-sortable="true">Service</th>
+                          <th data-sortable="true">Date & Time</th>
+                          <th data-sortable="true">Price</th>
                           <th data-sortable="true" class="text-center">
                             Status
                           </th>
@@ -321,7 +324,7 @@
                       </thead>
                       <tbody>
                         <tr class="no-results-row">
-                          <td colspan="4" class="text-center text-muted">
+                          <td colspan="6" class="text-center text-muted">
                             No walk-ins found.
                           </td>
                         </tr>
@@ -357,29 +360,8 @@
 
                 <div class="widget-card top-technicians-card">
                   <h2>Top Technicians</h2>
-                  <div class="technician-item">
-                    <div class="profile-photo">
-                      <img src="./images/redicon.png" alt="Bisu Go" />
-                    </div>
-                    <div class="technician-info">
-                      <h3>Bisu Go</h3>
-                      <small class="text-muted">5 Services Today</small>
-                    </div>
-                    <div class="performance-badge success">
-                      <span class="material-symbols-outlined">trending_up</span>
-                    </div>
-                  </div>
-                  <div class="technician-item">
-                    <div class="profile-photo">
-                      <img src="./images/redicon.png" alt="Rey Ignacio" />
-                    </div>
-                    <div class="technician-info">
-                      <h3>Rey Ignacio</h3>
-                      <small class="text-muted">4 Services Today</small>
-                    </div>
-                    <div class="performance-badge success">
-                      <span class="material-symbols-outlined">trending_up</span>
-                    </div>
+                  <div class="top-technicians-list">
+                    <p class="text-muted" style="text-align: center; padding: 2rem;">Loading technicians...</p>
                   </div>
                   <a href="technicians.html" class="show-all-link"
                     >View All Technicians</a

@@ -983,6 +983,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const allowedStatusesWithApprove = [...allowedStatuses, 'approve'];
             let filteredAppointments = appointments.filter(appt => {
                 const status = (appt.status || '').toLowerCase();
+                // Exclude cancelled appointments
+                if (status === 'cancelled') return false;
                 if (!allowedStatusesWithApprove.includes(status)) return false;
                 const matchesSearch = searchTerm === '' ||
                     Object.values(appt).some(val => String(val).toLowerCase().includes(searchTerm));
@@ -1142,6 +1144,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button class="action-icon-btn cancel-btn" title="${cancelTooltip}"${disableCancel ? ' disabled style="opacity:0.5;pointer-events:none;"' : ''}>
                             <span class="material-symbols-outlined">cancel</span>
                         </button>
+                        <button class="action-icon-btn delete-btn" title="Delete Appointment" style="color: #ff4444;">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
                     </td>
                 `;
                 fragment.appendChild(row);
@@ -1195,6 +1200,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const allowedStatuses = ['pending', 'approved', 'in progress', 'completed'];
             let filteredWalkins = walkins.filter(walkin => {
                 const status = (walkin.status || '').toLowerCase();
+                // Exclude cancelled walk-ins
+                if (status === 'cancelled') return false;
                 if (!allowedStatuses.includes(status)) return false;
                 const matchesSearch = searchTerm === '' ||
                     Object.values(walkin).some(val => String(val).toLowerCase().includes(searchTerm));
@@ -1284,13 +1291,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 // Disable cancel button if completed and paid, approved, or in progress
+                // Allow deletion for Pending walk-ins
                 let disableCancel = (walkin.status === 'Completed' && walkin.paymentStatus === 'Paid') || 
                                    walkin.status === 'In Progress' || 
                                    walkin.status === 'Approved' || 
                                    walkin.status === 'Approve';
-                let cancelTooltip = 'Cancel Appointment';
+                let cancelTooltip = 'Delete Walk-in';
                 
-                if (walkin.status === 'In Progress') {
+                if (walkin.status === 'Pending') {
+                    cancelTooltip = 'Delete Pending Walk-in';
+                } else if (walkin.status === 'In Progress') {
                     cancelTooltip = 'Cannot cancel: service has started';
                 } else if (walkin.status === 'Approved' || walkin.status === 'Approve') {
                     cancelTooltip = 'Cannot cancel: walk-in has been approved';
@@ -1399,12 +1409,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (appointmentTableBody) {
             appointmentTableBody.addEventListener('click', async (e) => {
                 const cancelButton = e.target.closest('.cancel-btn');
+                const deleteButton = e.target.closest('.delete-btn');
                 const approveButton = e.target.closest('.approve-btn');
                 const startServiceButton = e.target.closest('.start-service-btn');
                 const completeServiceButton = e.target.closest('.complete-service-btn');
                 const markPaidButton = e.target.closest('.mark-paid-btn');
                 const technicianSelect = e.target.closest('.technician-select');
-                const isActionButtonClick = approveButton || startServiceButton || completeServiceButton || cancelButton || markPaidButton || technicianSelect;
+                const isActionButtonClick = approveButton || startServiceButton || completeServiceButton || cancelButton || deleteButton || markPaidButton || technicianSelect;
                 const row = e.target.closest('tr');
 
                 if (!row || row.classList.contains('no-results-row')) return;
@@ -1633,6 +1644,60 @@ document.addEventListener('DOMContentLoaded', async () => {
                             console.error('Could not store appointmentToCancel:', e);
                         }
                         window.location.href = 'cancel-appointment.html';
+                    }
+                    return;
+                }
+
+                if (e.target.closest('.delete-btn')) {
+                    const deleteButton = e.target.closest('.delete-btn');
+                    const appointments = window.appData.appointments || [];
+                    const appointment = appointments.find(a => a.serviceId === row.dataset.serviceId);
+
+                    if (appointment) {
+                        const confirmDelete = confirm(`Are you sure you want to delete the appointment for ${appointment.customer}? This will move it to archived. This action cannot be undone.`);
+                        if (!confirmDelete) {
+                            return;
+                        }
+
+                        const db = window.firebase.firestore();
+                        try {
+                            // Move to archive
+                            const archiveRef = db.collection('archive_bookings').doc(appointment.serviceId);
+                            const bookingRef = db.collection('bookings').doc(appointment.serviceId);
+                            
+                            // Get current timestamp
+                            const now = new Date();
+                            const archivedBy = window.currentUserFullName || 'Admin';
+
+                            await archiveRef.set({
+                                ...appointment,
+                                archivedAt: now.toISOString(),
+                                archivedBy: archivedBy,
+                                _source: 'Booking',
+                                _originalCollection: 'bookings'
+                            });
+
+                            // Delete from bookings
+                            await bookingRef.delete();
+
+                            if (typeof showSuccessToast === 'function') {
+                                showSuccessToast(`Appointment ${appointment.serviceId} has been archived.`);
+                            } else {
+                                alert(`Appointment ${appointment.serviceId} has been archived.`);
+                            }
+
+                            // Remove row from table
+                            row.remove();
+                            populateAppointmentsTable();
+                            updateAppointmentPageStats();
+                        } catch (error) {
+                            console.error('Error deleting appointment:', error);
+                            if (typeof showSuccessToast === 'function') {
+                                showSuccessToast('Failed to delete appointment. Please try again.', 'error');
+                            } else {
+                                alert('Failed to delete appointment. Please try again.');
+                            }
+                        }
                     }
                     return;
                 }
@@ -1911,6 +1976,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (walkin) {
                         const originalStatus = walkin.status;
 
+                        // Allow deletion of Pending walk-ins
                         // Prevent cancelling once service is In Progress
                         if (originalStatus === 'In Progress') {
                             if (typeof showSuccessToast === 'function') showSuccessToast('Cannot cancel service after it has started.', 'error');

@@ -197,6 +197,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const selectedStatus = statusFilter ? statusFilter.value : 'all';
 
         appointments = appointments.filter(appt => {
+            // Exclude cancelled appointments
+            if (appt.status.toLowerCase() === 'cancelled') return false;
             const matchesSearch = searchTerm === '' || appt.customer.toLowerCase().includes(searchTerm) || appt.plate.toLowerCase().includes(searchTerm) || appt.service.toLowerCase().includes(searchTerm);
             const matchesStatus = selectedStatus === 'all' || appt.status.toLowerCase() === selectedStatus;
             return matchesSearch && matchesStatus;
@@ -214,27 +216,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             const row = document.createElement('tr');
             const statusClass = appt.status.toLowerCase().replace(' ', '-');
             row.dataset.appointmentId = appt.serviceId; // Use a unique ID for lookup
-            // The customer's profile picture is hardcoded for this example.
-            // In a real app, this would come from the customer's data.
-            const customerProfilePic = './images/redicon.png';
             
-            // Get creation timestamp - show when the appointment was created
-            let createdTime = 'N/A';
-            if (appt.createdAt) {
-                const createdDate = appt.createdAt instanceof Date ? appt.createdAt : (typeof appt.createdAt.toDate === 'function' ? appt.createdAt.toDate() : new Date(appt.createdAt));
-                createdTime = new Date(createdDate).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            } else if (appt.datetimeRaw) {
-                // Fallback to appointment datetime if createdAt not available
-                createdTime = new Date(appt.datetimeRaw).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            }
+            // Get customer name
+            const customerName = appt.customer || 'N/A';
+            
+            // Get price (show as PHP currency)
+            const price = (appt.price !== undefined && appt.price !== null) 
+                ? `₱${parseFloat(appt.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : 'N/A';
+            
+            // Get date and time
+            const dateTime = appt.datetime || 'N/A';
             
             row.innerHTML = `
-                <td class="customer-cell">
-                    <span>${appt.serviceId}</span>
-                </td>
-                <td>${appt.plateNumber}</td>
-                <td>${appt.serviceNames}</td>
-                <td><small>${createdTime}</small></td>
+                <td>${customerName}</td>
+                <td>${appt.plateNumber || 'N/A'}</td>
+                <td>${appt.serviceNames || 'N/A'}</td>
+                <td><small>${dateTime}</small></td>
+                <td>${price}</td>
                 <td class="text-center"><span class="${statusClass}">${appt.status}</span></td>
             `;
             fragment.appendChild(row);
@@ -277,6 +276,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const selectedStatus = statusFilter ? statusFilter.value : 'all';
 
         walkins = walkins.filter(walkin => {
+            // Exclude cancelled walk-ins
+            if (walkin.status.toLowerCase() === 'cancelled') return false;
             const matchesSearch = searchTerm === '' || walkin.plate.toLowerCase().includes(searchTerm) || walkin.service.toLowerCase().includes(searchTerm);
             const matchesStatus = selectedStatus === 'all' || walkin.status.toLowerCase() === selectedStatus;
             return matchesSearch && matchesStatus;
@@ -293,10 +294,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         paginatedWalkins.forEach(walkin => {
             const row = document.createElement('tr');
             const statusClass = walkin.status.toLowerCase().replace(/\s+/g, '-');
+            
+            // Get customer name
+            const customerName = walkin.customerName || walkin.carName || 'Walk-in Customer';
+            
+            // Get price (show as PHP currency)
+            const price = (walkin.price !== undefined && walkin.price !== null) 
+                ? `₱${parseFloat(walkin.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : 'N/A';
+            
+            // Get date and time
+            let dateTime = 'N/A';
+            if (walkin.datetime) {
+                dateTime = walkin.datetime;
+            } else if (walkin.dateTime) {
+                const date = walkin.dateTime instanceof Date ? walkin.dateTime : (typeof walkin.dateTime.toDate === 'function' ? walkin.dateTime.toDate() : new Date(walkin.dateTime));
+                dateTime = new Date(date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            }
+            
             row.innerHTML = `
-                <td>${walkin.id}</td>
-                <td>${walkin.plate}</td>
-                <td>${walkin.service}</td>
+                <td>${customerName}</td>
+                <td>${walkin.plate || 'N/A'}</td>
+                <td>${walkin.service || 'N/A'}</td>
+                <td><small>${dateTime}</small></td>
+                <td>${price}</td>
                 <td class="text-center"><span class="${statusClass}">${walkin.status}</span></td>
             `;
             fragment.appendChild(row);
@@ -327,9 +348,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const reviewsContainer = document.querySelector('.reviews-container');
         if (!reviewsContainer) return;
 
-        const sampleReviews = window.appData.reviews || [];
+        const reviews = window.appData.reviews || [];
+        
+        // Only show if there are reviews to display
+        if (reviews.length === 0) {
+            reviewsContainer.innerHTML = '<p class="text-muted" style="text-align: center; padding: 2rem;">No reviews available.</p>';
+            return;
+        }
+
         const fragment = document.createDocumentFragment();
-        sampleReviews.slice(0, 3).forEach(review => { // Show only 3 on dashboard
+        reviews.slice(0, 3).forEach(review => { // Show only 3 on dashboard
             const reviewCard = document.createElement('div');
             reviewCard.classList.add('review-card');
 
@@ -338,7 +366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 stars += `<span class="material-symbols-outlined ${i < review.rating ? 'filled' : ''}">star</span>`;
             }
 
-        // Add a reply button if the review doesn't already have a reply
+            // Add a reply button if the review doesn't already have a reply
             const replyButtonHTML = !review.reply
                 ? `<button class="btn-primary-outline quick-reply-btn" data-review-id="${review.transactionId}">
                        <span class="material-symbols-outlined">reply</span> Reply
@@ -633,6 +661,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         populateServiceReviews();
         setupRowClickNavigation(); // Set up the click listener
         setupRealtimeUpdates(); // Set up real-time listeners
+        setupAutoRefresh(); // Set up 24-hour auto-refresh
         setupAddTodoButton(); // Set up Add To-Do button listener
         loadDashboardTodos(); // Load to-do items from Firebase
     };
@@ -680,6 +709,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.warn('Could not set up real-time updates:', error);
         }
+    };
+
+    // --- Auto-Refresh Dashboard After 24 Hours ---
+    const setupAutoRefresh = () => {
+        const REFRESH_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        const STORAGE_KEY = 'dashboardLastRefreshTime';
+
+        const checkAndRefresh = () => {
+            const lastRefreshTime = localStorage.getItem(STORAGE_KEY);
+            const currentTime = Date.now();
+
+            if (!lastRefreshTime || (currentTime - parseInt(lastRefreshTime)) >= REFRESH_INTERVAL) {
+                console.log('🔄 Auto-refreshing dashboard data (24 hours passed)');
+                localStorage.setItem(STORAGE_KEY, currentTime.toString());
+                
+                // Reset pagination
+                appointmentsCurrentPage = 1;
+                walkinsCurrentPage = 1;
+                
+                // Fetch fresh data
+                fetchDashboardData();
+            }
+        };
+
+        // Check on page load
+        checkAndRefresh();
+
+        // Set up periodic check (every hour to be efficient)
+        setInterval(checkAndRefresh, 60 * 60 * 1000);
     };
 
     initializeDashboard();

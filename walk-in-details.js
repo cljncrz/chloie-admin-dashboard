@@ -164,9 +164,70 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = previousPage;
     };
 
+    /**
+     * Deletes the walk-in record from Firestore.
+     */
+    const deleteWalkin = async () => {
+        if (!walkinData || !walkinData.id) {
+            if (typeof showSuccessToast === 'function') {
+                showSuccessToast('Error: Walk-in data not found.', 'error');
+            } else {
+                alert('Error: Walk-in data not found.');
+            }
+            return;
+        }
+
+        // Only allow deletion of Pending walk-ins
+        if (walkinData.status !== 'Pending') {
+            if (typeof showSuccessToast === 'function') {
+                showSuccessToast(`Cannot delete: This walk-in is ${walkinData.status}.`, 'error');
+            } else {
+                alert(`Cannot delete: This walk-in is ${walkinData.status}.`);
+            }
+            return;
+        }
+
+        // Confirm deletion
+        const confirmDelete = confirm(`Are you sure you want to delete the walk-in for ${walkinData.plate}? This action cannot be undone.`);
+        if (!confirmDelete) {
+            return;
+        }
+
+        try {
+            const db = window.firebase.firestore();
+            await db.collection('walkins').doc(walkinData.id).delete();
+            
+            if (typeof showSuccessToast === 'function') {
+                showSuccessToast(`Walk-in ${walkinData.plate} has been deleted.`);
+            } else {
+                alert(`Walk-in ${walkinData.plate} has been deleted.`);
+            }
+
+            // Redirect back to appointment page after a short delay
+            setTimeout(() => {
+                window.location.href = 'appointment.html';
+            }, 1500);
+        } catch (error) {
+            console.error('Error deleting walk-in:', error);
+            if (typeof showSuccessToast === 'function') {
+                showSuccessToast('Failed to delete walk-in. Please try again.', 'error');
+            } else {
+                alert('Failed to delete walk-in. Please try again.');
+            }
+        }
+    };
+
     // --- Event Listeners ---
     if (backBtn) {
         backBtn.addEventListener('click', handleBackClick);
+    }
+
+    const deleteBtn = document.getElementById('delete-walkin-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            deleteWalkin();
+        });
     }
 
     // --- Initial Load ---
