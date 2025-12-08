@@ -1528,18 +1528,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Event listener for timeslot toggle buttons
-    if (queueList) {
-        queueList.addEventListener('click', async (e) => {
-            const toggleBtn = e.target.closest('.timeslot-toggle-btn');
-            if (toggleBtn && !toggleBtn.disabled) {
-                const dateStr = toggleBtn.dataset.date;
-                const timeStr = toggleBtn.dataset.time;
-                await toggleSlotAvailability(dateStr, timeStr);
-            }
-        });
-    }
-
     // --- Service Search Event Listeners ---
     serviceSearchInput.addEventListener('input', () => {
         populateServiceOptions(serviceSearchInput.value);
