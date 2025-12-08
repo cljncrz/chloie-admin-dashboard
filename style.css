@@ -8169,96 +8169,210 @@ input[type="checkbox"]:checked::after {
 }
 
 .time-slots-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
     margin-top: 1rem;
 }
 
+@media (max-width: 768px) {
+    .time-slots-list {
+        grid-template-columns: 1fr;
+    }
+}
+
 .time-slot-item {
+    position: relative;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: var(--color-white);
-    border: 1px solid var(--color-info-light);
-    border-radius: 8px;
+    flex-direction: column;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, var(--color-white) 0%, #f8fafc 100%);
+    border: 2px solid var(--color-info-light);
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.time-slot-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--color-primary);
     transition: all 0.3s ease;
 }
 
+.time-slot-item.inactive::before {
+    background: #9ca3af;
+}
+
 .time-slot-item:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+    border-color: var(--color-primary);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(-4px);
 }
 
 .time-slot-item.inactive {
-    opacity: 0.6;
-    background: var(--color-light);
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    border-color: #d1d5db;
+}
+
+.time-slot-item.inactive:hover {
+    border-color: #9ca3af;
 }
 
 .slot-time-display {
     display: flex;
     align-items: center;
     gap: 1rem;
+    margin-bottom: 1rem;
 }
 
 .slot-time-display .material-symbols-outlined {
-    font-size: 2rem;
+    font-size: 2.5rem;
     color: var(--color-primary);
+    padding: 0.75rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 12px;
+    transition: all 0.3s ease;
 }
 
 .time-slot-item.inactive .material-symbols-outlined {
-    color: var(--color-info);
+    color: #9ca3af;
+    background: rgba(156, 163, 175, 0.1);
 }
 
 .slot-times {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    flex: 1;
 }
 
 .slot-times strong {
-    font-size: 1rem;
+    font-size: 1.125rem;
+    font-weight: 700;
     color: var(--color-dark);
+    letter-spacing: -0.025em;
+}
+
+.time-slot-item.inactive .slot-times strong {
+    color: #6b7280;
 }
 
 .slot-times small {
     font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.time-slot-item:not(.inactive) .slot-times small {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+}
+
+.time-slot-item.inactive .slot-times small {
+    background: rgba(156, 163, 175, 0.2);
+    color: #6b7280;
 }
 
 .slot-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.75rem;
     align-items: center;
+    justify-content: space-between;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-info-light);
 }
 
-/* ON/OFF Toggle Button Styles */
-.btn-success {
-    background: #22c55e !important;
-    color: white !important;
-    border: none;
-    font-weight: 600;
+/* Modern Toggle Switch */
+.toggle-switch-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 56px;
+    height: 28px;
+    background: #cbd5e1;
+    border-radius: 28px;
+    cursor: pointer;
     transition: all 0.3s ease;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.btn-success:hover {
-    background: #16a34a !important;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(34, 197, 94, 0.3);
+.toggle-switch.active {
+    background: #22c55e;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
 }
 
-.btn-secondary {
-    background: #6b7280 !important;
-    color: white !important;
-    border: none;
+.toggle-switch::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 24px;
+    height: 24px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active::before {
+    transform: translateX(28px);
+}
+
+.toggle-label {
+    font-size: 0.875rem;
     font-weight: 600;
-    transition: all 0.3s ease;
+    color: var(--color-dark);
+    min-width: 40px;
 }
 
-.btn-secondary:hover {
-    background: #4b5563 !important;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(107, 114, 128, 0.3);
+.toggle-switch.active + .toggle-label {
+    color: #22c55e;
+}
+
+/* Action Buttons */
+.action-buttons-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.action-icon-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: var(--color-light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-icon-btn:hover {
+    background: var(--color-primary);
+    color: white;
+    transform: scale(1.1);
+}
+
+.action-icon-btn.delete-btn:hover {
+    background: #ef4444;
+    color: white;
+}
+
+.action-icon-btn .material-symbols-outlined {
+    font-size: 1.25rem;
 }
 
 /* ========== Modal Enhancements ========== */

@@ -200,22 +200,26 @@ document.addEventListener('DOMContentLoaded', async () => {
           <span class="material-symbols-outlined">${slot.isActive ? 'schedule' : 'schedule_disabled'}</span>
           <div class="slot-times">
             <strong>${slot.start} - ${slot.end}</strong>
-            <small class="text-muted">${slot.isActive ? 'Active' : 'Inactive'}</small>
+            <small>${slot.isActive ? 'Available' : 'Unavailable'}</small>
           </div>
         </div>
         <div class="slot-actions">
-          <button class="btn ${slot.isActive ? 'btn-success' : 'btn-secondary'}" 
-                  style="padding: 0.5rem 1rem; font-size: 0.875rem; min-width: 70px;"
-                  data-slot-id="${slot.id}"
-                  data-action="toggle">
-            ${slot.isActive ? 'ON' : 'OFF'}
-          </button>
-          <button class="action-icon-btn edit-slot-btn" title="Edit Slot">
-            <span class="material-symbols-outlined">edit</span>
-          </button>
-          <button class="action-icon-btn delete-slot-btn" title="Delete Slot" style="color: #ff4444;">
-            <span class="material-symbols-outlined">delete</span>
-          </button>
+          <div class="toggle-switch-wrapper">
+            <div class="toggle-switch ${slot.isActive ? 'active' : ''}" 
+                 data-slot-id="${slot.id}"
+                 data-action="toggle"
+                 title="Toggle availability">
+            </div>
+            <span class="toggle-label">${slot.isActive ? 'ON' : 'OFF'}</span>
+          </div>
+          <div class="action-buttons-group">
+            <button class="action-icon-btn edit-slot-btn" title="Edit Slot">
+              <span class="material-symbols-outlined">edit</span>
+            </button>
+            <button class="action-icon-btn delete-slot-btn delete-btn" title="Delete Slot">
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+          </div>
         </div>
       </div>
     `).join('');
