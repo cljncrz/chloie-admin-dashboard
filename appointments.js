@@ -553,6 +553,161 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // --- Timeslot Availability Management ---
+    const TIME_SLOTS = [
+        { id: 'slot1', start: '8:20 AM', end: '9:20 AM' },
+        { id: 'slot2', start: '9:20 AM', end: '10:20 AM' },
+        { id: 'slot3', start: '10:20 AM', end: '11:20 AM' },
+        { id: 'slot4', start: '11:20 AM', end: '12:10 PM' },
+        { id: 'slot5', start: '12:10 PM', end: '1:00 PM' },
+        { id: 'slot6', start: '1:20 PM', end: '2:20 PM' },
+        { id: 'slot7', start: '2:20 PM', end: '3:20 PM' },
+        { id: 'slot8', start: '3:50 PM', end: '4:50 PM' },
+        { id: 'slot9', start: '4:50 PM', end: '5:50 PM' },
+        { id: 'slot10', start: '5:50 PM', end: '6:50 PM' },
+        { id: 'slot11', start: '6:50 PM', end: '7:50 PM' },
+        { id: 'slot12', start: '7:50 PM', end: '8:50 PM' }
+    ];
+
+    // Get timeslot availability for a specific date
+    async function getTimeslotAvailability(dateStr) {
+        try {
+            const db = window.firebase.firestore();
+            const doc = await db.collection('timeslot_availability').doc(dateStr).get();
+            if (doc.exists) {
+                return doc.data();
+            }
+            // Return default: all slots enabled
+            return { date: dateStr, slots: {} };
+        } catch (error) {
+            console.error('Error fetching timeslot availability:', error);
+            return { date: dateStr, slots: {} };
+        }
+    }
+
+    // Update timeslot availability in Firestore
+    async function updateTimeslotAvailability(dateStr, slotId, isEnabled) {
+        try {
+            const db = window.firebase.firestore();
+            const docRef = db.collection('timeslot_availability').doc(dateStr);
+            
+            // Use merge to create or update
+            await docRef.set({
+                date: dateStr,
+                [`slots.${slotId}`]: isEnabled,
+                updatedAt: db.FieldValue.serverTimestamp(),
+                updatedBy: window.firebase.auth().currentUser?.email || 'admin'
+            }, { merge: true });
+            
+            console.log(`Timeslot ${slotId} ${isEnabled ? 'enabled' : 'disabled'} for ${dateStr}`);
+            return true;
+        } catch (error) {
+            console.error('Error updating timeslot availability:', error);
+            if (typeof showSuccessToast === 'function') {
+                showSuccessToast('Failed to update timeslot availability', 'error');
+            }
+            return false;
+        }
+    }
+
+    // Render timeslot availability controls
+    async function renderTimeslotControls() {
+        const container = document.getElementById('timeslot-availability-controls');
+        const dateDisplay = document.getElementById('timeslot-date-display');
+        if (!container) return;
+
+        const selectedDate = getSelectedDate();
+        if (!selectedDate) {
+            container.innerHTML = '<div class="text-muted" style="padding:1rem;text-align:center;">Select a date to manage timeslots</div>';
+            if (dateDisplay) dateDisplay.textContent = 'Select a date';
+            return;
+        }
+
+        // Format date for display and storage
+        const displayDate = selectedDate.toLocaleDateString('en-US', { 
+            weekday: 'short', 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+        const dateStr = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        
+        if (dateDisplay) dateDisplay.textContent = displayDate;
+
+        // Get current availability settings
+        const availability = await getTimeslotAvailability(dateStr);
+        
+        // Clear container and add loading state
+        container.innerHTML = '<div class="text-muted" style="padding:0.5rem;text-align:center;">Loading timeslots...</div>';
+
+        // Build timeslot controls
+        const controlsHTML = TIME_SLOTS.map(slot => {
+            const isEnabled = availability.slots?.[slot.id] !== false; // Default to true
+            const statusClass = isEnabled ? 'enabled' : 'disabled';
+            const statusText = isEnabled ? 'ON' : 'OFF';
+            
+            return `
+                <div class="timeslot-control-item ${statusClass}" data-slot-id="${slot.id}">
+                    <div class="timeslot-time">
+                        <span>${slot.start} - ${slot.end}</span>
+                    </div>
+                    <button class="timeslot-toggle-btn ${statusClass}" 
+                            data-slot-id="${slot.id}" 
+                            data-date="${dateStr}"
+                            data-enabled="${isEnabled}">
+                        <span class="toggle-status">${statusText}</span>
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = controlsHTML;
+
+        // Add event listeners to toggle buttons
+        container.querySelectorAll('.timeslot-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const button = e.currentTarget;
+                const slotId = button.dataset.slotId;
+                const dateStr = button.dataset.date;
+                const currentEnabled = button.dataset.enabled === 'true';
+                const newEnabled = !currentEnabled;
+
+                // Disable button during update
+                button.disabled = true;
+                button.innerHTML = '<span class="toggle-status">...</span>';
+
+                // Update in Firestore
+                const success = await updateTimeslotAvailability(dateStr, slotId, newEnabled);
+                
+                if (success) {
+                    // Update UI
+                    button.dataset.enabled = newEnabled;
+                    button.className = `timeslot-toggle-btn ${newEnabled ? 'enabled' : 'disabled'}`;
+                    button.innerHTML = `<span class="toggle-status">${newEnabled ? 'ON' : 'OFF'}</span>`;
+                    
+                    const item = button.closest('.timeslot-control-item');
+                    if (item) {
+                        item.className = `timeslot-control-item ${newEnabled ? 'enabled' : 'disabled'}`;
+                    }
+                    
+                    if (typeof showSuccessToast === 'function') {
+                        showSuccessToast(
+                            `Timeslot ${newEnabled ? 'enabled' : 'disabled'} successfully`, 
+                            'success'
+                        );
+                    }
+                } else {
+                    // Restore button on failure
+                    button.dataset.enabled = currentEnabled;
+                    button.innerHTML = `<span class="toggle-status">${currentEnabled ? 'ON' : 'OFF'}</span>`;
+                }
+                
+                button.disabled = false;
+            });
+        });
+    }
+
     // Hook into calendar date selection and appointment data updates
     function setupSlotCounterListeners() {
         // Listen for changes to the date (calendar)
@@ -560,6 +715,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (timeSlotsDate) {
             const observer = new MutationObserver(() => {
                 renderSlotCounter();
+                renderTimeslotControls(); // Render timeslot availability controls
                 // Keep the explicit date filter input in sync with the calendar only when using calendar mode
                 try {
                     if (window.tableDateFilterMode === 'calendar') {
@@ -586,6 +742,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         fetchAndPopulateAppointments = async function(...args) {
             await origFetchAndPopulate.apply(this, args);
             renderSlotCounter();
+            renderTimeslotControls(); // Render timeslot availability controls
             if (typeof populateAppointmentsTable === 'function') populateAppointmentsTable();
             if (typeof window.rerenderCalendar === 'function') window.rerenderCalendar();
         };

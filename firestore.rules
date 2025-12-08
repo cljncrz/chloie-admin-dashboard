@@ -1,128 +1,211 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if user is admin
-    function isAdmin() {
-      return request.auth != null && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+
+    // Helper: check if a given uid belongs to an admin user
+    function isAdmin(uid) {
+      return uid != null
+        && exists(/databases/$(database)/documents/users/$(uid))
+        && get(/databases/$(database)/documents/users/$(uid)).data.role == 'admin';
     }
-    
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Time Slots Configuration - Allow all authenticated users to read, only admins to write
-    match /time_slots_config/{document=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-    
-    // Settings collection - Admin only
-    match /settings/{document=**} {
-      allow read, write: if isAdmin();
-    }
-    
-    // Admin Settings - Admin only
-    match /adminSettings/{document=**} {
-      allow read, write: if isAdmin();
-    }
-    
-    // App Settings - Allow all authenticated users to read, only admins to write
-    match /app_settings/{document=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-    
-    // Users collection
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || request.auth.uid == userId;
-    }
-    
-    // Admins collection - Admin only
-    match /admins/{adminId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
-    }
-    
-    // Bookings/Appointments
-    match /bookings/{bookingId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
-    }
-    
-    // Walk-ins - Admin only
-    match /walkins/{walkinId} {
-      allow read, write: if isAdmin();
-    }
-    
-    // Archived bookings - Admin only
-    match /archive_bookings/{archiveId} {
-      allow read, write: if isAdmin();
-    }
-    
-    // Services
-    match /services/{serviceId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-    
-    // Technicians - Allow read for authenticated users, write for admins
-    match /technicians/{technicianId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-    
-    // Promotions
+
+    // ----------------------
+    // Public / General rules
+    // ----------------------
+
     match /promotions/{promotionId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read: if true;
+      allow create, update, delete: if request.auth != null && isAdmin(request.auth.uid);
     }
-    
-    // Reviews
-    match /reviews/{reviewId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+
+    match /media/{mediaId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
     }
-    
-    // Damage Reports
-    match /damage_reports/{reportId} {
-      allow read: if isAdmin();
-      allow create: if isAuthenticated();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+
+    match /services/{serviceId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
     }
-    
-    // Chat Rooms
-    match /chat_rooms/{chatId} {
-      allow read, write: if isAuthenticated();
-      
-      match /messages/{messageId} {
-        allow read, write: if isAuthenticated();
+
+    match /technicians/{technicianId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /activity_logs/{logId} {
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /geofencing_locations/{locationId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /admin_settings/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /admin_settings/geofencing {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    // ----------------------
+    // User-related rules
+    // ----------------------
+
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin(request.auth.uid));
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+
+      match /notifications/{notificationId} {
+        allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin(request.auth.uid));
       }
     }
+
+    match /user_locations/{userId} {
+      allow create, update, read: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && isAdmin(request.auth.uid);
+      allow delete: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /counters/{counterId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /bookings/{bookingId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if request.auth != null && (isAdmin(request.auth.uid) || resource.data.userId == request.auth.uid);
+    }
+
+    match /walkins/{walkinId} {
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+      allow get, list: if true;
+      allow write: if false;
+    }
+
+    match /todos/{todoId} {
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /cancellationRequests/{reqId} {
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+    }
     
-    // Notifications
+     match /damage_reports/{reportId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow get: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin(request.auth.uid);
+      allow list: if request.auth != null || isAdmin(request.auth.uid);
+      allow update: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin(request.auth.uid);
+      allow delete: if isAdmin(request.auth.uid);
+    }
+
+    match /feedbacks/{feedbackId} {
+      allow read: if request.auth != null && 
+                  (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
+                  resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid &&
+                     get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.userId == request.auth.uid;
+      allow update: if request.auth != null && isAdmin(request.auth.uid);
+      allow delete: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /technician_feedbacks/{feedbackId} {
+      allow read: if request.auth != null && 
+                  (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
+                   resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null &&
+                     request.resource.data.userId == request.auth.uid &&
+                     get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.userId == request.auth.uid;
+      allow update: if request.auth != null && isAdmin(request.auth.uid);
+      allow delete: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    // --- CHAT ROOMS & MESSAGES ---
+    match /chat_rooms/{roomId} {
+      // Allow any authenticated user to read chat rooms (for dashboard and app)
+      allow read: if request.auth != null;
+      // Allow only the user who owns the room or an admin to create/update
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin(request.auth.uid));
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        // Allow any authenticated user to read messages
+        allow read: if request.auth != null;
+        // Allow only the user who owns the room or an admin to create messages
+        allow create: if request.auth != null && (
+          get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.userId == request.auth.uid
+          || isAdmin(request.auth.uid)
+        ) && request.auth.uid == request.resource.data.senderId;
+        // Allow only the user who owns the room or an admin to update messages
+        allow update: if request.auth != null && (
+          get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.userId == request.auth.uid
+          || isAdmin(request.auth.uid)
+        );
+        allow delete: if false;
+      }
+    }
+
+    // --- ADMIN NOTIFICATIONS ---
+    match /adminNotifications/{notificationId} {
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    // --- NOTIFICATIONS ---
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read: if request.auth != null && (
+        isAdmin(request.auth.uid)
+        || resource.data.recipientUid == request.auth.uid
+      );
+      allow create, update, delete: if request.auth != null && isAdmin(request.auth.uid);
     }
     
-    // Reschedule Requests
-    match /reschedule_requests/{requestId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+    match /admin_notifications/{notificationId} {
+  		allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+		}
+
+    // --- ADMIN SETTINGS ---
+    match /adminSettings/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
     }
-    
-    // Default deny all other collections
-    match /{document=**} {
-      allow read, write: if false;
+
+    // Allow read/write for authenticated users on archive collections
+    match /archive_bookings/{docId} {
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+    match /archive_walkins/{docId} {
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /admins/{adminId} {
+      allow read: if request.auth != null && isAdmin(request.auth.uid);
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    // --- TIMESLOT AVAILABILITY ---
+    match /timeslot_availability/{dateDoc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    // --- TIME SLOTS CONFIGURATION ---
+    match /time_slots_config/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    // --- SETTINGS (including unavailableSlots) ---
+    match /settings/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
     }
   }
 }
+

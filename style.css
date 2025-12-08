@@ -6430,6 +6430,109 @@ input[type="checkbox"]:checked::after {
     grid-area: auto;
 }
 
+/* Timeslot Controls Container */
+.timeslot-controls-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+.timeslot-control-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--color-white);
+    border: 2px solid var(--color-info-light);
+    border-radius: var(--border-radius-2);
+    transition: all 0.2s ease;
+}
+
+.timeslot-control-item.disabled {
+    background: var(--color-light);
+    opacity: 0.7;
+    border-color: var(--color-dark);
+}
+
+.timeslot-control-item:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.timeslot-time {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--color-dark);
+}
+
+.timeslot-control-item.disabled .timeslot-time {
+    color: var(--color-dark);
+    opacity: 0.6;
+}
+
+.timeslot-toggle-btn {
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    border: 2px solid;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 60px;
+    text-align: center;
+}
+
+.timeslot-toggle-btn.enabled {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    color: white;
+}
+
+.timeslot-toggle-btn.enabled:hover {
+    background: #27ae60;
+    border-color: #27ae60;
+    transform: scale(1.05);
+}
+
+.timeslot-toggle-btn.disabled {
+    background: var(--color-danger);
+    border-color: var(--color-danger);
+    color: white;
+}
+
+.timeslot-toggle-btn.disabled:hover {
+    background: #c0392b;
+    border-color: #c0392b;
+    transform: scale(1.05);
+}
+
+.timeslot-toggle-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Dark theme support */
+.dark-theme-variables .timeslot-control-item {
+    background: var(--color-dark);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-theme-variables .timeslot-control-item.disabled {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.dark-theme-variables .timeslot-time {
+    color: var(--color-light);
+}
+
+.dark-theme-variables .timeslot-control-item:hover {
+    border-color: var(--color-primary);
+}
+
 .widget-header {
     display: flex;
     align-items: center;
@@ -8057,7 +8160,6 @@ input[type="checkbox"]:checked::after {
     padding-bottom: 0.75rem;
     border-bottom: 2px solid var(--color-light);
     margin-bottom: 0.75rem;
-}
 }
 
 .daily-slot-counter-section .slot-summary {

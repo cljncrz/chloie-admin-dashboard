@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Connection Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #3b82f6;
+            margin-bottom: 20px;
+        }
+        .test-item {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #ddd;
+        }
+        .test-item.success {
+            background: #f0fdf4;
+            border-left-color: #22c55e;
+        }
+        .test-item.error {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+        }
+        .test-item.pending {
+            background: #fef9c3;
+            border-left-color: #eab308;
+        }
+        .status {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .details {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        pre {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔥 Firebase Connection Test</h1>
+        <p>This page tests your Firebase configuration for the timeslot availability feature.</p>
+        
+        <button onclick="runTests()">Run Tests</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module" src="firebase-setup.js"></script>
+    <script type="module">
+        async function runTests() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            
+            const tests = [
+                testFirebaseInit,
+                testFirestoreConnection,
+                testTimeSlotsCollection,
+                testUnavailableSlotsCollection,
+                testAuthState
+            ];
+            
+            for (const test of tests) {
+                await test();
+            }
+        }
+        
+        function addTestResult(title, status, details = '') {
+            const resultsDiv = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-item ${status}`;
+            div.innerHTML = `
+                <div class="status">${getStatusIcon(status)} ${title}</div>
+                ${details ? `<div class="details">${details}</div>` : ''}
+            `;
+            resultsDiv.appendChild(div);
+        }
+        
+        function getStatusIcon(status) {
+            const icons = {
+                success: '✅',
+                error: '❌',
+                pending: '⏳'
+            };
+            return icons[status] || '•';
+        }
+        
+        async function testFirebaseInit() {
+            try {
+                await window.firebaseInitPromise;
+                if (window.firebase && window.db) {
+                    addTestResult(
+                        'Firebase Initialization',
+                        'success',
+                        'Firebase is properly initialized and ready'
+                    );
+                } else {
+                    addTestResult(
+                        'Firebase Initialization',
+                        'error',
+                        'Firebase promise resolved but window.firebase or window.db not found'
+                    );
+                }
+            } catch (error) {
+                addTestResult(
+                    'Firebase Initialization',
+                    'error',
+                    `Error: ${error.message}`
+                );
+            }
+        }
+        
+        async function testFirestoreConnection() {
+            try {
+                const testDoc = await window.db.collection('settings').doc('test').get();
+                addTestResult(
+                    'Firestore Connection',
+                    'success',
+                    'Successfully connected to Firestore database'
+                );
+            } catch (error) {
+                addTestResult(
+                    'Firestore Connection',
+                    'error',
+                    `Error: ${error.message}`
+                );
+            }
+        }
+        
+        async function testTimeSlotsCollection() {
+            try {
+                const doc = await window.db.collection('time_slots_config').doc('slots').get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    const slotsCount = data.slots ? data.slots.length : 0;
+                    const activeCount = data.slots ? data.slots.filter(s => s.isActive).length : 0;
+                    addTestResult(
+                        'Time Slots Configuration',
+                        'success',
+                        `Found ${slotsCount} time slots (${activeCount} active)<br><pre>${JSON.stringify(data.slots?.[0] || {}, null, 2)}</pre>`
+                    );
+                } else {
+                    addTestResult(
+                        'Time Slots Configuration',
+                        'pending',
+                        'Collection exists but no slots configured yet. Use the Time Slots Settings page to add slots.'
+                    );
+                }
+            } catch (error) {
+                addTestResult(
+                    'Time Slots Configuration',
+                    'error',
+                    `Error: ${error.message}`
+                );
+            }
+        }
+        
+        async function testUnavailableSlotsCollection() {
+            try {
+                const doc = await window.db.collection('settings').doc('unavailableSlots').get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    const blockedCount = data.slots ? data.slots.length : 0;
+                    addTestResult(
+                        'Unavailable Slots (Blocked Times)',
+                        'success',
+                        `Found ${blockedCount} blocked time slots${blockedCount > 0 ? '<br><pre>' + JSON.stringify(data.slots.slice(0, 3), null, 2) + '</pre>' : ''}`
+                    );
+                } else {
+                    addTestResult(
+                        'Unavailable Slots (Blocked Times)',
+                        'success',
+                        'Collection exists. No slots blocked yet (this is normal).'
+                    );
+                }
+            } catch (error) {
+                addTestResult(
+                    'Unavailable Slots (Blocked Times)',
+                    'error',
+                    `Error: ${error.message}`
+                );
+            }
+        }
+        
+        async function testAuthState() {
+            try {
+                await window.firebaseInitPromise;
+                const user = window.firebase.auth().currentUser;
+                if (user) {
+                    addTestResult(
+                        'Authentication Status',
+                        'success',
+                        `Logged in as: ${user.email}`
+                    );
+                } else {
+                    addTestResult(
+                        'Authentication Status',
+                        'pending',
+                        'Not logged in. You need to be logged in as admin to manage time slots.'
+                    );
+                }
+            } catch (error) {
+                addTestResult(
+                    'Authentication Status',
+                    'error',
+                    `Error: ${error.message}`
+                );
+            }
+        }
+        
+        // Make runTests available globally
+        window.runTests = runTests;
+        
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html>

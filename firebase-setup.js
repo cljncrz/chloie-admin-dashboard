@@ -501,11 +501,15 @@ console.log('Available methods:', Object.keys(window._firebaseStorageAPI));
 // Provide a convenience global for module-based code that expects these names
 window._firebaseServices = { auth, db, storage };
 
+// Add shortcut for window.db (used by many legacy scripts)
+window.db = window.firebase.firestore();
+
 // Resolve the init promise that was created at the top of this file
 // Give Firestore a moment to initialize and connect
 setTimeout(() => {
   console.log('Firebase services initialized');
   console.log('Native storage API available:', !!window._firebaseStorageAPI);
+  console.log('window.db shortcut:', !!window.db);
   if (firebaseInitResolve) {
     firebaseInitResolve();
   }

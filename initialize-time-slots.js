@@ -16,18 +16,18 @@ admin.initializeApp({
 const db = admin.firestore();
 
 const defaultTimeSlots = [
-  { id: '1', start: "8:20 AM", end: "9:20 AM", isActive: true },
-  { id: '2', start: "9:20 AM", end: "10:20 AM", isActive: true },
-  { id: '3', start: "10:20 AM", end: "11:20 AM", isActive: true },
-  { id: '4', start: "11:20 AM", end: "12:10 PM", isActive: true },
-  { id: '5', start: "12:10 PM", end: "1:00 PM", isActive: true },
-  { id: '6', start: "1:20 PM", end: "2:20 PM", isActive: true },
-  { id: '7', start: "2:20 PM", end: "3:20 PM", isActive: true },
-  { id: '8', start: "3:50 PM", end: "4:50 PM", isActive: true },
-  { id: '9', start: "4:50 PM", end: "5:50 PM", isActive: true },
-  { id: '10', start: "5:50 PM", end: "6:50 PM", isActive: true },
-  { id: '11', start: "6:50 PM", end: "7:50 PM", isActive: true },
-  { id: '12', start: "7:50 PM", end: "8:50 PM", isActive: true }
+  { id: 'slot1', start: "8:20 AM", end: "9:20 AM", isActive: true },
+  { id: 'slot2', start: "9:20 AM", end: "10:20 AM", isActive: true },
+  { id: 'slot3', start: "10:20 AM", end: "11:20 AM", isActive: true },
+  { id: 'slot4', start: "11:20 AM", end: "12:10 PM", isActive: true },
+  { id: 'slot5', start: "12:10 PM", end: "1:00 PM", isActive: true },
+  { id: 'slot6', start: "1:20 PM", end: "2:20 PM", isActive: true },
+  { id: 'slot7', start: "2:20 PM", end: "3:20 PM", isActive: true },
+  { id: 'slot8', start: "3:50 PM", end: "4:50 PM", isActive: true },
+  { id: 'slot9', start: "4:50 PM", end: "5:50 PM", isActive: true },
+  { id: 'slot10', start: "5:50 PM", end: "6:50 PM", isActive: true },
+  { id: 'slot11', start: "6:50 PM", end: "7:50 PM", isActive: true },
+  { id: 'slot12', start: "7:50 PM", end: "8:50 PM", isActive: true }
 ];
 
 async function initializeTimeSlots() {
