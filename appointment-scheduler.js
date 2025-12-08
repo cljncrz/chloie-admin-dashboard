@@ -490,8 +490,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
-    const generateTimeSlots = () => {
-        const slotDefinitions = [
+    // --- Load time slots from Firebase ---
+    let slotDefinitions = [];
+    
+    const loadTimeSlotDefinitions = async () => {
+        try {
+            if (!window.db) {
+                console.warn('Firebase not initialized, using default slots');
+                slotDefinitions = getDefaultSlotDefinitions();
+                return;
+            }
+            
+            const doc = await window.db.collection('time_slots_config').doc('slots').get();
+            
+            if (doc.exists) {
+                const data = doc.data();
+                // Filter for active slots only
+                slotDefinitions = (data.slots || [])
+                    .filter(slot => slot.isActive)
+                    .map(slot => ({ start: slot.start, end: slot.end }));
+                console.log('✅ Loaded time slots from Firebase:', slotDefinitions.length);
+            } else {
+                // Use default slots if none exist
+                slotDefinitions = getDefaultSlotDefinitions();
+                console.log('Using default time slots');
+            }
+        } catch (error) {
+            console.error('Error loading time slots:', error);
+            slotDefinitions = getDefaultSlotDefinitions();
+        }
+    };
+    
+    const getDefaultSlotDefinitions = () => {
+        return [
             { start: "8:20 AM", end: "9:20 AM" },
             { start: "9:20 AM", end: "10:20 AM" },
             { start: "10:20 AM", end: "11:20 AM" },
@@ -503,9 +534,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             { start: "4:50 PM", end: "5:50 PM" },
             { start: "5:50 PM", end: "6:50 PM" },
             { start: "6:50 PM", end: "7:50 PM" },
-            { start: "7:50 PM", end: "8:50 PM" },
+            { start: "7:50 PM", end: "8:50 PM" }
         ];
+    };
 
+    const generateTimeSlots = () => {
         const slots = [];
         const now = new Date();
         const isToday = selectedDate.toDateString() === now.toDateString();
@@ -1605,8 +1638,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- Initial Page Render ---
-    // Load unavailable slots before rendering
-    loadUnavailableSlots().then(() => {
+    // Load time slot definitions and unavailable slots before rendering
+    Promise.all([
+        loadTimeSlotDefinitions(),
+        loadUnavailableSlots()
+    ]).then(() => {
         renderCalendar();
     });
 
