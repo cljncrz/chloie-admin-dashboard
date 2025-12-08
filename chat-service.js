@@ -158,6 +158,7 @@ class ChatService {
           const messages = [];
           snapshot.docs.forEach((doc) => {
             const data = doc.data();
+            const isAdmin = data.isAdmin || data.senderRole === 'admin';
             messages.push({
               id: doc.id,
               senderId: data.senderId || '',
@@ -172,7 +173,7 @@ class ChatService {
               timestamp: data.timestamp ? this.formatTimestamp(data.timestamp) : '',
               rawTimestamp: data.timestamp,
               status: data.status || 'sent', // 'sent', 'delivered', 'read'
-              isAdmin: data.isAdmin || false
+              isAdmin: isAdmin
             });
           });
           onUpdate(messages);

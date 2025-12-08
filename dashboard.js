@@ -199,6 +199,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         appointments = appointments.filter(appt => {
             // Exclude cancelled appointments
             if (appt.status.toLowerCase() === 'cancelled') return false;
+            
+            // Exclude completed and paid appointments that are beyond service date
+            if (window.appData && typeof window.appData.isBeyondServiceDate === 'function') {
+                const isBeyond = window.appData.isBeyondServiceDate(appt);
+                if (appt.status.toLowerCase() === 'completed' && 
+                    (appt.paymentStatus || '').toLowerCase() === 'paid' && 
+                    isBeyond) {
+                    return false;
+                }
+            }
+            
             const matchesSearch = searchTerm === '' || appt.customer.toLowerCase().includes(searchTerm) || appt.plate.toLowerCase().includes(searchTerm) || appt.service.toLowerCase().includes(searchTerm);
             const matchesStatus = selectedStatus === 'all' || appt.status.toLowerCase() === selectedStatus;
             return matchesSearch && matchesStatus;
@@ -278,6 +289,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         walkins = walkins.filter(walkin => {
             // Exclude cancelled walk-ins
             if (walkin.status.toLowerCase() === 'cancelled') return false;
+            
+            // Exclude completed and paid walk-ins that are beyond service date
+            if (window.appData && typeof window.appData.isBeyondServiceDate === 'function') {
+                const isBeyond = window.appData.isBeyondServiceDate(walkin);
+                if (walkin.status.toLowerCase() === 'completed' && 
+                    (walkin.paymentStatus || '').toLowerCase() === 'paid' && 
+                    isBeyond) {
+                    return false;
+                }
+            }
+            
             const matchesSearch = searchTerm === '' || walkin.plate.toLowerCase().includes(searchTerm) || walkin.service.toLowerCase().includes(searchTerm);
             const matchesStatus = selectedStatus === 'all' || walkin.status.toLowerCase() === selectedStatus;
             return matchesSearch && matchesStatus;

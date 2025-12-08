@@ -996,6 +996,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Exclude cancelled appointments
                 if (status === 'cancelled') return false;
                 if (!allowedStatusesWithApprove.includes(status)) return false;
+                
+                // Exclude completed and paid appointments that are beyond service date
+                const isBeyond = window.appData.isBeyondServiceDate(appt);
+                if (status === 'completed' && (appt.paymentStatus || '').toLowerCase() === 'paid' && isBeyond) {
+                    return false;
+                }
+                
                 const matchesSearch = searchTerm === '' ||
                     Object.values(appt).some(val => String(val).toLowerCase().includes(searchTerm));
                 const matchesStatus = selectedStatus === 'all' || status === selectedStatus;
@@ -1230,6 +1237,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Exclude cancelled walk-ins
                 if (status === 'cancelled') return false;
                 if (!allowedStatuses.includes(status)) return false;
+                
+                // Exclude completed and paid walk-ins that are beyond service date
+                const isBeyond = window.appData.isBeyondServiceDate(walkin);
+                if (status === 'completed' && (walkin.paymentStatus || '').toLowerCase() === 'paid' && isBeyond) {
+                    return false;
+                }
+                
                 const matchesSearch = searchTerm === '' ||
                     Object.values(walkin).some(val => String(val).toLowerCase().includes(searchTerm));
                 const matchesStatus = selectedStatus === 'all' || status === selectedStatus;

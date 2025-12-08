@@ -111,6 +111,12 @@ document.addEventListener('DOMContentLoaded', async () => {
    * Render messages for current conversation
    */
   const renderMessages = (messages) => {
+    console.log('Rendering messages:', messages.length, 'messages');
+    if (!messageListEl) {
+      console.error('Message list element not found');
+      return;
+    }
+    
     messageListEl.innerHTML = '';
 
     if (messages.length === 0) {
@@ -124,8 +130,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const fragment = document.createDocumentFragment();
     messages.forEach(msg => {
+      console.log('Message:', msg.text, 'isAdmin:', msg.isAdmin, 'senderRole:', msg.senderRole);
       const msgEl = document.createElement('div');
-      msgEl.className = `chat-message ${msg.isAdmin ? 'admin' : 'customer'}`;
+      const isAdmin = msg.isAdmin || msg.senderRole === 'admin';
+      msgEl.className = `chat-message ${isAdmin ? 'admin' : 'customer'}`;
 
       let contentHTML = '';
       if (msg.type === 'text') {
@@ -153,7 +161,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     messageListEl.appendChild(fragment);
     // Auto-scroll to bottom
-    messageListEl.scrollTop = messageListEl.scrollHeight;
+    setTimeout(() => {
+      messageListEl.scrollTop = messageListEl.scrollHeight;
+    }, 100);
   };
 
   /**
@@ -187,6 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * Select a conversation to view
    */
   const selectConversation = async (convId) => {
+    console.log('Selecting conversation:', convId);
     currentConversationId = convId;
     
     // Update UI
@@ -206,6 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Listen to messages
+    console.log('Setting up message listener for conversation:', convId);
     chatService.listenToMessages(convId, renderMessages);
   };
 
@@ -236,17 +248,25 @@ document.addEventListener('DOMContentLoaded', async () => {
    */
   const handleSendMessage = async (e) => {
     e.preventDefault();
+    console.log('handleSendMessage called');
     
     const text = messageInput.value.trim();
-    if (!text || !currentConversationId) return;
+    console.log('Message text:', text, 'currentConversationId:', currentConversationId);
+    
+    if (!text || !currentConversationId) {
+      console.warn('Cannot send: text is empty or no conversation selected');
+      return;
+    }
 
     try {
       messageInput.disabled = true;
+      console.log('Sending message...');
       await chatService.sendMessage(currentConversationId, text, currentAdminData);
+      console.log('Message sent successfully');
       messageInput.value = '';
     } catch (error) {
       alert('Failed to send message');
-      console.error(error);
+      console.error('Error sending message:', error);
     } finally {
       messageInput.disabled = false;
       messageInput.focus();
@@ -277,7 +297,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderConversationsList(e.target.value);
   });
 
-  messageForm?.addEventListener('submit', handleSendMessage);
+  if (messageForm) {
+    messageForm.addEventListener('submit', handleSendMessage);
+    console.log('Message form event listener attached');
+  } else {
+    console.error('Message form not found!');
+  }
 
   attachmentBtn?.addEventListener('click', () => {
     fileInput.click();
