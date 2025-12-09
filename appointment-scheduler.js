@@ -526,15 +526,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             { start: "8:20 AM", end: "9:20 AM" },
             { start: "9:20 AM", end: "10:20 AM" },
             { start: "10:20 AM", end: "11:20 AM" },
-            { start: "11:20 AM", end: "12:10 PM" },
-            { start: "12:10 PM", end: "1:00 PM" },
+            { start: "11:20 AM", end: "12:20 PM" },
+            { start: "12:20 PM", end: "1:20 PM" },
             { start: "1:20 PM", end: "2:20 PM" },
             { start: "2:20 PM", end: "3:20 PM" },
-            { start: "3:50 PM", end: "4:50 PM" },
-            { start: "4:50 PM", end: "5:50 PM" },
-            { start: "5:50 PM", end: "6:50 PM" },
-            { start: "6:50 PM", end: "7:50 PM" },
-            { start: "7:50 PM", end: "8:50 PM" }
+            { start: "3:20 PM", end: "4:20 PM" },
+            { start: "4:20 PM", end: "5:20 PM" },
+            { start: "5:20 PM", end: "6:20 PM" },
+            { start: "6:20 PM", end: "7:20 PM" },
+            { start: "7:20 PM", end: "8:20 PM" }
         ];
     };
 
@@ -543,7 +543,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const now = new Date();
         const isToday = selectedDate.toDateString() === now.toDateString();
         const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
-        const selectedDateStr = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        // Use local date to avoid timezone offset issues
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const selectedDateStr = `${year}-${month}-${day}`; // YYYY-MM-DD format
 
         slotDefinitions.forEach(def => {
             const slotTime = new Date(selectedDate);
@@ -606,10 +610,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loadUnavailableSlots = async () => {
         try {
             if (!window.db) return;
-            const doc = await window.db.collection('settings').doc('unavailableSlots').get();
+            // Use local date to avoid timezone offset issues
+            const year = selectedDate.getFullYear();
+            const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(selectedDate.getDate()).padStart(2, '0');
+            const selectedDateStr = `${year}-${month}-${day}`;
+            
+            // Query timeslot_availability collection
+            const doc = await window.db.collection('timeslot_availability').doc(selectedDateStr).get();
+            unavailableSlots = []; // Reset
+            
             if (doc.exists) {
                 const data = doc.data();
-                unavailableSlots = data.slots || [];
+                if (data.slots && typeof data.slots === 'object') {
+                    // Convert from {slotTime: {start, end, available}} structure to [{date, time}] structure
+                    Object.entries(data.slots).forEach(([time, slotInfo]) => {
+                        // Handle both old format (boolean) and new format (object)
+                        const isAvailable = typeof slotInfo === 'object' ? slotInfo.available : slotInfo;
+                        
+                        // Add to unavailableSlots only if false (blocked)
+                        if (isAvailable === false) {
+                            unavailableSlots.push({ date: selectedDateStr, time: time });
+                        }
+                    });
+                    console.log('✅ Loaded unavailable slots for', selectedDateStr, ':', unavailableSlots);
+                }
+            } else {
+                console.log('ℹ️ No timeslot data found for', selectedDateStr, '- all slots available');
             }
         } catch (err) {
             console.error('Error loading unavailable slots:', err);
@@ -619,12 +646,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveUnavailableSlots = async () => {
         try {
             if (!window.db) return;
-            await window.db.collection('settings').doc('unavailableSlots').set({
-                slots: unavailableSlots,
-                updatedAt: new Date().toISOString()
+            // Use local date to avoid timezone offset issues
+            const year = selectedDate.getFullYear();
+            const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(selectedDate.getDate()).padStart(2, '0');
+            const selectedDateStr = `${year}-${month}-${day}`;
+            
+            // Build complete slots object with detailed slot information
+            const slotsObject = {};
+            
+            // Set all defined slots with full details
+            slotDefinitions.forEach(def => {
+                const isBlocked = unavailableSlots.some(slot => 
+                    slot.date === selectedDateStr && slot.time === def.start
+                );
+                // Store full slot details: start, end, and available status
+                slotsObject[def.start] = {
+                    start: def.start,
+                    end: def.end,
+                    available: !isBlocked  // true = available, false = blocked
+                };
             });
+            
+            // Save to timeslot_availability collection
+            const docRef = window.db.collection('timeslot_availability').doc(selectedDateStr);
+            
+            // Create the document data with proper nested structure
+            const docData = {
+                date: selectedDateStr,
+                slots: slotsObject,  // Proper nested object with detailed slot info
+                updatedAt: new Date().toISOString(),
+                updatedBy: 'admin'
+            };
+            
+            // Use merge: true to not overwrite other fields
+            await docRef.set(docData, { merge: true });
+            
+            console.log('✅ Unavailable slots saved to Firestore for', selectedDateStr);
+            console.log('   Slots data:', slotsObject);
         } catch (err) {
-            console.error('Error saving unavailable slots:', err);
+            console.error('❌ Error saving unavailable slots:', err);
         }
     };
 
@@ -636,6 +697,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (index >= 0) {
             // Remove from unavailable list (make available)
             unavailableSlots.splice(index, 1);
+            console.log(`✅ Toggled ON: ${timeStr} for ${dateStr}, unavailableSlots:`, unavailableSlots);
             if (typeof showSuccessToast === 'function') {
                 showSuccessToast('Timeslot marked as available');
             } else {
@@ -644,6 +706,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             // Add to unavailable list (block)
             unavailableSlots.push({ date: dateStr, time: timeStr });
+            console.log(`🔴 Toggled OFF: ${timeStr} for ${dateStr}, unavailableSlots:`, unavailableSlots);
             if (typeof showSuccessToast === 'function') {
                 showSuccessToast('Timeslot marked as unavailable');
             } else {
@@ -751,7 +814,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!target) return;
         
         const slots = generateTimeSlots();
-        const selectedDateStr = selectedDate.toISOString().split('T')[0];
+        // Use local date to avoid timezone offset issues
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const selectedDateStr = `${year}-${month}-${day}`;
         
         // Create or update the timeslot availability section
         let availSection = target.querySelector('.timeslot-availability-section');
@@ -810,16 +877,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     
     const renderQueue = () => {
-        // Render timeslot availability under the calendar
-        if (queueList) {
-            queueList.innerHTML = '';
-            renderTimeslotAvailability();
-        }
-        // Render daily counter in the right column
-        if (dailyCounterList) {
-            dailyCounterList.innerHTML = '';
-            renderDailySlotCounter();
-        }
+        // First load unavailable slots for the selected date, then render
+        loadUnavailableSlots().then(() => {
+            console.log('Slots loaded, now rendering...');
+            // Then render timeslot availability under the calendar
+            if (queueList) {
+                queueList.innerHTML = '';
+                renderTimeslotAvailability();
+            }
+            // Render daily counter in the right column
+            if (dailyCounterList) {
+                dailyCounterList.innerHTML = '';
+                renderDailySlotCounter();
+            }
+        }).catch(err => {
+            console.error('Error in renderQueue:', err);
+        });
     };
 
     // --- Reschedule Logic ---

@@ -812,27 +812,146 @@ aside .sidebar-menu a:hover span {
     margin-left: 1rem;
 }
 
+/* Action Buttons Group Container */
+.action-buttons-group {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 .action-icon-btn {
-    background: transparent;
+    background: var(--color-light);
+    border: 1px solid var(--color-info-light);
     cursor: pointer;
     color: var(--color-info-dark);
-    transition: all 300ms ease;
-    padding: 0.2rem;
-    border-radius: 50%;
+    transition: all 0.25s ease;
+    padding: 0.45rem;
+    border-radius: var(--border-radius-1);
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-width: 36px;
+    min-height: 36px;
+}
+
+.action-icon-btn .material-symbols-outlined {
+    font-size: 1.2rem;
 }
 
 .action-icon-btn:hover {
-    background: var(--color-light);
-    color: var(--color-primary);
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.action-icon-btn.approve-btn:hover {
+    background: #22c55e;
+    border-color: #22c55e;
+}
+
+.action-icon-btn.start-service-btn:hover {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.action-icon-btn.complete-service-btn:hover {
+    background: #8b5cf6;
+    border-color: #8b5cf6;
+}
+
+.action-icon-btn.mark-paid-btn:hover {
+    background: #f59e0b;
+    border-color: #f59e0b;
+}
+
+.action-icon-btn.cancel-btn:hover {
+    background: #f97316;
+    border-color: #f97316;
+}
+
+.action-icon-btn.delete-btn {
+    color: #ef4444;
+}
+
+.action-icon-btn.delete-btn:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: white;
 }
 
 .action-icon-btn:disabled {
     cursor: not-allowed;
     color: var(--color-info-light);
-    background: transparent;
+    background: var(--color-light);
+    opacity: 0.5;
+    border-color: var(--color-info-light);
+    transform: none;
+}
+
+/* Dark theme support for action buttons */
+.dark-theme-variables .action-icon-btn {
+    background: var(--chart-header-bg);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #e5e7eb;
+}
+
+.dark-theme-variables .action-icon-btn:hover {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.dark-theme-variables .action-icon-btn.approve-btn:hover {
+    background: #16a34a;
+    border-color: #16a34a;
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.dark-theme-variables .action-icon-btn.start-service-btn:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.dark-theme-variables .action-icon-btn.complete-service-btn:hover {
+    background: #7c3aed;
+    border-color: #7c3aed;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.dark-theme-variables .action-icon-btn.mark-paid-btn:hover {
+    background: #d97706;
+    border-color: #d97706;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.dark-theme-variables .action-icon-btn.cancel-btn:hover {
+    background: #ea580c;
+    border-color: #ea580c;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+}
+
+.dark-theme-variables .action-icon-btn.delete-btn {
+    color: #f87171;
+}
+
+.dark-theme-variables .action-icon-btn.delete-btn:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.dark-theme-variables .action-icon-btn:disabled {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.3);
+    opacity: 0.5;
 }
 
 /* ================== MAIN CONTENT ================== */
@@ -6432,86 +6551,130 @@ input[type="checkbox"]:checked::after {
 
 /* Timeslot Controls Container */
 .timeslot-controls-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.25rem 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    padding: 0.5rem 0;
     max-height: 500px;
     overflow-y: auto;
 }
 
+@media (max-width: 1024px) {
+    .timeslot-controls-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .timeslot-controls-container {
+        grid-template-columns: 1fr;
+    }
+}
+
 .timeslot-control-item {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.55rem 0.85rem;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.65rem 0.75rem;
     background: var(--color-white);
     border: 2px solid var(--color-info-light);
     border-radius: var(--border-radius-2);
     transition: all 0.2s ease;
+    gap: 0.5rem;
 }
 
 .timeslot-control-item.disabled {
     background: var(--color-light);
-    opacity: 0.7;
-    border-color: var(--color-dark);
+    opacity: 0.8;
+    border-color: rgba(0, 0, 0, 0.15);
 }
 
 .timeslot-control-item:hover {
     border-color: var(--color-primary);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
 }
 
 .timeslot-time {
     display: flex;
-    align-items: center;
-    gap: 0.4rem;
+    flex-direction: column;
+    gap: 0.35rem;
     font-weight: 500;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--color-dark);
 }
 
-.timeslot-control-item.disabled .timeslot-time {
+.timeslot-time .time-label {
+    font-weight: 600;
+    font-size: 0.85rem;
     color: var(--color-dark);
-    opacity: 0.6;
+    line-height: 1.2;
+}
+
+.timeslot-control-item.disabled .timeslot-time .time-label {
+    color: var(--color-dark);
+    opacity: 0.7;
+}
+
+.status-indicator {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
+
+.status-indicator.enabled {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #34d399;
+}
+
+.status-indicator.disabled {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
 }
 
 .timeslot-toggle-btn {
-    padding: 0.35rem 0.85rem;
-    border-radius: 20px;
-    border: 2px solid;
+    padding: 0.5rem;
+    border-radius: var(--border-radius-2);
+    border: none;
     font-weight: 600;
     font-size: 0.75rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-width: 55px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.timeslot-toggle-btn .material-symbols-outlined {
+    font-size: 2rem;
+    transition: all 0.2s ease;
 }
 
 .timeslot-toggle-btn.enabled {
-    background: var(--color-success);
-    border-color: var(--color-success);
-    color: white;
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--color-success);
 }
 
 .timeslot-toggle-btn.enabled:hover {
-    background: #27ae60;
-    border-color: #27ae60;
+    background: rgba(34, 197, 94, 0.2);
     transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
 }
 
 .timeslot-toggle-btn.disabled {
-    background: var(--color-danger);
-    border-color: var(--color-danger);
-    color: white;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-danger);
 }
 
 .timeslot-toggle-btn.disabled:hover {
-    background: #c0392b;
-    border-color: #c0392b;
+    background: rgba(239, 68, 68, 0.2);
     transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(192, 57, 43, 0.3);
 }
 
 .timeslot-toggle-btn:disabled {
@@ -6532,46 +6695,52 @@ input[type="checkbox"]:checked::after {
 }
 
 .dark-theme-variables .timeslot-control-item.disabled {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.3);
     border-color: rgba(255, 255, 255, 0.1);
-    opacity: 0.65;
+    opacity: 0.85;
 }
 
-.dark-theme-variables .timeslot-time {
+.dark-theme-variables .timeslot-time .time-label {
     color: #ffffff;
     font-weight: 600;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.dark-theme-variables .timeslot-control-item.disabled .timeslot-time {
+.dark-theme-variables .timeslot-control-item.disabled .timeslot-time .time-label {
     color: #e0e0e0;
     opacity: 1;
     font-weight: 600;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
+.dark-theme-variables .status-indicator.enabled {
+    background: rgba(34, 197, 94, 0.25);
+    color: #6ee7b7;
+    border-color: #059669;
+}
+
+.dark-theme-variables .status-indicator.disabled {
+    background: rgba(239, 68, 68, 0.25);
+    color: #fca5a5;
+    border-color: #dc2626;
+}
+
 .dark-theme-variables .timeslot-toggle-btn.enabled {
-    background: #2ecc71;
-    border-color: #2ecc71;
-    box-shadow: 0 2px 6px rgba(46, 204, 113, 0.4);
+    background: rgba(34, 197, 94, 0.2);
+    color: #6ee7b7;
 }
 
 .dark-theme-variables .timeslot-toggle-btn.enabled:hover {
-    background: #27ae60;
-    border-color: #27ae60;
-    box-shadow: 0 4px 12px rgba(46, 204, 113, 0.5);
+    background: rgba(34, 197, 94, 0.3);
 }
 
 .dark-theme-variables .timeslot-toggle-btn.disabled {
-    background: #e74c3c;
-    border-color: #e74c3c;
-    box-shadow: 0 2px 6px rgba(231, 76, 60, 0.4);
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
 }
 
 .dark-theme-variables .timeslot-toggle-btn.disabled:hover {
-    background: #c0392b;
-    border-color: #c0392b;
-    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.5);
+    background: rgba(239, 68, 68, 0.3);
 }
 
 .widget-header {
@@ -6849,12 +7018,18 @@ input[type="checkbox"]:checked::after {
 
 .slot-summary {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 0.6rem;
     padding: 0.75rem;
     background: var(--color-light);
     border-radius: var(--border-radius-2);
     margin-bottom: 0.75rem;
+}
+
+@media screen and (max-width: 768px) {
+    .slot-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 .slot-stat {
@@ -6948,7 +7123,50 @@ input[type="checkbox"]:checked::after {
 
 .slot-appointment-info {
     font-size: 0.8rem;
-}
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+    }
+
+    .slot-info-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--color-dark);
+    }
+
+    .slot-info-row .slot-icon {
+        font-size: 1rem;
+        color: var(--color-primary);
+        flex-shrink: 0;
+    }
+
+    .slot-info-row span:last-child {
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .badge.type {
+        padding: 0.25rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .badge.type.booking {
+        background: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #93c5fd;
+    }
+
+    .badge.type.walkin {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
 
 .slot-status {
     padding: 2px 8px;
@@ -6958,23 +7176,44 @@ input[type="checkbox"]:checked::after {
 }
 
 .slot-status.pending {
-    background: var(--slot-bg-pending);
-    color: var(--slot-text-pending);
+    background: #fef08a;
+    color: #854d0e;
 }
 
 .slot-status.approved {
-    background: var(--slot-bg-approved);
-    color: var(--slot-text-approved);
+    background: #dbeafe;
+    color: #0c4a6e;
 }
 
 .slot-status.in-progress {
-    background: var(--slot-bg-inprogress);
-    color: var(--slot-text-inprogress);
+    background: #a7f3d0;
+    color: #065f46;
 }
 
 .slot-status.completed {
-    background: var(--slot-bg-completed);
-    color: var(--slot-text-completed);
+    background: #d1d5db;
+    color: #374151;
+    }
+
+    /* Dark theme support for slot appointment info */
+    .dark-theme-variables .slot-info-row {
+        color: #e5e7eb;
+    }
+
+    .dark-theme-variables .slot-info-row .slot-icon {
+        color: var(--color-primary);
+    }
+
+    .dark-theme-variables .badge.type.booking {
+        background: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+        border-color: #3b82f6;
+    }
+
+    .dark-theme-variables .badge.type.walkin {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+        border-color: #f59e0b;
 }
 
 /* Dark theme support for slot counter: use chart header background for contrast */

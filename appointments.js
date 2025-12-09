@@ -435,37 +435,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Count appointments for a specific date (excluding cancelled)
+    // Slots are consumed only when status is Approved or In Progress
     function countAppointmentsForDate(dateObj) {
-        if (!dateObj) return { inprogress: 0, pending: 0, total: 0 };
+        if (!dateObj) return { inProgress: 0, approved: 0, pending: 0, total: 0 };
         const dateStr = dateObj.toDateString();
         const bookings = window.appData?.appointments || [];
         const walkins = window.appData?.walkins || [];
-        let inprogress = 0; // Only 'in progress' appointments count for slot limit
+        let inProgress = 0;
+        let approved = 0;
         let pending = 0;
         [...bookings, ...walkins].forEach(item => {
             const t = item.datetimeRaw ? new Date(item.datetimeRaw) : null;
             if (!t || t.toDateString() !== dateStr) return;
             if (String(item.status).toLowerCase() === 'cancelled') return;
             const status = String(item.status).toLowerCase();
-            if (status === 'pending') {
+            const isInProgress = status.includes('in progress') || status.includes('in_progress');
+            const isApproved = status.includes('approved') || status === 'approve';
+            const isPending = status.includes('pending');
+            if (isInProgress) {
+                inProgress++;
+            } else if (isApproved) {
+                approved++;
+            } else if (isPending) {
                 pending++;
-            } else if (status === 'in progress') {
-                inprogress++;
             }
         });
-        return { inprogress, pending, total: inprogress + pending };
+        return { inProgress, approved, pending, total: inProgress + approved + pending };
     }
 
     // Render the slot counter for the selected date
     function renderSlotCounter() {
         const slotCounterContainer = document.getElementById('slot-counter-container');
+        const dateLabelEl = document.getElementById('slot-counter-date');
         if (!slotCounterContainer) return;
         
         const selectedDate = getSelectedDate();
         if (!selectedDate) {
             slotCounterContainer.querySelector('#available-slots').textContent = '10';
-            slotCounterContainer.querySelector('#booked-slots').textContent = '0';
+            slotCounterContainer.querySelector('#inprogress-slots').textContent = '0';
+            slotCounterContainer.querySelector('#approved-slots').textContent = '0';
             slotCounterContainer.querySelector('#pending-slots').textContent = '0';
+            if (dateLabelEl) dateLabelEl.textContent = 'Select a date • Max 10 slots/day';
             const listContainer = document.getElementById('slot-appointments-list');
             if (listContainer) listContainer.innerHTML = '<div class="text-muted" style="padding:1rem;text-align:center;">No date selected.</div>';
             return;
@@ -473,13 +483,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Count appointments for the selected date
         const counts = countAppointmentsForDate(selectedDate);
-        const available = Math.max(0, MAX_SLOTS_PER_DAY - counts.inprogress);
+        const available = Math.max(0, MAX_SLOTS_PER_DAY - counts.inProgress);
+        if (dateLabelEl) dateLabelEl.textContent = `${selectedDate.toDateString()} • Max ${MAX_SLOTS_PER_DAY} slots/day`;
         // Update slot summary
         const availableEl = document.getElementById('available-slots');
-        const bookedEl = document.getElementById('booked-slots');
+        const inProgressEl = document.getElementById('inprogress-slots');
+        const approvedEl = document.getElementById('approved-slots');
         const pendingEl = document.getElementById('pending-slots');
         if (availableEl) availableEl.textContent = available;
-        if (bookedEl) bookedEl.textContent = counts.inprogress;
+        if (inProgressEl) inProgressEl.textContent = counts.inProgress;
+        if (approvedEl) approvedEl.textContent = counts.approved;
         if (pendingEl) pendingEl.textContent = counts.pending;
         
         // Color code based on availability — use CSS classes for theme adaptivity
@@ -490,7 +503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             else availableEl.classList.add('ok');
         }
         
-        // Render chronological list of appointments
+        // Render chronological list of IN-PROGRESS and PENDING appointments
         const listContainer = document.getElementById('slot-appointments-list');
         if (!listContainer) return;
         
@@ -502,7 +515,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         [...bookings, ...walkins].forEach(item => {
             const t = item.datetimeRaw ? new Date(item.datetimeRaw) : null;
             if (!t || t.toDateString() !== dateStr) return;
-            if (String(item.status).toLowerCase() === 'cancelled') return;
+            const status = String(item.status).toLowerCase();
+            // Include in-progress and pending appointments
+            const isInProgress = status.includes('in progress') || status.includes('in_progress');
+            const isPending = status.includes('pending');
+            if (!isInProgress && !isPending) return;
             
             const type = item.serviceId ? 'booking' : 'walkin';
             items.push({ type, id: item.serviceId || item.id, time: t, data: item });
@@ -530,8 +547,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             div.dataset.type = type;
             div.dataset.serviceId = id;
             
-            const serviceName = data.serviceNames || data.service || '';
+            const serviceName = data.serviceNames || data.service || 'N/A';
             const plateOrName = data.plate || data.carName || data.customer || 'N/A';
+            const customerName = data.customerName || data.customer || 'N/A';
+            const technician = data.technician || data.technicianName || 'Unassigned';
             const status = String(data.status);
             const statusClass = status.toLowerCase().replace(/\s+/g, '-');
             const timeStr = time.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
@@ -541,11 +560,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="slot-appointment-details">
                     <div class="slot-appointment-header">
                         <strong>${plateOrName}</strong>
-                        <span class="badge type ${type}" style="margin-left:6px;font-size:0.7rem;">${type === 'walkin' ? 'Walk-in' : 'App'}</span>
-                        <span class="slot-status ${statusClass}" style="margin-left:6px;font-size:0.7rem;">${status}</span>
+                        <span class="badge type ${type}">${type === 'walkin' ? 'Walk-in' : 'App'}</span>
+                        <span class="slot-status ${statusClass}">${status}</span>
                     </div>
                     <div class="slot-appointment-info">
-                        <small class="text-muted">${timeStr} • ${serviceName}</small>
+                        <div class="slot-info-row">
+                            <span class="material-symbols-outlined slot-icon">schedule</span>
+                            <span>${timeStr}</span>
+                        </div>
+                        <div class="slot-info-row">
+                            <span class="material-symbols-outlined slot-icon">person</span>
+                            <span>${customerName}</span>
+                        </div>
+                        <div class="slot-info-row">
+                            <span class="material-symbols-outlined slot-icon">build</span>
+                            <span>${serviceName}</span>
+                        </div>
+                        <div class="slot-info-row">
+                            <span class="material-symbols-outlined slot-icon">engineering</span>
+                            <span>${technician}</span>
+                        </div>
                     </div>
                 </div>
             `;
@@ -558,15 +592,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 'slot1', start: '8:20 AM', end: '9:20 AM' },
         { id: 'slot2', start: '9:20 AM', end: '10:20 AM' },
         { id: 'slot3', start: '10:20 AM', end: '11:20 AM' },
-        { id: 'slot4', start: '11:20 AM', end: '12:10 PM' },
-        { id: 'slot5', start: '12:10 PM', end: '1:00 PM' },
+        { id: 'slot4', start: '11:20 AM', end: '12:20 PM' },
+        { id: 'slot5', start: '12:20 PM', end: '1:20 PM' },
         { id: 'slot6', start: '1:20 PM', end: '2:20 PM' },
         { id: 'slot7', start: '2:20 PM', end: '3:20 PM' },
-        { id: 'slot8', start: '3:50 PM', end: '4:50 PM' },
-        { id: 'slot9', start: '4:50 PM', end: '5:50 PM' },
-        { id: 'slot10', start: '5:50 PM', end: '6:50 PM' },
-        { id: 'slot11', start: '6:50 PM', end: '7:50 PM' },
-        { id: 'slot12', start: '7:50 PM', end: '8:50 PM' }
+        { id: 'slot8', start: '3:20 PM', end: '4:20 PM' },
+        { id: 'slot9', start: '4:20 PM', end: '5:20 PM' },
+        { id: 'slot10', start: '5:20 PM', end: '6:20 PM' },
+        { id: 'slot11', start: '6:20 PM', end: '7:20 PM' },
+        { id: 'slot12', start: '7:20 PM', end: '8:20 PM' }
     ];
 
     // Get timeslot availability for a specific date
@@ -575,34 +609,55 @@ document.addEventListener('DOMContentLoaded', async () => {
             const db = window.firebase.firestore();
             const doc = await db.collection('timeslot_availability').doc(dateStr).get();
             if (doc.exists) {
-                return doc.data();
+                const data = doc.data();
+                console.log(`✅ Loaded timeslot data for ${dateStr}:`, data.slots);
+                return data;
             }
             // Return default: all slots enabled
+            console.log(`ℹ️ No timeslot data found for ${dateStr} - using defaults (all enabled)`);
             return { date: dateStr, slots: {} };
         } catch (error) {
-            console.error('Error fetching timeslot availability:', error);
+            console.error(`❌ Error fetching timeslot availability for ${dateStr}:`, error);
             return { date: dateStr, slots: {} };
         }
     }
 
     // Update timeslot availability in Firestore
-    async function updateTimeslotAvailability(dateStr, slotId, isEnabled) {
+    async function updateTimeslotAvailability(dateStr, slotId, slotStart, isEnabled) {
         try {
             const db = window.firebase.firestore();
             const docRef = db.collection('timeslot_availability').doc(dateStr);
             
-            // Use merge to create or update
+            // Read current document to preserve existing slots
+            const currentDoc = await docRef.get();
+            let currentSlots = {};
+            
+            if (currentDoc.exists && currentDoc.data().slots) {
+                currentSlots = currentDoc.data().slots;
+            }
+            
+            // Find the slot definition to get start and end times
+            const slotDef = TIME_SLOTS.find(s => s.start === slotStart);
+            
+            // Update the specific slot with full details
+            currentSlots[slotStart] = {
+                start: slotStart,
+                end: slotDef ? slotDef.end : 'N/A',
+                available: isEnabled
+            };
+            
+            // Write back the entire slots object with merge
             await docRef.set({
                 date: dateStr,
-                [`slots.${slotId}`]: isEnabled,
+                slots: currentSlots,  // Proper nested object with detailed slot info
                 updatedAt: db.FieldValue.serverTimestamp(),
                 updatedBy: window.firebase.auth().currentUser?.email || 'admin'
             }, { merge: true });
             
-            console.log(`Timeslot ${slotId} ${isEnabled ? 'enabled' : 'disabled'} for ${dateStr}`);
+            console.log(`✅ Timeslot ${slotStart} ${isEnabled ? 'ENABLED' : 'DISABLED'} for ${dateStr}`);
             return true;
         } catch (error) {
-            console.error('Error updating timeslot availability:', error);
+            console.error('❌ Error updating timeslot availability:', error);
             if (typeof showSuccessToast === 'function') {
                 showSuccessToast('Failed to update timeslot availability', 'error');
             }
@@ -630,7 +685,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             month: 'short', 
             day: 'numeric' 
         });
-        const dateStr = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        // Use local date to avoid timezone offset issues
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`; // YYYY-MM-DD format
         
         if (dateDisplay) dateDisplay.textContent = displayDate;
 
@@ -642,20 +701,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Build timeslot controls
         const controlsHTML = TIME_SLOTS.map(slot => {
-            const isEnabled = availability.slots?.[slot.id] !== false; // Default to true
+            // Use slot.start as the key to match appointment-scheduler.js
+            // slots should be an object like { "8:20 AM": { start, end, available }, ... }
+            const slots = availability.slots || {};
+            const slotInfo = slots[slot.start];
+            
+            // Handle both object format (new: { available: true }) and boolean format (old: true/false)
+            let isEnabled = true; // Default to enabled
+            if (slotInfo) {
+                if (typeof slotInfo === 'object' && slotInfo.available !== undefined) {
+                    // New format with available field
+                    isEnabled = slotInfo.available;
+                } else if (typeof slotInfo === 'boolean') {
+                    // Old format with boolean value
+                    isEnabled = slotInfo;
+                }
+            }
+            
             const statusClass = isEnabled ? 'enabled' : 'disabled';
             const statusText = isEnabled ? 'ON' : 'OFF';
+            
+            console.log(`Slot ${slot.id} (${slot.start}): slotInfo=${JSON.stringify(slotInfo)}, isEnabled=${isEnabled}`);
             
             return `
                 <div class="timeslot-control-item ${statusClass}" data-slot-id="${slot.id}">
                     <div class="timeslot-time">
-                        <span>${slot.start} - ${slot.end}</span>
+                        <span class="time-label">${slot.start} - ${slot.end}</span>
+                        <span class="status-indicator ${statusClass}">${statusText}</span>
                     </div>
                     <button class="timeslot-toggle-btn ${statusClass}" 
                             data-slot-id="${slot.id}" 
+                            data-slot-start="${slot.start}"
                             data-date="${dateStr}"
-                            data-enabled="${isEnabled}">
-                        <span class="toggle-status">${statusText}</span>
+                            data-enabled="${isEnabled}"
+                            title="Click to toggle availability">
+                        <span class="material-symbols-outlined">${isEnabled ? 'toggle_on' : 'toggle_off'}</span>
                     </button>
                 </div>
             `;
@@ -669,6 +749,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 e.preventDefault();
                 const button = e.currentTarget;
                 const slotId = button.dataset.slotId;
+                const slotStart = button.dataset.slotStart; // Use start time for storage key
                 const dateStr = button.dataset.date;
                 const currentEnabled = button.dataset.enabled === 'true';
                 const newEnabled = !currentEnabled;
@@ -677,30 +758,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                 button.disabled = true;
                 button.innerHTML = '<span class="toggle-status">...</span>';
 
-                // Update in Firestore
-                const success = await updateTimeslotAvailability(dateStr, slotId, newEnabled);
+                // Update in Firestore - pass slotStart instead of slotId
+                const success = await updateTimeslotAvailability(dateStr, slotId, slotStart, newEnabled);
                 
                 if (success) {
                     // Update UI
                     button.dataset.enabled = newEnabled;
                     button.className = `timeslot-toggle-btn ${newEnabled ? 'enabled' : 'disabled'}`;
-                    button.innerHTML = `<span class="toggle-status">${newEnabled ? 'ON' : 'OFF'}</span>`;
+                    button.innerHTML = `<span class="material-symbols-outlined">${newEnabled ? 'toggle_on' : 'toggle_off'}</span>`;
                     
                     const item = button.closest('.timeslot-control-item');
                     if (item) {
                         item.className = `timeslot-control-item ${newEnabled ? 'enabled' : 'disabled'}`;
+                        const statusIndicator = item.querySelector('.status-indicator');
+                        if (statusIndicator) {
+                            statusIndicator.className = `status-indicator ${newEnabled ? 'enabled' : 'disabled'}`;
+                            statusIndicator.textContent = newEnabled ? 'ON' : 'OFF';
+                        }
                     }
                     
                     if (typeof showSuccessToast === 'function') {
                         showSuccessToast(
-                            `Timeslot ${newEnabled ? 'enabled' : 'disabled'} successfully`, 
+                            `Timeslot ${newEnabled ? 'enabled' : 'disabled'} successfully`,
                             'success'
                         );
                     }
                 } else {
                     // Restore button on failure
                     button.dataset.enabled = currentEnabled;
-                    button.innerHTML = `<span class="toggle-status">${currentEnabled ? 'ON' : 'OFF'}</span>`;
+                    button.innerHTML = `<span class="material-symbols-outlined">${currentEnabled ? 'toggle_on' : 'toggle_off'}</span>`;
                 }
                 
                 button.disabled = false;
@@ -1330,14 +1416,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="text-center">${statusDisplay}${beyondBadge}</td>
                     <td class="text-center">${paymentBadge}</td>
                     <td class="text-center">
-                        ${actionButtons}
-                        ${paymentActionButton}
-                        <button class="action-icon-btn cancel-btn" title="${cancelTooltip}"${disableCancel ? ' disabled style="opacity:0.5;pointer-events:none;"' : ''}>
-                            <span class="material-symbols-outlined">cancel</span>
-                        </button>
-                        <button class="action-icon-btn delete-btn" title="Delete Appointment" style="color: #ff4444;">
-                            <span class="material-symbols-outlined">delete</span>
-                        </button>
+                        <div class="action-buttons-group">
+                            ${actionButtons}
+                            ${paymentActionButton}
+                            <button class="action-icon-btn cancel-btn" title="${cancelTooltip}"${disableCancel ? ' disabled style="opacity:0.5;pointer-events:none;"' : ''}>
+                                <span class="material-symbols-outlined">cancel</span>
+                            </button>
+                            <button class="action-icon-btn delete-btn" title="Delete Appointment">
+                                <span class="material-symbols-outlined">delete</span>
+                            </button>
+                        </div>
                     </td>
                 `;
                 fragment.appendChild(row);
@@ -1535,11 +1623,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="text-center"><span class="${statusClass}">${walkin.status}</span>${beyondBadge}</td>
                     <td class="text-center">${paymentBadge}</td>
                     <td class="text-center">
-                        ${actionButtons}
-                        ${paymentActionButton}
-                        <button class="action-icon-btn cancel-btn" title="${cancelTooltip}"${disableCancel ? ' disabled style="opacity:0.5;pointer-events:none;"' : ''}>
-                            <span class="material-symbols-outlined">cancel</span>
-                        </button>
+                        <div class="action-buttons-group">
+                            ${actionButtons}
+                            ${paymentActionButton}
+                            <button class="action-icon-btn cancel-btn" title="${cancelTooltip}"${disableCancel ? ' disabled style="opacity:0.5;pointer-events:none;"' : ''}>
+                                <span class="material-symbols-outlined">cancel</span>
+                            </button>
+                        </div>
                     </td>
                 `;
                 fragment.appendChild(row);

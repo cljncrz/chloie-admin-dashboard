@@ -291,25 +291,29 @@
               <div class="queue-widget daily-counter-widget">
                 <div class="widget-header">
                   <h3>Daily Slot Counter</h3>
-                  <small>Max 10 slots per day</small>
+                  <small id="slot-counter-date">Select a date • Max 10 slots/day</small>
                 </div>
-                <div id="daily-counter-list" class="slot-counter-container">
+                <div id="slot-counter-container" class="slot-counter-container">
                   <div class="slot-summary">
                     <div class="slot-stat">
                       <span class="slot-label">Available Slots:</span>
                       <span class="slot-value" id="available-slots">10</span>
                     </div>
                     <div class="slot-stat">
-                      <span class="slot-label">Booked/Approved:</span>
-                      <span class="slot-value" id="booked-slots">0</span>
+                      <span class="slot-label">In Progress:</span>
+                      <span class="slot-value" id="inprogress-slots">0</span>
                     </div>
                     <div class="slot-stat">
-                      <span class="slot-label">Pending Approval:</span>
+                      <span class="slot-label">Approved:</span>
+                      <span class="slot-value" id="approved-slots">0</span>
+                    </div>
+                    <div class="slot-stat">
+                      <span class="slot-label">Pending:</span>
                       <span class="slot-value" id="pending-slots">0</span>
                     </div>
                   </div>
                   <div id="slot-appointments-list" class="slot-appointments-list">
-                    <!-- Appointments will be listed here in chronological order -->
+                    <!-- In-progress appointments will be listed here in chronological order -->
                   </div>
                 </div>
               </div>

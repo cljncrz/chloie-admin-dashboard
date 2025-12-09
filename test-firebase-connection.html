@@ -192,25 +192,31 @@
         
         async function testUnavailableSlotsCollection() {
             try {
-                const doc = await window.db.collection('settings').doc('unavailableSlots').get();
+                // Check timeslot_availability collection (using today's date as example)
+                const today = new Date().toISOString().split('T')[0];
+                const doc = await window.db.collection('timeslot_availability').doc(today).get();
                 if (doc.exists) {
                     const data = doc.data();
-                    const blockedCount = data.slots ? data.slots.length : 0;
+                    const slots = data.slots || {};
+                    const blockedSlots = Object.entries(slots)
+                        .filter(([_, val]) => val === false)
+                        .map(([time, _]) => time);
+                    const blockedCount = blockedSlots.length;
                     addTestResult(
-                        'Unavailable Slots (Blocked Times)',
+                        'Timeslot Availability (Blocked Times)',
                         'success',
-                        `Found ${blockedCount} blocked time slots${blockedCount > 0 ? '<br><pre>' + JSON.stringify(data.slots.slice(0, 3), null, 2) + '</pre>' : ''}`
+                        `Found ${blockedCount} blocked time slots for ${today}${blockedCount > 0 ? '<br><pre>' + JSON.stringify(blockedSlots.slice(0, 3), null, 2) + '</pre>' : ''}`
                     );
                 } else {
                     addTestResult(
-                        'Unavailable Slots (Blocked Times)',
+                        'Timeslot Availability (Blocked Times)',
                         'success',
-                        'Collection exists. No slots blocked yet (this is normal).'
+                        `Collection exists. No slots blocked for ${today} yet (this is normal).`
                     );
                 }
             } catch (error) {
                 addTestResult(
-                    'Unavailable Slots (Blocked Times)',
+                    'Timeslot Availability (Blocked Times)',
                     'error',
                     `Error: ${error.message}`
                 );
