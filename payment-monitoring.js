@@ -242,7 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 acc.gcash += payment.amount;
             } else if (payment.paymentMethod === 'PayMaya') {
                 acc.maya += payment.amount;
-            } else if (payment.paymentMethod === 'Cash on Hand') {
+            } else if (payment.paymentMethod === 'Cash' || payment.paymentMethod === 'Cash on Hand') {
                 acc.cash += payment.amount;
             }
             return acc;
