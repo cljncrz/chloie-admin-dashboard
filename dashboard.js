@@ -560,96 +560,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loadDashboardTodos = () => {
         const todoContainer = document.getElementById('dashboard-todo-list');
         if (!todoContainer) return;
-
         const noResultsRow = todoContainer.querySelector('.no-results-row');
-
         // Listen for real-time updates from Firestore
         db.collection('todos')
             .where('archived', '==', false)
             .orderBy('createdAt', 'desc')
-            .limit(5)
+            .limit(10)
             .onSnapshot((snapshot) => {
                 const fragment = document.createDocumentFragment();
                 let todoCount = 0;
-
                 // Clear existing items except no-results message
                 todoContainer.querySelectorAll('.todo-item').forEach(item => item.remove());
-
                 snapshot.forEach((doc) => {
-                    const todo = doc.data();
+                    const todo = { id: doc.id, ...doc.data() };
                     todoCount++;
-
-                    const todoItem = document.createElement('div');
-                    todoItem.className = `todo-item ${todo.completed ? 'completed' : ''}`;
-                    todoItem.dataset.id = doc.id;
-
-                    // Format due date if available
-                    let dueDateText = '';
-                    if (todo.dueDate) {
-                        const dueDateTime = todo.dueTime ? `${todo.dueDate}T${todo.dueTime}` : todo.dueDate;
-                        const due = new Date(dueDateTime);
-                        const today = new Date();
-                        const tomorrow = new Date(today);
-                        tomorrow.setDate(tomorrow.getDate() + 1);
-
-                        if (due.toDateString() === today.toDateString()) {
-                            dueDateText = 'Due: Today';
-                        } else if (due.toDateString() === tomorrow.toDateString()) {
-                            dueDateText = 'Due: Tomorrow';
-                        } else {
-                            dueDateText = `Due: ${due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-                        }
-                    }
-
-                    // Create icon based on priority or completion status
-                    let iconName = 'check_circle';
-                    if (!todo.completed) {
-                        if (todo.priority === 'high') iconName = 'priority_high';
-                        else if (todo.priority === 'low') iconName = 'low_priority';
-                        else iconName = 'radio_button_unchecked';
-                    }
-
-                    todoItem.innerHTML = `
-                        <div class="icon" style="cursor: pointer;" title="${todo.completed ? 'Mark as incomplete' : 'Mark as complete'}">
-                            <span class="material-symbols-outlined">${iconName}</span>
-                        </div>
-                        <div class="details" style="flex: 1;">
-                            <h3>${todo.text}</h3>
-                            ${dueDateText ? `<small class="text-muted">${dueDateText}</small>` : ''}
-                        </div>
-                        <button class="delete-todo-btn" title="Delete task">
-                            <span class="material-symbols-outlined">delete</span>
-                        </button>
-                    `;
-
-                    // Add click handler for toggle completion
-                    const iconDiv = todoItem.querySelector('.icon');
-                    iconDiv.addEventListener('click', async () => {
-                        try {
-                            await db.collection('todos').doc(doc.id).update({
-                                completed: !todo.completed
-                            });
-                        } catch (error) {
-                            console.error('Error toggling todo:', error);
-                        }
-                    });
-
-                    // Add click handler for delete
-                    const deleteBtn = todoItem.querySelector('.delete-todo-btn');
-                    deleteBtn.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        if (confirm('Delete this task?')) {
+                    // Use shared renderer from todo-lists.js
+                    const todoItem = window.renderTodoItem(todo, {
+                        onToggle: async (t) => {
                             try {
-                                await db.collection('todos').doc(doc.id).delete();
+                                await db.collection('todos').doc(t.id).update({ completed: !t.completed });
                             } catch (error) {
-                                console.error('Error deleting todo:', error);
+                                console.error('Error toggling todo:', error);
                             }
-                        }
+                        },
+                        onDelete: async (t) => {
+                            if (confirm('Delete this task?')) {
+                                try {
+                                    await db.collection('todos').doc(t.id).delete();
+                                } catch (error) {
+                                    console.error('Error deleting todo:', error);
+                                }
+                            }
+                        },
+                        onEdit: null,
+                        onPriority: null,
+                        onUnarchive: null
                     });
-
                     fragment.appendChild(todoItem);
                 });
-
                 // Update UI
                 if (todoCount === 0) {
                     noResultsRow.style.display = 'block';
@@ -686,6 +634,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         setupAutoRefresh(); // Set up 24-hour auto-refresh
         setupAddTodoButton(); // Set up Add To-Do button listener
         loadDashboardTodos(); // Load to-do items from Firebase
+        loadTopTechnicians(); // Load top technicians widget
+        loadDamageReports(); // Load damage reports widget
     };
 
     // --- Real-Time Updates for Dashboard Cards ---
@@ -730,6 +680,105 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         } catch (error) {
             console.warn('Could not set up real-time updates:', error);
+        }
+    };
+
+    // --- Load Top Technicians Widget ---
+    const loadTopTechnicians = async () => {
+        const container = document.querySelector('.top-technicians-list');
+        if (!container) return;
+
+        try {
+            const techniciansSnapshot = await db.collection('technicians').get();
+            const appointmentsSnapshot = await db.collection('bookings').get();
+
+            // Count completed jobs per technician
+            const techStats = {};
+            appointmentsSnapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.status === 'Completed' && data.technician) {
+                    techStats[data.technician] = (techStats[data.technician] || 0) + 1;
+                }
+            });
+
+            // Get top 5 technicians by completed jobs
+            const topTechs = techniciansSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data(), completedJobs: techStats[doc.data().name] || 0 }))
+                .filter(tech => tech.status === 'Active')
+                .sort((a, b) => b.completedJobs - a.completedJobs)
+                .slice(0, 5);
+
+            if (topTechs.length === 0) {
+                container.innerHTML = '<p class="text-muted" style="text-align: center; padding: 1rem;">No active technicians found.</p>';
+                return;
+            }
+
+            container.innerHTML = topTechs.map((tech, index) => `
+                <div class="technician-item" style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem; border-bottom: 1px solid var(--color-light); cursor: pointer;" onclick="window.location.href='technician-profile.html?id=${tech.id}'">
+                    <div class="rank-badge" style="min-width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: ${index === 0 ? 'var(--color-warning)' : 'var(--color-info-light)'}; color: white; border-radius: 50%; font-weight: bold;">${index + 1}</div>
+                    <div class="tech-avatar" style="width: 40px; height: 40px; border-radius: 50%; background: var(--color-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">${tech.name.charAt(0)}</div>
+                    <div class="tech-info" style="flex: 1;">
+                        <h4 style="margin: 0; font-size: 0.9rem;">${tech.name}</h4>
+                        <small class="text-muted">${tech.completedJobs} completed jobs</small>
+                    </div>
+                    <span class="material-symbols-outlined" style="color: var(--color-info-dark);">arrow_forward</span>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading top technicians:', error);
+            container.innerHTML = '<p class="text-muted" style="text-align: center; padding: 1rem;">Error loading technicians.</p>';
+        }
+    };
+
+    // --- Load Damage Reports Widget ---
+    const loadDamageReports = async () => {
+        const container = document.querySelector('.damage-reports-list');
+        if (!container) return;
+
+        try {
+            const reportsSnapshot = await db.collection('damageReports')
+                .orderBy('createdAt', 'desc')
+                .limit(5)
+                .get();
+
+            if (reportsSnapshot.empty) {
+                container.innerHTML = '<p class="text-muted" style="text-align: center; padding: 1rem;">No damage reports available.</p>';
+                return;
+            }
+
+            // Fetch user data for customer names
+            const userIds = [...new Set(reportsSnapshot.docs.map(doc => doc.data().userId).filter(Boolean))];
+            const usersData = {};
+            if (userIds.length > 0) {
+                const usersSnapshot = await db.collection('users').where(window.firebase.firestore.FieldPath.documentId(), 'in', userIds.slice(0, 10)).get();
+                usersSnapshot.forEach(doc => {
+                    usersData[doc.id] = doc.data();
+                });
+            }
+
+            container.innerHTML = reportsSnapshot.docs.map(doc => {
+                const report = { id: doc.id, ...doc.data() };
+                const userData = usersData[report.userId] || {};
+                const customerName = userData.fullName || report.customerName || 'Unknown Customer';
+                const reportDate = report.createdAt?.toDate ? report.createdAt.toDate() : new Date();
+                const statusColor = report.status === 'Resolved' ? 'var(--color-success)' : 
+                                   report.status === 'Under Review' ? 'var(--color-warning)' : 
+                                   'var(--color-info-dark)';
+
+                return `
+                    <div class="damage-report-item" style="padding: 0.75rem; border-bottom: 1px solid var(--color-light); cursor: pointer;" onclick="sessionStorage.setItem('selectedDamageReport', JSON.stringify(${JSON.stringify(report).replace(/"/g, '&quot;')})); window.location.href='damage-reports-details.html';">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                            <h4 style="margin: 0; font-size: 0.9rem;">${customerName}</h4>
+                            <span style="font-size: 0.75rem; color: ${statusColor}; font-weight: 600;">${report.status || 'Submitted'}</span>
+                        </div>
+                        <p style="margin: 0.25rem 0; font-size: 0.85rem; color: var(--color-dark-variant);">${(report.description || '').substring(0, 60)}${(report.description || '').length > 60 ? '...' : ''}</p>
+                        <small class="text-muted">${reportDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Error loading damage reports:', error);
+            container.innerHTML = '<p class="text-muted" style="text-align: center; padding: 1rem;">Error loading damage reports.</p>';
         }
     };
 

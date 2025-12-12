@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             customersSnapshot.docs.forEach(doc => {
                 const customerData = doc.data();
                 customersMap[doc.id] = {
-                    name: customerData.name || 'Unknown',
+                    name: customerData.fullName || customerData.name || 'Unknown',
                     email: customerData.email || '',
                     phone: customerData.phone || '',
                     plateNumber: customerData.plateNumber || '',
@@ -51,17 +51,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
             });
 
-            // Fetch paid bookings from Firestore
-            const bookingsSnapshot = await db.collection('bookings').where('paymentStatus', '==', 'Paid').get();
+            // Fetch all bookings from Firestore
+            const bookingsSnapshot = await db.collection('bookings').get();
             const paidAppointments = bookingsSnapshot.docs.map(doc => {
                 const data = doc.data();
                 const scheduleDate = data.scheduleDate?.toDate ? data.scheduleDate.toDate() : (data.scheduleDate ? new Date(data.scheduleDate) : new Date());
                 const customerData = customersMap[data.userId] || {};
-                const customerName = data.customer || data.customerName || customerData.name || 'Unknown';
-                const customerEmail = data.email || customerData.email || '';
-                const customerPhone = data.phone || customerData.phone || '';
-                const plateNumber = data.plate || data.plateNumber || customerData.plateNumber || 'N/A';
-                const carType = data.carType || customerData.carType || '';
+                const customerName = customerData.name || data.customer || data.customerName || 'Unknown';
+                const customerEmail = customerData.email || data.email || '';
+                const customerPhone = customerData.phone || data.phone || '';
+                const plateNumber = customerData.plateNumber || data.plate || data.plateNumber || 'N/A';
+                const carType = customerData.carType || data.carType || '';
                 let bookingAmount = 0;
                 if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
                     bookingAmount = data.amount;
@@ -95,12 +95,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
             });
 
-            // Fetch paid walk-ins from Firestore
-            const walkinsSnapshot = await db.collection('walkins').where('paymentStatus', '==', 'Paid').get();
+            // Fetch all walk-ins from Firestore
+            const walkinsSnapshot = await db.collection('walkins').get();
             const paidWalkins = walkinsSnapshot.docs.map(doc => {
                 const data = doc.data();
-                const scheduleDate = data.dateTime?.toDate ? data.dateTime.toDate() : (data.dateTime ? new Date(data.dateTime) : new Date());
-                const customerData = customersMap[data.customerId] || { name: data.customerName || 'Walk-in Customer', email: data.email || '', phone: data.phone || '', plateNumber: data.plateNumber || '', carType: data.carType || '' };
+                // Use datetimeRaw timestamp or completedAt or dateTime for date
+                let scheduleDate;
+                if (data.datetimeRaw) {
+                    scheduleDate = new Date(data.datetimeRaw);
+                } else if (data.completedAt?.toDate) {
+                    scheduleDate = data.completedAt.toDate();
+                } else if (data.dateTime?.toDate) {
+                    scheduleDate = data.dateTime.toDate();
+                } else if (data.dateTime) {
+                    scheduleDate = new Date(data.dateTime);
+                } else {
+                    scheduleDate = new Date();
+                }
+                const customerData = customersMap[data.userId] || customersMap[data.customerId] || {};
+                const customerName = customerData.name || data.customerName || 'Walk-in Customer';
+                const customerEmail = customerData.email || data.email || '';
+                const customerPhone = customerData.phone || data.phoneNumber || '';
+                const plateNumber = customerData.plateNumber || data.plate || data.plateNumber || 'N/A';
+                const carType = customerData.carType || data.carType || data.carName || '';
                 let walkinAmount = 0;
                 if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
                     walkinAmount = data.amount;
@@ -120,32 +137,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return {
                     transactionId: doc.id,
                     date: scheduleDate,
-                    customer: customerData.name,
-                    email: customerData.email,
-                    phone: customerData.phone,
-                    plateNumber: customerData.plateNumber,
+                    customer: customerName,
+                    email: customerEmail,
+                    phone: customerPhone,
+                    plateNumber: plateNumber,
                     service: serviceName,
                     amount: walkinAmount,
                     paymentMethod: data.paymentMethod || 'Unknown',
                     technician: data.technician || '',
-                    carType: data.carType || customerData.carType,
+                    carType: carType,
                     customerId: data.customerId,
                     isWalkin: true,
                 };
             });
 
-            // Fetch paid archive_bookings from Firestore
-            const archiveSnapshot = await db.collection('archive_bookings').where('paymentStatus', '==', 'Paid').get();
+            // Fetch all archive_bookings from Firestore
+            const archiveSnapshot = await db.collection('archive_bookings').get();
             const paidArchived = archiveSnapshot.docs.map(doc => {
                 const data = doc.data();
                 // Use archivedAt or completedAt or createdAt for date
                 const scheduleDate = data.archivedAt?.toDate ? data.archivedAt.toDate() : (data.completedAt?.toDate ? data.completedAt.toDate() : (data.createdAt?.toDate ? data.createdAt.toDate() : new Date()));
                 const customerData = customersMap[data.userId] || {};
-                const customerName = data.customer || data.customerName || customerData.name || 'Unknown';
-                const customerEmail = data.email || customerData.email || '';
-                const customerPhone = data.phone || customerData.phone || '';
-                const plateNumber = data.plate || data.plateNumber || customerData.plateNumber || 'N/A';
-                const carType = data.carType || customerData.carType || '';
+                const customerName = customerData.name || data.customer || data.customerName || 'Unknown';
+                const customerEmail = customerData.email || data.email || '';
+                const customerPhone = customerData.phone || data.phone || '';
+                const plateNumber = customerData.plateNumber || data.plate || data.plateNumber || 'N/A';
+                const carType = customerData.carType || data.carType || '';
                 let bookingAmount = 0;
                 if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
                     bookingAmount = data.amount;
@@ -179,13 +196,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
             });
 
-            // Fetch paid archive_walkins from Firestore
-            const archiveWalkinsSnapshot = await db.collection('archive_walkins').where('paymentStatus', '==', 'Paid').get();
+            // Fetch all archive_walkins from Firestore
+            const archiveWalkinsSnapshot = await db.collection('archive_walkins').get();
             const paidArchiveWalkins = archiveWalkinsSnapshot.docs.map(doc => {
                 const data = doc.data();
-                // Use archivedAt or completedAt or createdAt for date
-                const scheduleDate = data.archivedAt?.toDate ? data.archivedAt.toDate() : (data.completedAt?.toDate ? data.completedAt.toDate() : (data.createdAt?.toDate ? data.createdAt.toDate() : new Date()));
-                const customerData = customersMap[data.customerId] || { name: data.customerName || 'Walk-in Customer', email: data.email || '', phone: data.phone || '', plateNumber: data.plateNumber || '', carType: data.carType || '' };
+                // Use datetimeRaw timestamp or archivedAt or completedAt for date
+                let scheduleDate;
+                if (data.datetimeRaw) {
+                    scheduleDate = new Date(data.datetimeRaw);
+                } else if (data.archivedAt?.toDate) {
+                    scheduleDate = data.archivedAt.toDate();
+                } else if (data.completedAt?.toDate) {
+                    scheduleDate = data.completedAt.toDate();
+                } else if (data.createdAt?.toDate) {
+                    scheduleDate = data.createdAt.toDate();
+                } else {
+                    scheduleDate = new Date();
+                }
+                const customerData = customersMap[data.userId] || customersMap[data.customerId] || {};
+                const customerName = customerData.name || data.customerName || 'Walk-in Customer';
+                const customerEmail = customerData.email || data.email || '';
+                const customerPhone = customerData.phone || data.phoneNumber || '';
+                const plateNumber = customerData.plateNumber || data.plate || data.plateNumber || 'N/A';
+                const carType = customerData.carType || data.carType || data.carName || '';
                 let walkinAmount = 0;
                 if (typeof data.amount === 'number' && !isNaN(data.amount) && data.amount > 0) {
                     walkinAmount = data.amount;
@@ -205,15 +238,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return {
                     transactionId: doc.id,
                     date: scheduleDate,
-                    customer: customerData.name,
-                    email: customerData.email,
-                    phone: customerData.phone,
-                    plateNumber: customerData.plateNumber,
+                    customer: customerName,
+                    email: customerEmail,
+                    phone: customerPhone,
+                    plateNumber: plateNumber,
                     service: serviceName,
                     amount: walkinAmount,
                     paymentMethod: data.paymentMethod || 'Unknown',
                     technician: data.technician || '',
-                    carType: data.carType || customerData.carType,
+                    carType: carType,
                     customerId: data.customerId,
                     isArchiveWalkin: true,
                 };
@@ -426,6 +459,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 paginatedPayments.forEach((payment) => {
                     const row = document.createElement('tr');
                     row.classList.add('clickable-row');
+                    row.dataset.transactionId = payment.transactionId;
+                    
+                    // Determine appointment type badge
+                    let typeLabel = '';
+                    let typeBadgeClass = '';
+                    if (payment.isWalkin || payment.isArchiveWalkin) {
+                        typeLabel = 'Walk-in';
+                        typeBadgeClass = 'type walkin';
+                    } else if (payment.isBooking || payment.isArchived) {
+                        typeLabel = 'Appointment';
+                        typeBadgeClass = 'type booking';
+                    }
+                    
                     row.innerHTML = /*html*/`
                         <td>${payment.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                         <td>
@@ -437,6 +483,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </td>
                         <td>
                             <div>${payment.service}</div>
+                            ${typeLabel ? `<div style="margin-top: 4px;"><span class="badge ${typeBadgeClass}">${typeLabel}</span></div>` : ''}
                         </td>
                         <td>
                             <div>${formatCurrency(payment.amount)}</div>
@@ -553,17 +600,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Allow clicking the whole row or the specific button
         if (!viewBtn && !row.classList.contains('clickable-row')) return;
 
-        // Find the full data object for the clicked row
-        const transactionId = row.querySelector('td:first-child').textContent;
-        // The `paymentData` is derived from `reviews`, which has all the necessary details.
-        const reviewData = paymentData.find(p => p.transactionId === transactionId);
+        // Get the transaction ID from the row dataset
+        const transactionId = row.dataset.transactionId;
+        const paymentRecord = paymentData.find(p => p.transactionId === transactionId);
 
-        if (reviewData) {
-            // Clear previous data before setting new data to prevent conflicts.
-            sessionStorage.removeItem('selectedReviewData');
-            // The review-details.html page expects data in sessionStorage under this key.
-            sessionStorage.setItem('selectedReviewData', JSON.stringify(reviewData));
-            window.location.href = 'review-details.html';
+        if (paymentRecord) {
+            // Store the booking/walkin ID for the appointment details page
+            sessionStorage.setItem('selectedBookingId', transactionId);
+            
+            // Navigate to appointment details page
+            window.location.href = 'appointment-details.html';
         }
     });
 

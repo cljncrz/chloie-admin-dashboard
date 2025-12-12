@@ -13,7 +13,7 @@
         const paymentStatusClass = paymentStatus.toLowerCase();
         const paymentMethod = apptData.paymentMethod || apptData.payment_method || apptData.paymentType || 'N/A';
         const price = (apptData.price !== undefined && apptData.price !== null)
-            ? `\u20b1${parseFloat(apptData.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            ? `₱${parseFloat(apptData.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : 'N/A';
         let dateTime = 'N/A';
         if (apptData.datetime) {
@@ -196,9 +196,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Payment Status: show badge for N/A and Pending
             const paymentStatusEl = document.getElementById('detail-payment-status');
             if (paymentStatusEl) {
-                let status = apptData.paymentStatus || 'N/A';
-                if (!status || status === 'N/A') {
-                    paymentStatusEl.innerHTML = '<span class="payment-status-badge na">N/A</span>';
+                let status = apptData.paymentStatus || 'Unpaid';
+                if (!status || status === 'N/A' || status === 'Unpaid') {
+                    paymentStatusEl.innerHTML = '<span class="payment-status-badge unpaid">Unpaid</span>';
                 } else if (status.toLowerCase() === 'pending') {
                     paymentStatusEl.innerHTML = '<span class="payment-status-badge pending">Pending</span>';
                 } else if (status.toLowerCase() === 'paid') {
@@ -236,11 +236,66 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Initializes the page by getting data from sessionStorage.
      */
-    const initializePage = () => {
+    const initializePage = async () => {
         const appointmentDataString = sessionStorage.getItem('selectedAppointmentData');
+        const bookingId = sessionStorage.getItem('selectedBookingId');
+        
         if (appointmentDataString) {
             appointmentData = JSON.parse(appointmentDataString);
             populateAppointmentDetails(appointmentData);
+        } else if (bookingId) {
+            // Coming from payment monitoring - fetch the booking/walkin data
+            try {
+                // Try bookings collection first
+                let docSnapshot = await db.collection('bookings').doc(bookingId).get();
+                
+                if (!docSnapshot.exists) {
+                    // Try walkins collection
+                    docSnapshot = await db.collection('walkins').doc(bookingId).get();
+                }
+                
+                if (!docSnapshot.exists) {
+                    // Try archive_bookings collection
+                    docSnapshot = await db.collection('archive_bookings').doc(bookingId).get();
+                }
+                
+                if (!docSnapshot.exists) {
+                    // Try archive_walkins collection
+                    docSnapshot = await db.collection('archive_walkins').doc(bookingId).get();
+                }
+                
+                if (docSnapshot.exists) {
+                    const data = docSnapshot.data();
+                    appointmentData = {
+                        serviceId: bookingId,
+                        userId: data.userId || data.customerId,
+                        customer: data.customer || data.customerName,
+                        service: data.service || data.serviceNames,
+                        phone: data.phone || data.phoneNumber,
+                        email: data.email,
+                        plateNumber: data.plateNumber || data.plate,
+                        plate: data.plate || data.plateNumber,
+                        carName: data.carName,
+                        carType: data.carType,
+                        paymentStatus: data.paymentStatus,
+                        paymentMethod: data.paymentMethod,
+                        price: data.price || data.amount || data.totalAmount,
+                        status: data.status,
+                        datetime: data.datetime || data.scheduleDate || data.dateTime,
+                        paidAt: data.paidAt,
+                        scheduleDate: data.scheduleDate || data.dateTime
+                    };
+                    populateAppointmentDetails(appointmentData);
+                    // Clear the bookingId from session storage
+                    sessionStorage.removeItem('selectedBookingId');
+                } else {
+                    console.error('Booking not found in any collection.');
+                    populateAppointmentDetails(null);
+                }
+            } catch (error) {
+                console.error('Error fetching booking data:', error);
+                populateAppointmentDetails(null);
+            }
         } else {
             console.error('No appointment data found in sessionStorage.');
             populateAppointmentDetails(null); // Show an error message on the page
