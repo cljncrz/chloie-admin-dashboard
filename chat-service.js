@@ -102,28 +102,40 @@ class ChatService {
           const chats = [];
           snapshot.docs.forEach((doc) => {
             const data = doc.data();
+            // Fallbacks for mobile payloads
+            const lastMsg = data.lastMessage || data.lastMessageText || data.last_message || '';
+            const lastMsgTime = data.lastMessageTime || data.last_message_time || data.lastMessageTimestamp || data.createdAt || null;
+            const userName = data.userName || data.customerName || data.name || 'Unknown User';
+            const userEmail = data.userEmail || data.email || '';
+            const profilePic = data.profilePic || data.customerProfilePic || data.photoURL || './images/redicon.png';
             chats.push({
               id: doc.id,
-              userName: data.userName || 'Unknown User',
-              userEmail: data.userEmail || '',
+              userName,
+              userEmail,
               userId: data.userId || doc.id,
-              profilePic: data.profilePic || './images/redicon.png',
+              profilePic,
               isVerified: data.isVerified || false,
-              lastMessage: data.lastMessage || 'No messages yet',
-              lastMessageTime: data.lastMessageTime ? this.formatTimestamp(data.lastMessageTime) : '',
+              lastMessage: lastMsg || 'No messages yet',
+              lastMessageTime: lastMsgTime ? this.formatTimestamp(lastMsgTime) : '',
               lastMessageSenderId: data.lastMessageSenderId || '',
-              lastMessageSenderRole: data.lastMessageSenderRole || 'customer',
+              lastMessageSenderRole: data.lastMessageSenderRole || data.last_message_sender_role || 'customer',
               unreadCount: data.unreadCount || 0,
               createdAt: data.createdAt ? this.formatTimestamp(data.createdAt) : '',
-              rawLastMessageTime: data.lastMessageTime || data.createdAt // Fallback to createdAt if no lastMessageTime
+              rawLastMessageTime: lastMsgTime || data.createdAt // Fallback to createdAt if no lastMessageTime
             });
           });
           
           // Sort by most recent (either lastMessageTime or createdAt)
           chats.sort((a, b) => {
-            const timeA = a.rawLastMessageTime?.getTime?.() || 0;
-            const timeB = b.rawLastMessageTime?.getTime?.() || 0;
-            return timeB - timeA; // Descending order
+            const getTime = (t) => {
+              if (!t) return 0;
+              if (t.toDate) return t.toDate().getTime();
+              if (t.seconds) return t.seconds * 1000; // Firestore Timestamp-like object
+              if (typeof t === 'number') return t;
+              const d = new Date(t);
+              return isNaN(d.getTime()) ? 0 : d.getTime();
+            };
+            return getTime(b.rawLastMessageTime) - getTime(a.rawLastMessageTime);
           });
           
           onUpdate(chats);
@@ -159,19 +171,24 @@ class ChatService {
           snapshot.docs.forEach((doc) => {
             const data = doc.data();
             const isAdmin = data.isAdmin || data.senderRole === 'admin';
+            // Fallbacks for mobile payloads
+            const text = data.text || data.message || data.body || '';
+            const type = data.type || (data.mediaUrl ? 'image' : 'text');
+            const ts = data.timestamp || data.createdAt || data.sentAt || data.time || null;
+            const senderRole = data.senderRole || (isAdmin ? 'admin' : (data.role || 'customer'));
             messages.push({
               id: doc.id,
               senderId: data.senderId || '',
-              senderName: data.senderName || 'Unknown',
-              senderRole: data.senderRole || 'customer',
-              senderProfilePic: data.senderProfilePic || './images/redicon.png',
-              type: data.type || 'text', // 'text', 'image', 'video', 'file'
-              text: data.text || '',
-              mediaUrl: data.mediaUrl || '',
+              senderName: data.senderName || data.name || 'Unknown',
+              senderRole,
+              senderProfilePic: data.senderProfilePic || data.profilePic || './images/redicon.png',
+              type, // 'text', 'image', 'video', 'file'
+              text,
+              mediaUrl: data.mediaUrl || data.url || '',
               fileName: data.fileName || '',
               fileSize: data.fileSize || 0,
-              timestamp: data.timestamp ? this.formatTimestamp(data.timestamp) : '',
-              rawTimestamp: data.timestamp,
+              timestamp: ts ? this.formatTimestamp(ts) : '',
+              rawTimestamp: ts,
               status: data.status || 'sent', // 'sent', 'delivered', 'read'
               isAdmin: isAdmin
             });
