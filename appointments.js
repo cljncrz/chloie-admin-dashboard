@@ -75,16 +75,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!archived || archived.length === 0) {
                 try {
                     const db = window.firebase.firestore();
-                    const snap = await db.collection('archive_bookings').orderBy('archivedAt', 'desc').get();
-                    if (!snap.empty) {
-                        archived = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    // Fetch from both archive_bookings and archive_walkins
+                    const bookingsSnap = await db.collection('archive_bookings').orderBy('archivedAt', 'desc').get();
+                    const walkinsSnap = await db.collection('archive_walkins').orderBy('archivedAt', 'desc').get();
+                    
+                    let archivedItems = [];
+                    if (!bookingsSnap.empty) {
+                        archivedItems = archivedItems.concat(bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                    }
+                    if (!walkinsSnap.empty) {
+                        archivedItems = archivedItems.concat(walkinsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                    }
+                    
+                    if (archivedItems.length > 0) {
+                        // Sort combined items by archivedAt descending
+                        archived = archivedItems.sort((a, b) => {
+                            const aTime = a.archivedAt ? new Date(a.archivedAt).getTime() : 0;
+                            const bTime = b.archivedAt ? new Date(b.archivedAt).getTime() : 0;
+                            return bTime - aTime;
+                        });
                     } else {
                         // Also try a fallback collection name that some deployments use
                         const snap2 = await db.collection('archived_appointments').orderBy('archivedAt', 'desc').get();
                         if (!snap2.empty) archived = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
                     }
                 } catch (fsErr) {
-                    console.debug('Firestore fetch for archive_bookings failed:', fsErr);
+                    console.debug('Firestore fetch for archive collections failed:', fsErr);
                 }
             }
 
@@ -354,7 +370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             for (const walkin of walkins) {
                 const docRef = db.collection('walkins').doc(walkin.id);
-                const archiveRef = db.collection('archive_bookings').doc(walkin.id);
+                const archiveRef = db.collection('archive_walkins').doc(walkin.id);
                 items.push({ 
                     docRef, 
                     archiveRef, 

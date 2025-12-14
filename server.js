@@ -268,14 +268,38 @@ app.get('/api/media', async (req, res) => {
 /**
  * Get archived appointments (server-side read)
  * GET /api/archived-appointments?limit=100
- * Returns archived documents using the Admin SDK so clients don't need Firestore read privileges.
+ * Returns archived documents from both archive_bookings and archive_walkins using the Admin SDK 
+ * so clients don't need Firestore read privileges.
  */
 app.get('/api/archived-appointments', async (req, res) => {
   try {
     if (!admin || !db) return res.status(500).json({ success: false, error: 'Admin SDK not initialized' });
     const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
-    const snapshot = await db.collection('archive_bookings').orderBy('archivedAt', 'desc').limit(limit).get();
-    const archived = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Fetch from both collections
+    const [bookingsSnapshot, walkinsSnapshot] = await Promise.all([
+      db.collection('archive_bookings').orderBy('archivedAt', 'desc').limit(limit).get(),
+      db.collection('archive_walkins').orderBy('archivedAt', 'desc').limit(limit).get()
+    ]);
+    
+    let archived = [];
+    if (!bookingsSnapshot.empty) {
+      archived = archived.concat(bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }
+    if (!walkinsSnapshot.empty) {
+      archived = archived.concat(walkinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }
+    
+    // Sort combined results by archivedAt descending
+    archived.sort((a, b) => {
+      const aTime = a.archivedAt ? new Date(a.archivedAt).getTime() : 0;
+      const bTime = b.archivedAt ? new Date(b.archivedAt).getTime() : 0;
+      return bTime - aTime;
+    });
+    
+    // Limit to requested number of items
+    archived = archived.slice(0, limit);
+    
     res.json({ success: true, archived });
   } catch (error) {
     console.error('Error fetching archived appointments:', error);
@@ -615,7 +639,7 @@ app.post('/api/notifications/send', async (req, res) => {
  * Body: { limit?: number }
  * This endpoint requires the server to be initialized with a service account
  * (the Admin SDK). It will move documents from `bookings` and `walkins`
- * into `archived_appointments`, and delete the originals using batched writes.
+ * into `archive_bookings` and `archive_walkins` respectively, and delete the originals using batched writes.
  */
 app.post('/api/archive-completed-paid', async (req, res) => {
   try {
@@ -628,13 +652,13 @@ app.post('/api/archive-completed-paid', async (req, res) => {
     const maxItemsPerBatch = 200; // safe floor (200 items => 400 writes)
 
     // Helper to move a set of docs
-    const moveDocs = async (collectionName, query) => {
+    const moveDocs = async (collectionName, archiveCollectionName, query) => {
       const moved = [];
       const snapshot = await query.get();
       for (const doc of snapshot.docs) {
         const data = doc.data();
         const id = doc.id;
-        const archivedRef = db.collection('archive_bookings').doc(id);
+        const archivedRef = db.collection(archiveCollectionName).doc(id);
         // Store _source to identify origin
         moved.push({ id, data: { ...data, archivedAt: new Date().toISOString(), _source: collectionName === 'bookings' ? 'Booking' : 'Walk-in' }, docRef: db.collection(collectionName).doc(id), archiveRef: archivedRef });
       }
@@ -646,8 +670,8 @@ app.post('/api/archive-completed-paid', async (req, res) => {
     const walkinsQuery = db.collection('walkins').where('status', '==', 'Completed').where('paymentStatus', '==', 'Paid').limit(limit);
 
     const [bookingsToMove, walkinsToMove] = await Promise.all([
-      moveDocs('bookings', bookingsQuery),
-      moveDocs('walkins', walkinsQuery),
+      moveDocs('bookings', 'archive_bookings', bookingsQuery),
+      moveDocs('walkins', 'archive_walkins', walkinsQuery),
     ]);
 
     const items = [...bookingsToMove, ...walkinsToMove];

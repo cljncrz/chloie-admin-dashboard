@@ -84,6 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('archive_bookings not available', err && err.message ? err.message : err);
       }
 
+      try {
+        const archivedWalkinsSnap = await db.collection('archive_walkins').get();
+        const archivedWalkins = archivedWalkinsSnap.docs.map(d => ({ id: d.id, ...d.data(), archived: true }));
+        if (archivedWalkins.length) walkins = walkins.concat(archivedWalkins);
+      } catch (err) {
+        console.warn('archive_walkins not available', err && err.message ? err.message : err);
+      }
+
       const servicesSnap = await db.collection('services').get();
       servicesData = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       window.appData = window.appData || {};
