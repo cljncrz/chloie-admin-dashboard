@@ -17,8 +17,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Stat Card Elements
     const totalPaidEl = document.getElementById('total-paid-stat');
-    const gcashTotalEl = document.getElementById('gcash-total-stat');
-    const mayaTotalEl = document.getElementById('maya-total-stat');
     const cashTotalEl = document.getElementById('cash-total-stat');
 
     // Pagination Elements
@@ -271,26 +269,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const getPaymentTotals = () => {
         const totals = paymentData.reduce((acc, payment) => {
             acc.total += payment.amount;
-            if (payment.paymentMethod === 'GCash') {
-                acc.gcash += payment.amount;
-            } else if (payment.paymentMethod === 'PayMaya') {
-                acc.maya += payment.amount;
-            } else if (payment.paymentMethod === 'Cash' || payment.paymentMethod === 'Cash on Hand') {
+            if (payment.paymentMethod === 'Cash' || payment.paymentMethod === 'Cash on Hand') {
                 acc.cash += payment.amount;
             }
             return acc;
-        }, { total: 0, gcash: 0, maya: 0, cash: 0 });
+        }, { total: 0, cash: 0 });
         return totals;
     };
 
     const calculateAndDisplayStats = () => {
-        if (!totalPaidEl || !gcashTotalEl || !mayaTotalEl || !cashTotalEl) return;
+        if (!totalPaidEl || !cashTotalEl) return;
 
         const totals = getPaymentTotals();
 
         totalPaidEl.textContent = formatCurrency(totals.total);
-        gcashTotalEl.textContent = formatCurrency(totals.gcash);
-        mayaTotalEl.textContent = formatCurrency(totals.maya);
         cashTotalEl.textContent = formatCurrency(totals.cash);
     };
 
@@ -300,14 +292,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const totals = getPaymentTotals();
 
-        const chartLabels = ['GCash', 'Maya', 'Cash on Hand'];
-        const chartData = [totals.gcash, totals.maya, totals.cash];
+        const chartLabels = ['Cash on Hand'];
+        const chartData = [totals.cash];
 
         const colorPalette = [
-            '#007BFF', // A distinct blue for GCash
-            '#00C6AE', // A teal/green for Maya
-            '#7F1618', // A distinct orange for Cash on Hand
-            getCssVar('--color-success-variant'), // Use existing theme color for Cash
+            '#7F1618', // Cash on Hand color
         ];
 
         const chartConfig = {
