@@ -92,15 +92,46 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tbody.innerHTML = `<tr><td colspan="7" class="text-center text-warning">No archived services found or unable to load archived services. Ensure the server is running or check permissions.</td></tr>`;
                 return;
             }
-            // Normalize for table rendering
-            const normalized = archived.map(a => ({
-                serviceId: a.serviceId || a.id || '',
-                customer: a.customer || a.carName || a.plate || 'N/A',
-                service: a.service || a.serviceNames || '',
-                datetime: a.datetime || '',
-                price: a.price || '',
-                archivedAt: a.archivedAt || '',
-                _source: a._source || ''
+            // Helper function to fetch customer data based on customer ID
+            const fetchCustomerData = async (customerId) => {
+                if (!customerId) return null;
+                try {
+                    const db = window.firebase.firestore();
+                    const customerDoc = await db.collection('users').doc(customerId).get();
+                    if (customerDoc.exists) {
+                        return customerDoc.data();
+                    }
+                } catch (err) {
+                    console.debug('Could not fetch customer data for ID:', customerId, err);
+                }
+                return null;
+            };
+
+            // Normalize for table rendering with customer data fetching
+            const normalized = await Promise.all(archived.map(async (a) => {
+                let customerData = null;
+                let customerName = a.customer || a.carName || a.plate || 'N/A';
+                
+                // If there's a customer ID, fetch the full customer data
+                if (a.customerId || a.userId) {
+                    const custId = a.customerId || a.userId;
+                    customerData = await fetchCustomerData(custId);
+                    if (customerData) {
+                        customerName = customerData.fullName || customerData.name || customerData.displayName || customerName;
+                    }
+                }
+                
+                return {
+                    serviceId: a.serviceId || a.id || '',
+                    customerId: a.customerId || a.userId || '',
+                    customer: customerName,
+                    customerData: customerData,
+                    service: a.service || a.serviceNames || '',
+                    datetime: a.datetime || '',
+                    price: a.price || '',
+                    archivedAt: a.archivedAt || '',
+                    _source: a._source || ''
+                };
             }));
             // Update archived notification (count + last archived time) in the header
             try {
@@ -138,16 +169,40 @@ document.addEventListener('DOMContentLoaded', async () => {
             normalized.sort((a, b) => new Date(b.archivedAt) - new Date(a.archivedAt));
             for (const item of normalized) {
                 const tr = document.createElement('tr');
+                tr.style.cursor = item.customerData ? 'pointer' : 'default';
                 const archivedAt = item.archivedAt ? (new Date(item.archivedAt)).toLocaleString() : 'N/A';
+                
+                // Display customer info with email if available
+                let customerDisplay = item.customer || 'N/A';
+                if (item.customerData && item.customerData.email) {
+                    customerDisplay = `${item.customer}<br><small style="color: var(--color-muted);">${item.customerData.email}</small>`;
+                }
+                
                 tr.innerHTML = `
                     <td>${item.serviceId}</td>
-                    <td>${item.customer || 'N/A'}</td>
+                    <td>${customerDisplay}</td>
                     <td>${item.service || 'N/A'}</td>
                     <td>${item.datetime || 'N/A'}</td>
                     <td>${item.price || 'N/A'}</td>
                     <td>${item._source || 'N/A'}</td>
                     <td>${archivedAt}</td>
                 `;
+                
+                // Make row clickable to view full customer details
+                if (item.customerData && item.customerId) {
+                    tr.addEventListener('click', () => {
+                        const details = [
+                            `Name: ${item.customerData.name || 'N/A'}`,
+                            `Email: ${item.customerData.email || 'N/A'}`,
+                            `Phone: ${item.customerData.phone || 'N/A'}`,
+                            `Plate/Car: ${item.customerData.plateNumber || item.customerData.carName || 'N/A'}`,
+                            `Orders: ${item.customerData.orders || 0}`,
+                            `Verified: ${item.customerData.isVerified ? 'Yes' : 'No'}`
+                        ].join('\n');
+                        alert(details);
+                    });
+                }
+                
                 tbody.appendChild(tr);
             }
         } catch (err) {
@@ -2026,27 +2081,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                             return;
                         }
                         // Approve payment directly, no modal
-                        let paymentMethod = '';
+                        // Preserve the appointment's existing payment method if available
+                        let paymentMethod = appointment.paymentMethod || '';
                         let customerId = appointment.customerId || appointment.userId || appointment.customerUid;
                         (async () => {
                             try {
                                 const db = window.firebase.firestore();
-                                if (!customerId) {
-                                    // Try to find by fullName if no ID
-                                    const usersSnapshot = await db.collection('users').where('fullName', '==', appointment.customer).limit(1).get();
-                                    if (!usersSnapshot.empty) {
-                                        customerId = usersSnapshot.docs[0].id;
+                                // Only fetch payment method from user if appointment doesn't have one
+                                if (!paymentMethod) {
+                                    if (!customerId) {
+                                        // Try to find by fullName if no ID
+                                        const usersSnapshot = await db.collection('users').where('fullName', '==', appointment.customer).limit(1).get();
+                                        if (!usersSnapshot.empty) {
+                                            customerId = usersSnapshot.docs[0].id;
+                                        }
                                     }
-                                }
-                                if (customerId) {
-                                    const userDoc = await db.collection('users').doc(customerId).get();
-                                    if (userDoc.exists) {
-                                        const userData = userDoc.data();
-                                        paymentMethod = userData.paymentMethod || 'Not set';
+                                    if (customerId) {
+                                        const userDoc = await db.collection('users').doc(customerId).get();
+                                        if (userDoc.exists) {
+                                            const userData = userDoc.data();
+                                            paymentMethod = userData.paymentMethod || 'Cash on Hand';
+                                        }
+                                    }
+                                    // Only default to 'Cash on Hand' if still empty
+                                    if (!paymentMethod) {
+                                        paymentMethod = 'Cash on Hand';
                                     }
                                 }
                             } catch (err) {
-                                paymentMethod = 'Not set';
+                                // If error and no payment method, default to 'Cash on Hand'
+                                if (!paymentMethod) {
+                                    paymentMethod = 'Cash on Hand';
+                                }
                                 console.error('Error fetching user payment method:', err);
                             }
 
