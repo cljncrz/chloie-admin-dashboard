@@ -72,6 +72,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('damage-full-report').textContent = report.description || 'No report details provided.';
     document.getElementById('damage-report-date').textContent = `Reported on: ${report.date || 'Unknown Date'}`;
     
+    // Update status badge with actual status from database
+    const statusBadge = document.getElementById('damage-status-badge');
+    if (statusBadge && report.status) {
+      statusBadge.textContent = report.status;
+    }
+    
     // Update notification target information
     const targetCustomerName = document.getElementById('target-customer-name');
     const targetCustomerContact = document.getElementById('target-customer-contact');
@@ -157,8 +163,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       // Set up grid layout for multiple images
       mediaContainer.style.display = 'grid';
-      mediaContainer.style.gridTemplateColumns = report.imageUrls.length === 1 ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))';
-      mediaContainer.style.gap = '1rem';
+      mediaContainer.style.gridTemplateColumns = report.imageUrls.length === 1 ? '1fr' : 'repeat(2, 1fr)';
+      mediaContainer.style.gap = '0.5rem';
       
       // Create image elements for each URL
       report.imageUrls.forEach((imageUrl, index) => {

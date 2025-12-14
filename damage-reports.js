@@ -206,6 +206,8 @@
             formattedDate = data.date;
           }
 
+          const { status, ...otherData } = data;
+
           return {
             reportId: doc.id,
             userId: data.userId || null,
@@ -214,11 +216,12 @@
             location: data.location || 'N/A',
             description: data.description || 'No description',
             date: formattedDate,
-            status: data.status || 'Submitted',
+            status: data.adminResponse ? 'Resolved' : 'Under Review',
+            adminResponse: data.adminResponse || null,
             imageUrls: data.imageUrls || [],
             createdAt: data.createdAt,
             // Keep original data for details page
-            ...data
+            ...otherData
           };
         });
 
@@ -268,13 +271,11 @@
   // Get status badge HTML
   function getStatusBadge(status) {
     const statusColors = {
-      'Submitted': 'background: #3498db; color: white;',
       'Under Review': 'background: #f39c12; color: white;',
-      'Resolved': 'background: #2ecc71; color: white;',
-      'Closed': 'background: #95a5a6; color: white;'
+      'Resolved': 'background: #2ecc71; color: white;'
     };
-    const style = statusColors[status] || statusColors['Submitted'];
-    return `<span style="padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; ${style}">${status || 'Submitted'}</span>`;
+    const style = statusColors[status] || statusColors['Under Review'];
+    return `<span style="padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; ${style}">${status || 'Under Review'}</span>`;
   }
 
   let filteredReports = [];
@@ -416,7 +417,6 @@
   function setupBatchActions() {
     const selectAllCheckbox = $('#select-all-damage-reports');
     const deleteBtn = $('#delete-selected-damage-reports-btn');
-    const markReviewedBtn = $('#mark-reviewed-btn');
 
     // Select all functionality
     if (selectAllCheckbox) {
@@ -433,57 +433,6 @@
         updateBatchButtonStates();
       }
     });
-
-    // Mark as reviewed
-    if (markReviewedBtn) {
-      markReviewedBtn.addEventListener('click', async () => {
-        const selectedIds = getSelectedReportIds();
-        if (selectedIds.length === 0) return;
-
-        const confirmed = confirm(`Mark ${selectedIds.length} report(s) as "Under Review"?`);
-        if (!confirmed) return;
-
-        try {
-          markReviewedBtn.disabled = true;
-          markReviewedBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Updating...';
-
-          await window.firebaseInitPromise;
-          const db = window.firebase.firestore();
-          const batch = db.batch();
-
-          selectedIds.forEach(id => {
-            const ref = db.collection('damage_reports').doc(id);
-            batch.update(ref, {
-              status: 'Under Review',
-              statusUpdatedAt: new Date().toISOString(),
-              statusUpdatedBy: window.firebase.auth().currentUser?.email || 'admin'
-            });
-          });
-
-          await batch.commit();
-
-          // Update local data
-          damageReports.forEach(rep => {
-            if (selectedIds.includes(rep.reportId)) {
-              rep.status = 'Under Review';
-            }
-          });
-
-          console.log(`✅ ${selectedIds.length} report(s) marked as Under Review`);
-          showSuccessToast(`${selectedIds.length} report(s) marked as Under Review`);
-
-          // Refresh display
-          renderDamageReports();
-          updateBatchButtonStates();
-        } catch (error) {
-          console.error('❌ Error updating reports:', error);
-          alert('Failed to update reports: ' + error.message);
-        } finally {
-          markReviewedBtn.disabled = false;
-          markReviewedBtn.innerHTML = '<span class="material-symbols-outlined">check</span> Mark as Reviewed';
-        }
-      });
-    }
 
     // Delete selected
     if (deleteBtn) {
@@ -537,10 +486,8 @@
   function updateBatchButtonStates() {
     const selectedIds = getSelectedReportIds();
     const deleteBtn = $('#delete-selected-damage-reports-btn');
-    const markReviewedBtn = $('#mark-reviewed-btn');
 
     if (deleteBtn) deleteBtn.disabled = selectedIds.length === 0;
-    if (markReviewedBtn) markReviewedBtn.disabled = selectedIds.length === 0;
 
     // Update select all checkbox state
     const selectAllCheckbox = $('#select-all-damage-reports');

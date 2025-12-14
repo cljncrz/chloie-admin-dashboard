@@ -1,3 +1,55 @@
+// Function to fetch the photo based on userId
+const fetchPhotoByUserId = async (userId) => {
+    try {
+        if (!userId) {
+            console.warn('No userId provided for photo fetch');
+            return null;
+        }
+
+        const db = window.firebase.firestore();
+        const userDoc = await db.collection('users').doc(userId).get();
+
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            if (userData.photoURL) {
+                return userData.photoURL;
+            } else if (userData.photoUrl) {
+                return userData.photoUrl;
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error fetching photo for userId:', userId, error);
+        return null;
+    }
+};
+
+// Function to fetch the profileImageUrl based on userId
+const fetchProfileImageUrlByUserId = async (userId) => {
+    try {
+        if (!userId) {
+            console.warn('No userId provided for profileImageUrl fetch');
+            return null;
+        }
+
+        const db = window.firebase.firestore();
+        const userDoc = await db.collection('users').doc(userId).get();
+
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            if (userData.profileImageUrl) {
+                return userData.profileImageUrl;
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error fetching profileImageUrl for userId:', userId, error);
+        return null;
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     // This script runs on the customer-profile.html page
     // Retrieve the stored data from sessionStorage
@@ -21,15 +73,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set customer profile image (support both photoURL and photoUrl)
     const avatarImg = document.getElementById('profile-avatar-img');
-    if (avatarImg) {
-        if (profileData.photoURL) {
-            avatarImg.src = profileData.photoURL;
-        } else if (profileData.photoUrl) {
-            avatarImg.src = profileData.photoUrl;
-        } else {
+    const setProfilePhoto = async () => {
+        if (!avatarImg) return;
+
+        try {
+            // First, check if photoURL or photoUrl exists in the profileData
+            if (profileData.photoURL) {
+                avatarImg.src = profileData.photoURL;
+                return;
+            } else if (profileData.photoUrl) {
+                avatarImg.src = profileData.photoUrl;
+                return;
+            }
+
+            // If not, try to fetch from Firestore using userId
+            let userId = profileData.customerId || null;
+
+            // If no customerId, try to get userId from Firestore by matching fullName
+            if (!userId && profileData.fullName) {
+                const db = window.firebase.firestore();
+                try {
+                    const userSnapshot = await db.collection('users')
+                        .where('fullName', '==', profileData.fullName)
+                        .limit(1)
+                        .get();
+                    
+                    if (!userSnapshot.empty) {
+                        userId = userSnapshot.docs[0].id;
+                    }
+                } catch (err) {
+                    console.warn('Could not fetch userId from Firestore:', err);
+                }
+            }
+
+            // Fetch the photo from Firestore using the userId
+            if (userId) {
+                const photoUrl = await fetchPhotoByUserId(userId);
+                if (photoUrl) {
+                    avatarImg.src = photoUrl;
+                    return;
+                }
+
+                // If photoURL/photoUrl not found, try profileImageUrl
+                const profileImageUrl = await fetchProfileImageUrlByUserId(userId);
+                if (profileImageUrl) {
+                    avatarImg.src = profileImageUrl;
+                    return;
+                }
+            }
+
+            // Fallback to default image if no photo found
+            avatarImg.src = './images/redicon.png';
+        } catch (error) {
+            console.error('Error setting profile photo:', error);
             avatarImg.src = './images/redicon.png';
         }
-    }
+    };
+
+    // Call the function to set the profile photo
+    setProfilePhoto();
     
     // Handle different date formats (Firestore timestamp vs. string)
     let registrationDateText = 'N/A';
